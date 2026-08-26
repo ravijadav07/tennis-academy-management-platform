@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.vite/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Archives
+.agent.zip
+.agent/
+
+# Supabase
+supabase/.temp/
+supabase/functions/**/node_modules/tennis-academy-master-audit.txt

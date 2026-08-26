@@ -1,0 +1,12 @@
+﻿export const batches = [
+  { id: 'batch-1', name: 'Advanced Tournament', coach: 'Vikram Singh', business_entity: 'the-club', level: 'advanced', schedule: 'Mon, Wed, Fri 4-6 PM', capacity: 20, enrolled: 18, status: 'active', ageGroup: 'U-16/U-18', location: 'Court 1' },
+  { id: 'batch-2', name: 'Intermediate Group', coach: 'Sania Mirza', business_entity: 'the-club', level: 'intermediate', schedule: 'Tue, Thu 4-6 PM, Sat 8-10 AM', capacity: 24, enrolled: 22, status: 'active', ageGroup: 'U-14/U-16', location: 'Court 2' },
+  { id: 'batch-3', name: 'Beginner Batch A', coach: 'Rajesh Kumar', business_entity: 'tots-tennis', level: 'beginner', schedule: 'Mon, Wed 4-5 PM', capacity: 16, enrolled: 15, status: 'active', ageGroup: 'U-10', location: 'Court 3' },
+  { id: 'batch-4', name: 'Beginner Batch B', coach: 'Rajesh Kumar', business_entity: 'tots-tennis', level: 'beginner', schedule: 'Tue, Thu 4-5 PM', capacity: 16, enrolled: 14, status: 'active', ageGroup: 'U-10/U-12', location: 'Court 3' },
+  { id: 'batch-5', name: '1-on-1 Elite', coach: 'Anjali Thakur', business_entity: 'the-club', level: 'advanced', schedule: 'Flexible (by appointment)', capacity: 12, enrolled: 12, status: 'active', ageGroup: 'All', location: 'Court 1' },
+  { id: 'batch-6', name: 'Fitness', coach: 'Suresh Menon', business_entity: 'tots-tennis', level: 'all', schedule: 'Daily 6-7 AM', capacity: 30, enrolled: 28, status: 'active', ageGroup: 'All', location: 'Gym' },
+  { id: 'batch-7', name: 'Women U-14', coach: 'Priya Sharma', business_entity: 'the-club', level: 'intermediate', schedule: 'Mon, Wed, Fri 5-7 PM', capacity: 16, enrolled: 14, status: 'active', ageGroup: 'U-14', location: 'Court 2' },
+  { id: 'batch-8', name: 'Advanced Tournament (TT)', coach: 'Deepak Verma', business_entity: 'tots-tennis', level: 'advanced', schedule: 'Tue, Thu, Sat 4-6 PM', capacity: 16, enrolled: 15, status: 'active', ageGroup: 'U-16/U-18', location: 'Court 4' },
+  { id: 'batch-9', name: 'Junior Dev', coach: 'Neha Kapoor', business_entity: 'the-club', level: 'beginner', schedule: 'Sat, Sun 9-11 AM', capacity: 12, enrolled: 9, status: 'active', ageGroup: 'U-8/U-10', location: 'Court 3' },
+  { id: 'batch-10', name: 'Beginner Batch C', coach: 'Arun Nair', business_entity: 'the-club', level: 'beginner', schedule: 'Mon, Wed, Fri 3-4 PM', capacity: 16, enrolled: 13, status: 'active', ageGroup: 'U-10', location: 'Court 3' },
+];

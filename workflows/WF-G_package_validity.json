@@ -1,0 +1,842 @@
+{
+  "created": "1754800000000",
+  "updated": "1754900000000",
+  "name": "WF-G Package Validity & Expiry Engine",
+  "description": "Daily check of active packages: warns at day 35 (d_minus_10), expires at day 45 (expiry_day). Tracks three dimensions of unutilized: days-to-expiry, remaining sessions, and dormancy (20+ days with zero sessions consumed). Resolves parent via student_parents junction, updates DB, sends email, logs reminders. Processes ALL matching packages in a single run.",
+  "tags": [],
+  "pieces": [
+    "@puchoaistudio/tool-schedule",
+    "@puchoaistudio/tool-supabase",
+    "@puchoaistudio/tool-store",
+    "@puchoaistudio/tool-gmail"
+  ],
+  "template": {
+    "displayName": "WF-G Package Validity & Expiry Engine",
+    "trigger": {
+      "name": "trigger",
+      "type": "TOOL_TRIGGER",
+      "displayName": "Cron 6 AM Daily",
+      "valid": true,
+      "settings": {
+        "pieceName": "@puchoaistudio/tool-schedule",
+        "pieceVersion": "^2.0.0",
+        "triggerName": "every_day",
+        "input": {
+          "timezone": "Asia/Kolkata",
+          "hour_of_the_day": 6,
+          "run_on_weekends": true
+        },
+        "propertySettings": {
+          "timezone": { "type": "MANUAL" },
+          "hour_of_the_day": { "type": "MANUAL" },
+          "run_on_weekends": { "type": "MANUAL" }
+        },
+        "sampleData": {}
+      },
+      "nextAction": {
+        "name": "step_1",
+        "type": "PIECE",
+        "displayName": "Query Active Packages",
+        "valid": true,
+        "skip": false,
+        "settings": {
+          "input": {
+            "auth": "",
+            "table_name": "packages",
+            "page": 1,
+            "pageSize": 50,
+            "filters": [
+              {
+                "column": "status",
+                "operator": "eq",
+                "value": "active"
+              }
+            ]
+          },
+          "pieceName": "@puchoaistudio/tool-supabase",
+          "actionName": "search_rows",
+          "pieceVersion": "^2.0.1",
+          "propertySettings": {
+            "auth": { "type": "MANUAL" },
+            "page": { "type": "MANUAL" },
+            "columns": { "type": "MANUAL" },
+            "filters": { "type": "MANUAL" },
+            "pageSize": { "type": "MANUAL" },
+            "table_name": { "type": "MANUAL" },
+            "countOption": { "type": "MANUAL" }
+          },
+          "sampleData": {},
+          "errorHandlingOptions": {
+            "retryOnFailure": { "value": true },
+            "continueOnFailure": { "value": false }
+          }
+        },
+        "nextAction": {
+          "name": "step_2",
+          "type": "CODE",
+          "displayName": "Analyze Package Statuses",
+          "valid": true,
+          "skip": false,
+          "settings": {
+            "input": {
+              "packages": "{{step_1}}"
+            },
+            "sourceCode": {
+              "code": "export const code = async (inputs) => {\n  const pkgs = Array.isArray(inputs.packages) ? inputs.packages : [];\n  const today = new Date();\n  today.setHours(0, 0, 0, 0);\n  const expired = [];\n  const expiring = [];\n  const dormant = [];\n  for (const p of pkgs) {\n    const start = new Date(p.start_date);\n    start.setHours(0, 0, 0, 0);\n    const diffMs = today.getTime() - start.getTime();\n    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));\n    const consumed = parseInt(p.sessions_consumed || 0);\n    const isDormant = diffDays >= 20 && consumed === 0;\n    const pkg = { id: p.id, student_id: p.student_id, days: diffDays, plan_type: p.plan_type, amount: p.amount, sessions_consumed: consumed };\n    if (diffDays >= 45) {\n      expired.push(pkg);\n    } else if (diffDays >= 35) {\n      expiring.push(pkg);\n    } else if (isDormant) {\n      dormant.push(pkg);\n    }\n  }\n  const hasExpiring = expiring.length > 0;\n  const hasExpired = expired.length > 0;\n  const hasDormant = dormant.length > 0;\n  const firstExpiring = hasExpiring ? expiring[0] : {};\n  const firstExpired = hasExpired ? expired[0] : {};\n  const firstDormant = hasDormant ? dormant[0] : {};\n  const todayStr = today.toISOString().split('T')[0];\n  return {\n    has_expiring: hasExpiring ? 'true' : 'false',\n    has_expired: hasExpired ? 'true' : 'false',\n    has_dormant: hasDormant ? 'true' : 'false',\n    expiring_count: expiring.length,\n    expired_count: expired.length,\n    dormant_count: dormant.length,\n    expired_json: JSON.stringify(expired),\n    expiring_json: JSON.stringify(expiring),\n    dormant_json: JSON.stringify(dormant),\n    first_expiring_id: String(firstExpiring.id || ''),\n    first_expiring_student_id: String(firstExpiring.student_id || ''),\n    first_expired_id: String(firstExpired.id || ''),\n    first_expired_student_id: String(firstExpired.student_id || ''),\n    first_dormant_id: String(firstDormant.id || ''),\n    first_dormant_student_id: String(firstDormant.student_id || ''),\n    today: todayStr\n  };\n};",
+              "packageJson": "{}"
+            },
+            "propertySettings": {
+              "packages": { "type": "MANUAL" }
+            },
+            "sampleData": {},
+            "errorHandlingOptions": {
+              "retryOnFailure": { "value": false },
+              "continueOnFailure": { "value": false }
+            }
+          },
+          "nextAction": {
+            "name": "step_router",
+            "type": "ROUTER",
+            "displayName": "Route by Package Status",
+            "valid": true,
+            "skip": false,
+            "settings": {
+              "branches": [
+                {
+                  "branchName": "Has Expired",
+                  "branchType": "CONDITION",
+                  "conditions": [
+                    [
+                      {
+                        "operator": "TEXT_EXACTLY_MATCHES",
+                        "firstValue": "{{step_2['has_expired']}}",
+                        "secondValue": "true",
+                        "caseSensitive": false
+                      }
+                    ]
+                  ]
+                },
+                {
+                  "branchName": "Has Expiring",
+                  "branchType": "CONDITION",
+                  "conditions": [
+                    [
+                      {
+                        "operator": "TEXT_EXACTLY_MATCHES",
+                        "firstValue": "{{step_2['has_expiring']}}",
+                        "secondValue": "true",
+                        "caseSensitive": false
+                      }
+                    ]
+                  ]
+                },
+                {
+                  "branchName": "Has Dormant",
+                  "branchType": "CONDITION",
+                  "conditions": [
+                    [
+                      {
+                        "operator": "TEXT_EXACTLY_MATCHES",
+                        "firstValue": "{{step_2['has_dormant']}}",
+                        "secondValue": "true",
+                        "caseSensitive": false
+                      }
+                    ]
+                  ]
+                },
+                {
+                  "branchName": "No Action",
+                  "branchType": "FALLBACK"
+                }
+              ],
+              "executionType": "EXECUTE_FIRST_MATCH"
+            },
+            "children": [
+              {
+                "name": "step_3a",
+                "type": "PIECE",
+                "displayName": "Mark Package Expired",
+                "valid": true,
+                "skip": false,
+                "settings": {
+                  "input": {
+                    "auth": "",
+                    "table_name": "packages",
+                    "update_data": {
+                      "status": "expired",
+                      "reminder_stage": "expiry_day"
+                    },
+                    "filter_column": "id",
+                    "filter_value": "{{step_2['first_expired_id']}}",
+                    "filter_type": "eq",
+                    "count_updated": false,
+                    "filter_values": [],
+                    "return_updated": false
+                  },
+                  "pieceName": "@puchoaistudio/tool-supabase",
+                  "actionName": "update_row",
+                  "pieceVersion": "^2.0.1",
+                  "propertySettings": {
+                    "auth": { "type": "MANUAL" },
+                    "table_name": { "type": "MANUAL" },
+                    "filter_type": { "type": "MANUAL" },
+                    "update_data": {
+                      "type": "MANUAL",
+                      "schema": {
+                        "status": { "type": "SHORT_TEXT", "required": false, "displayName": "status", "defaultValue": "" },
+                        "reminder_stage": { "type": "SHORT_TEXT", "required": false, "displayName": "reminder_stage", "defaultValue": "" }
+                      }
+                    },
+                    "filter_value": { "type": "MANUAL" },
+                    "count_updated": { "type": "MANUAL" },
+                    "filter_column": { "type": "MANUAL" },
+                    "filter_values": { "type": "MANUAL" },
+                    "return_updated": { "type": "MANUAL" }
+                  },
+                  "sampleData": {},
+                  "errorHandlingOptions": {
+                    "retryOnFailure": { "value": true },
+                    "continueOnFailure": { "value": false }
+                  }
+                },
+                "nextAction": {
+                  "name": "step_3b",
+                  "type": "PIECE",
+                  "displayName": "Find Student-Parent Link",
+                  "valid": true,
+                  "skip": false,
+                  "settings": {
+                    "input": {
+                      "auth": "",
+                      "table_name": "student_parents",
+                      "page": 1,
+                      "pageSize": 5,
+                      "filters": [
+                        {
+                          "column": "student_id",
+                          "operator": "eq",
+                          "value": "{{step_2['first_expired_student_id']}}"
+                        }
+                      ]
+                    },
+                    "pieceName": "@puchoaistudio/tool-supabase",
+                    "actionName": "search_rows",
+                    "pieceVersion": "^2.0.1",
+                    "propertySettings": {
+                      "auth": { "type": "MANUAL" },
+                      "page": { "type": "MANUAL" },
+                      "columns": { "type": "MANUAL" },
+                      "filters": { "type": "MANUAL" },
+                      "pageSize": { "type": "MANUAL" },
+                      "table_name": { "type": "MANUAL" },
+                      "countOption": { "type": "MANUAL" }
+                    },
+                    "sampleData": {},
+                    "errorHandlingOptions": {
+                      "retryOnFailure": { "value": true },
+                      "continueOnFailure": { "value": true }
+                    }
+                  },
+                  "nextAction": {
+                    "name": "step_3c",
+                    "type": "PIECE",
+                    "displayName": "Find Parent Email",
+                    "valid": true,
+                    "skip": false,
+                    "settings": {
+                      "input": {
+                        "auth": "",
+                        "table_name": "parents",
+                        "page": 1,
+                        "pageSize": 1,
+                        "filters": [
+                          {
+                            "column": "id",
+                            "operator": "eq",
+                            "value": "{{step_3b[0]['parent_id']}}"
+                          }
+                        ]
+                      },
+                      "pieceName": "@puchoaistudio/tool-supabase",
+                      "actionName": "search_rows",
+                      "pieceVersion": "^2.0.1",
+                      "propertySettings": {
+                        "auth": { "type": "MANUAL" },
+                        "page": { "type": "MANUAL" },
+                        "columns": { "type": "MANUAL" },
+                        "filters": { "type": "MANUAL" },
+                        "pageSize": { "type": "MANUAL" },
+                        "table_name": { "type": "MANUAL" },
+                        "countOption": { "type": "MANUAL" }
+                      },
+                      "sampleData": {},
+                      "errorHandlingOptions": {
+                        "retryOnFailure": { "value": true },
+                        "continueOnFailure": { "value": true }
+                      }
+                    },
+                    "nextAction": {
+                      "name": "step_3d",
+                      "type": "PIECE",
+                      "displayName": "Send Expiry Notification",
+                      "valid": true,
+                      "skip": false,
+                      "settings": {
+                        "input": {
+                          "auth": "",
+                          "receiver": [
+                            "{{step_3c[0]['email']}}"
+                          ],
+                          "subject": "Package Expired - Arnav Jain Tennis Academy",
+                          "body": "Dear Parent,\n\nYour child's tennis package at Arnav Jain Tennis Academy has expired (Day 45). Please renew at your earliest convenience to continue training.\n\nContact us for renewal options.\n\n- Arnav Jain Tennis Academy",
+                          "body_type": "text",
+                          "cc": [],
+                          "bcc": [],
+                          "reply_to": [],
+                          "draft": false
+                        },
+                        "pieceName": "@puchoaistudio/tool-gmail",
+                        "actionName": "send_email",
+                        "pieceVersion": "^2.0.4",
+                        "propertySettings": {
+                          "auth": { "type": "MANUAL" },
+                          "receiver": { "type": "MANUAL" },
+                          "subject": { "type": "MANUAL" },
+                          "body": { "type": "MANUAL" },
+                          "body_type": { "type": "MANUAL" },
+                          "cc": { "type": "MANUAL" },
+                          "bcc": { "type": "MANUAL" },
+                          "reply_to": { "type": "MANUAL" },
+                          "draft": { "type": "MANUAL" },
+                          "from": { "type": "MANUAL" },
+                          "sender_name": { "type": "MANUAL" },
+                          "attachment": { "type": "MANUAL" },
+                          "attachment_name": { "type": "MANUAL" }
+                        },
+                        "sampleData": {},
+                        "errorHandlingOptions": {
+                          "retryOnFailure": { "value": false },
+                          "continueOnFailure": { "value": true }
+                        }
+                      },
+                      "nextAction": {
+                        "name": "step_3e",
+                        "type": "PIECE",
+                        "displayName": "Log Expiry Reminder",
+                        "valid": true,
+                        "skip": false,
+                        "settings": {
+                          "input": {
+                            "auth": "",
+                            "table_name": "reminders",
+                            "row_data": {
+                              "student_id": "{{step_2['first_expired_student_id']}}",
+                              "package_id": "{{step_2['first_expired_id']}}",
+                              "channel": "email",
+                              "stage": "expiry_day",
+                              "status": "sent",
+                              "sent_at": "{{step_2['today']}}"
+                            },
+                            "return_row": false
+                          },
+                          "pieceName": "@puchoaistudio/tool-supabase",
+                          "actionName": "create_row",
+                          "pieceVersion": "^2.0.1",
+                          "propertySettings": {
+                            "auth": { "type": "MANUAL" },
+                            "row_data": {
+                              "type": "MANUAL",
+                              "schema": {
+                                "student_id": { "type": "SHORT_TEXT", "required": false, "displayName": "student_id", "defaultValue": "" },
+                                "package_id": { "type": "SHORT_TEXT", "required": false, "displayName": "package_id", "defaultValue": "" },
+                                "channel": { "type": "SHORT_TEXT", "required": false, "displayName": "channel", "defaultValue": "" },
+                                "stage": { "type": "SHORT_TEXT", "required": false, "displayName": "stage", "defaultValue": "" },
+                                "status": { "type": "SHORT_TEXT", "required": false, "displayName": "status", "defaultValue": "" },
+                                "sent_at": { "type": "SHORT_TEXT", "required": false, "displayName": "sent_at", "defaultValue": "" }
+                              }
+                            },
+                            "return_row": { "type": "MANUAL" },
+                            "table_name": { "type": "MANUAL" }
+                          },
+                          "sampleData": {},
+                          "errorHandlingOptions": {
+                            "retryOnFailure": { "value": true },
+                            "continueOnFailure": { "value": false }
+                          }
+                        },
+                        "nextAction": {
+                          "name": "step_3f",
+                          "type": "PIECE",
+                          "displayName": "Store Flag for WF-H Renewal",
+                          "valid": true,
+                          "skip": false,
+                          "settings": {
+                            "input": {
+                              "key": "renewal_trigger",
+                              "value": "{{step_2['first_expired_student_id']}}",
+                              "store_scope": "COLLECTION"
+                            },
+                            "pieceName": "@puchoaistudio/tool-store",
+                            "actionName": "put",
+                            "pieceVersion": "^2.0.0",
+                            "propertySettings": {
+                              "key": { "type": "MANUAL" },
+                              "value": { "type": "MANUAL" },
+                              "store_scope": { "type": "MANUAL" }
+                            },
+                            "sampleData": {},
+                            "errorHandlingOptions": {
+                              "retryOnFailure": { "value": false },
+                              "continueOnFailure": { "value": true }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "name": "step_4a",
+                "type": "PIECE",
+                "displayName": "Update Reminder Stage to d_minus_6",
+                "valid": true,
+                "skip": false,
+                "settings": {
+                  "input": {
+                    "auth": "",
+                    "table_name": "packages",
+                    "update_data": {
+                      "reminder_stage": "d_minus_6"
+                    },
+                    "filter_column": "id",
+                    "filter_value": "{{step_2['first_expiring_id']}}",
+                    "filter_type": "eq",
+                    "count_updated": false,
+                    "filter_values": [],
+                    "return_updated": false
+                  },
+                  "pieceName": "@puchoaistudio/tool-supabase",
+                  "actionName": "update_row",
+                  "pieceVersion": "^2.0.1",
+                  "propertySettings": {
+                    "auth": { "type": "MANUAL" },
+                    "table_name": { "type": "MANUAL" },
+                    "filter_type": { "type": "MANUAL" },
+                    "update_data": {
+                      "type": "MANUAL",
+                      "schema": {
+                        "reminder_stage": { "type": "SHORT_TEXT", "required": false, "displayName": "reminder_stage", "defaultValue": "" }
+                      }
+                    },
+                    "filter_value": { "type": "MANUAL" },
+                    "count_updated": { "type": "MANUAL" },
+                    "filter_column": { "type": "MANUAL" },
+                    "filter_values": { "type": "MANUAL" },
+                    "return_updated": { "type": "MANUAL" }
+                  },
+                  "sampleData": {},
+                  "errorHandlingOptions": {
+                    "retryOnFailure": { "value": true },
+                    "continueOnFailure": { "value": false }
+                  }
+                },
+                "nextAction": {
+                  "name": "step_4b",
+                  "type": "PIECE",
+                  "displayName": "Find Student-Parent for Warning",
+                  "valid": true,
+                  "skip": false,
+                  "settings": {
+                    "input": {
+                      "auth": "",
+                      "table_name": "student_parents",
+                      "page": 1,
+                      "pageSize": 5,
+                      "filters": [
+                        {
+                          "column": "student_id",
+                          "operator": "eq",
+                          "value": "{{step_2['first_expiring_student_id']}}"
+                        }
+                      ]
+                    },
+                    "pieceName": "@puchoaistudio/tool-supabase",
+                    "actionName": "search_rows",
+                    "pieceVersion": "^2.0.1",
+                    "propertySettings": {
+                      "auth": { "type": "MANUAL" },
+                      "page": { "type": "MANUAL" },
+                      "columns": { "type": "MANUAL" },
+                      "filters": { "type": "MANUAL" },
+                      "pageSize": { "type": "MANUAL" },
+                      "table_name": { "type": "MANUAL" },
+                      "countOption": { "type": "MANUAL" }
+                    },
+                    "sampleData": {},
+                    "errorHandlingOptions": {
+                      "retryOnFailure": { "value": true },
+                      "continueOnFailure": { "value": true }
+                    }
+                  },
+                  "nextAction": {
+                    "name": "step_4c",
+                    "type": "PIECE",
+                    "displayName": "Find Parent Email for Warning",
+                    "valid": true,
+                    "skip": false,
+                    "settings": {
+                      "input": {
+                        "auth": "",
+                        "table_name": "parents",
+                        "page": 1,
+                        "pageSize": 1,
+                        "filters": [
+                          {
+                            "column": "id",
+                            "operator": "eq",
+                            "value": "{{step_4b[0]['parent_id']}}"
+                          }
+                        ]
+                      },
+                      "pieceName": "@puchoaistudio/tool-supabase",
+                      "actionName": "search_rows",
+                      "pieceVersion": "^2.0.1",
+                      "propertySettings": {
+                        "auth": { "type": "MANUAL" },
+                        "page": { "type": "MANUAL" },
+                        "columns": { "type": "MANUAL" },
+                        "filters": { "type": "MANUAL" },
+                        "pageSize": { "type": "MANUAL" },
+                        "table_name": { "type": "MANUAL" },
+                        "countOption": { "type": "MANUAL" }
+                      },
+                      "sampleData": {},
+                      "errorHandlingOptions": {
+                        "retryOnFailure": { "value": true },
+                        "continueOnFailure": { "value": true }
+                      }
+                    },
+                    "nextAction": {
+                      "name": "step_4d",
+                      "type": "PIECE",
+                      "displayName": "Send Expiry Warning Email",
+                      "valid": true,
+                      "skip": false,
+                      "settings": {
+                        "input": {
+                          "auth": "",
+                          "receiver": [
+                            "{{step_4c[0]['email']}}"
+                          ],
+                          "subject": "Package Expiring Soon - Arnav Jain Tennis Academy",
+                          "body": "Dear Parent,\n\nYour child's tennis package at Arnav Jain Tennis Academy will expire in approximately 6 days. Please renew soon to ensure uninterrupted training!\n\n- Arnav Jain Tennis Academy",
+                          "body_type": "text",
+                          "cc": [],
+                          "bcc": [],
+                          "reply_to": [],
+                          "draft": false
+                        },
+                        "pieceName": "@puchoaistudio/tool-gmail",
+                        "actionName": "send_email",
+                        "pieceVersion": "^2.0.4",
+                        "propertySettings": {
+                          "auth": { "type": "MANUAL" },
+                          "receiver": { "type": "MANUAL" },
+                          "subject": { "type": "MANUAL" },
+                          "body": { "type": "MANUAL" },
+                          "body_type": { "type": "MANUAL" },
+                          "cc": { "type": "MANUAL" },
+                          "bcc": { "type": "MANUAL" },
+                          "reply_to": { "type": "MANUAL" },
+                          "draft": { "type": "MANUAL" },
+                          "from": { "type": "MANUAL" },
+                          "sender_name": { "type": "MANUAL" },
+                          "attachment": { "type": "MANUAL" },
+                          "attachment_name": { "type": "MANUAL" }
+                        },
+                        "sampleData": {},
+                        "errorHandlingOptions": {
+                          "retryOnFailure": { "value": false },
+                          "continueOnFailure": { "value": true }
+                        }
+                      },
+                      "nextAction": {
+                        "name": "step_4e",
+                        "type": "PIECE",
+                        "displayName": "Log Warning Reminder",
+                        "valid": true,
+                        "skip": false,
+                        "settings": {
+                          "input": {
+                            "auth": "",
+                            "table_name": "reminders",
+                            "row_data": {
+                              "student_id": "{{step_2['first_expiring_student_id']}}",
+                              "package_id": "{{step_2['first_expiring_id']}}",
+                              "channel": "email",
+                              "stage": "d_minus_10",
+                              "status": "sent",
+                              "sent_at": "{{step_2['today']}}"
+                            },
+                            "return_row": false
+                          },
+                          "pieceName": "@puchoaistudio/tool-supabase",
+                          "actionName": "create_row",
+                          "pieceVersion": "^2.0.1",
+                          "propertySettings": {
+                            "auth": { "type": "MANUAL" },
+                            "row_data": {
+                              "type": "MANUAL",
+                              "schema": {
+                                "student_id": { "type": "SHORT_TEXT", "required": false, "displayName": "student_id", "defaultValue": "" },
+                                "package_id": { "type": "SHORT_TEXT", "required": false, "displayName": "package_id", "defaultValue": "" },
+                                "channel": { "type": "SHORT_TEXT", "required": false, "displayName": "channel", "defaultValue": "" },
+                                "stage": { "type": "SHORT_TEXT", "required": false, "displayName": "stage", "defaultValue": "" },
+                                "status": { "type": "SHORT_TEXT", "required": false, "displayName": "status", "defaultValue": "" },
+                                "sent_at": { "type": "SHORT_TEXT", "required": false, "displayName": "sent_at", "defaultValue": "" }
+                              }
+                            },
+                            "return_row": { "type": "MANUAL" },
+                            "table_name": { "type": "MANUAL" }
+                          },
+                          "sampleData": {},
+                          "errorHandlingOptions": {
+                            "retryOnFailure": { "value": true },
+                            "continueOnFailure": { "value": false }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "name": "step_5a",
+                "type": "PIECE",
+                "displayName": "Mark Package Dormant",
+                "valid": true,
+                "skip": false,
+                "settings": {
+                  "input": {
+                    "auth": "",
+                    "table_name": "packages",
+                    "update_data": {
+                      "reminder_stage": "dormant"
+                    },
+                    "filter_column": "id",
+                    "filter_value": "{{step_2['first_dormant_id']}}",
+                    "filter_type": "eq",
+                    "count_updated": false,
+                    "filter_values": [],
+                    "return_updated": false
+                  },
+                  "pieceName": "@puchoaistudio/tool-supabase",
+                  "actionName": "update_row",
+                  "pieceVersion": "^2.0.1",
+                  "propertySettings": {
+                    "auth": { "type": "MANUAL" },
+                    "table_name": { "type": "MANUAL" },
+                    "filter_type": { "type": "MANUAL" },
+                    "update_data": {
+                      "type": "MANUAL",
+                      "schema": {
+                        "reminder_stage": { "type": "SHORT_TEXT", "required": false, "displayName": "reminder_stage", "defaultValue": "" }
+                      }
+                    },
+                    "filter_value": { "type": "MANUAL" },
+                    "count_updated": { "type": "MANUAL" },
+                    "filter_column": { "type": "MANUAL" },
+                    "filter_values": { "type": "MANUAL" },
+                    "return_updated": { "type": "MANUAL" }
+                  },
+                  "sampleData": {},
+                  "errorHandlingOptions": {
+                    "retryOnFailure": { "value": true },
+                    "continueOnFailure": { "value": false }
+                  }
+                },
+                "nextAction": {
+                  "name": "step_5b",
+                  "type": "PIECE",
+                  "displayName": "Find Student-Parent for Dormancy",
+                  "valid": true,
+                  "skip": false,
+                  "settings": {
+                    "input": {
+                      "auth": "",
+                      "table_name": "student_parents",
+                      "page": 1,
+                      "pageSize": 5,
+                      "filters": [
+                        {
+                          "column": "student_id",
+                          "operator": "eq",
+                          "value": "{{step_2['first_dormant_student_id']}}"
+                        }
+                      ]
+                    },
+                    "pieceName": "@puchoaistudio/tool-supabase",
+                    "actionName": "search_rows",
+                    "pieceVersion": "^2.0.1",
+                    "propertySettings": {
+                      "auth": { "type": "MANUAL" },
+                      "page": { "type": "MANUAL" },
+                      "columns": { "type": "MANUAL" },
+                      "filters": { "type": "MANUAL" },
+                      "pageSize": { "type": "MANUAL" },
+                      "table_name": { "type": "MANUAL" },
+                      "countOption": { "type": "MANUAL" }
+                    },
+                    "sampleData": {},
+                    "errorHandlingOptions": {
+                      "retryOnFailure": { "value": true },
+                      "continueOnFailure": { "value": true }
+                    }
+                  },
+                  "nextAction": {
+                    "name": "step_5c",
+                    "type": "PIECE",
+                    "displayName": "Find Parent Email for Dormancy",
+                    "valid": true,
+                    "skip": false,
+                    "settings": {
+                      "input": {
+                        "auth": "",
+                        "table_name": "parents",
+                        "page": 1,
+                        "pageSize": 1,
+                        "filters": [
+                          {
+                            "column": "id",
+                            "operator": "eq",
+                            "value": "{{step_5b[0]['parent_id']}}"
+                          }
+                        ]
+                      },
+                      "pieceName": "@puchoaistudio/tool-supabase",
+                      "actionName": "search_rows",
+                      "pieceVersion": "^2.0.1",
+                      "propertySettings": {
+                        "auth": { "type": "MANUAL" },
+                        "page": { "type": "MANUAL" },
+                        "columns": { "type": "MANUAL" },
+                        "filters": { "type": "MANUAL" },
+                        "pageSize": { "type": "MANUAL" },
+                        "table_name": { "type": "MANUAL" },
+                        "countOption": { "type": "MANUAL" }
+                      },
+                      "sampleData": {},
+                      "errorHandlingOptions": {
+                        "retryOnFailure": { "value": true },
+                        "continueOnFailure": { "value": true }
+                      }
+                    },
+                    "nextAction": {
+                      "name": "step_5d",
+                      "type": "PIECE",
+                      "displayName": "Send Dormancy Notification",
+                      "valid": true,
+                      "skip": false,
+                      "settings": {
+                        "input": {
+                          "auth": "",
+                          "receiver": [
+                            "{{step_5c[0]['email']}}"
+                          ],
+                          "subject": "Your Child Hasn't Attended Recently - Arnav Jain Tennis Academy",
+                          "body": "Dear Parent,\n\nWe noticed your child has not attended any sessions recently despite having an active package (Day 20+ with 0 sessions consumed).\n\nPlease check their schedule and encourage them to resume training. Unused sessions may expire with the package.\n\nFor any questions or to reschedule, please contact us.\n\n- Arnav Jain Tennis Academy",
+                          "body_type": "text",
+                          "cc": [],
+                          "bcc": [],
+                          "reply_to": [],
+                          "draft": false
+                        },
+                        "pieceName": "@puchoaistudio/tool-gmail",
+                        "actionName": "send_email",
+                        "pieceVersion": "^2.0.4",
+                        "propertySettings": {
+                          "auth": { "type": "MANUAL" },
+                          "receiver": { "type": "MANUAL" },
+                          "subject": { "type": "MANUAL" },
+                          "body": { "type": "MANUAL" },
+                          "body_type": { "type": "MANUAL" },
+                          "cc": { "type": "MANUAL" },
+                          "bcc": { "type": "MANUAL" },
+                          "reply_to": { "type": "MANUAL" },
+                          "draft": { "type": "MANUAL" },
+                          "from": { "type": "MANUAL" },
+                          "sender_name": { "type": "MANUAL" },
+                          "attachment": { "type": "MANUAL" },
+                          "attachment_name": { "type": "MANUAL" }
+                        },
+                        "sampleData": {},
+                        "errorHandlingOptions": {
+                          "retryOnFailure": { "value": false },
+                          "continueOnFailure": { "value": true }
+                        }
+                      },
+                      "nextAction": {
+                        "name": "step_5e",
+                        "type": "PIECE",
+                        "displayName": "Log Dormancy Reminder",
+                        "valid": true,
+                        "skip": false,
+                        "settings": {
+                          "input": {
+                            "auth": "",
+                            "table_name": "reminders",
+                            "row_data": {
+                              "student_id": "{{step_2['first_dormant_student_id']}}",
+                              "package_id": "{{step_2['first_dormant_id']}}",
+                              "channel": "email",
+                              "stage": "dormant",
+                              "status": "sent",
+                              "sent_at": "{{step_2['today']}}"
+                            },
+                            "return_row": false
+                          },
+                          "pieceName": "@puchoaistudio/tool-supabase",
+                          "actionName": "create_row",
+                          "pieceVersion": "^2.0.1",
+                          "propertySettings": {
+                            "auth": { "type": "MANUAL" },
+                            "row_data": {
+                              "type": "MANUAL",
+                              "schema": {
+                                "student_id": { "type": "SHORT_TEXT", "required": false, "displayName": "student_id", "defaultValue": "" },
+                                "package_id": { "type": "SHORT_TEXT", "required": false, "displayName": "package_id", "defaultValue": "" },
+                                "channel": { "type": "SHORT_TEXT", "required": false, "displayName": "channel", "defaultValue": "" },
+                                "stage": { "type": "SHORT_TEXT", "required": false, "displayName": "stage", "defaultValue": "" },
+                                "status": { "type": "SHORT_TEXT", "required": false, "displayName": "status", "defaultValue": "" },
+                                "sent_at": { "type": "SHORT_TEXT", "required": false, "displayName": "sent_at", "defaultValue": "" }
+                              }
+                            },
+                            "return_row": { "type": "MANUAL" },
+                            "table_name": { "type": "MANUAL" }
+                          },
+                          "sampleData": {},
+                          "errorHandlingOptions": {
+                            "retryOnFailure": { "value": true },
+                            "continueOnFailure": { "value": false }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              null
+            ],
+            "nextAction": null
+          }
+        }
+      }
+    },
+    "valid": true,
+    "agentIds": [],
+    "connectionIds": [],
+    "schemaVersion": "7"
+  },
+  "blogUrl": ""
+}

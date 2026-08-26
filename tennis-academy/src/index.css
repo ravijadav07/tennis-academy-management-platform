@@ -1,0 +1,192 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #7C4DFF;
+  --color-brand-50: #F1ECFF;
+  --color-brand-600: #6437E8;
+  --color-brand-700: #4C1FB7;
+  --color-ink: #171B35;
+  --color-ink-muted: #62697D;
+  --color-ink-faint: #8C93A6;
+  --color-canvas: #F8F8FC;
+  --color-canvas-soft: #FAFAFD;
+  --color-line: #E9EAF1;
+  --color-ok: #16A34A;
+  --color-ok-bg: #ECFDF3;
+  --color-warn: #D97706;
+  --color-warn-bg: #FFF7E6;
+  --color-err: #DC2626;
+  --color-err-bg: #FEF2F2;
+  --color-off: #6B7280;
+  --color-off-bg: #F3F4F6;
+
+  --font-sans: 'Inter', 'SF Pro Text', system-ui, -apple-system, sans-serif;
+  --font-display: 'Space Grotesk', 'Inter', sans-serif;
+
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 16px;
+  --radius-2xl: 18px;
+  --radius-3xl: 24px;
+
+  --shadow-card: 0 1px 2px rgba(20, 24, 40, 0.03);
+  --shadow-card-hover: 0 5px 18px rgba(31, 24, 62, 0.05);
+  --shadow-soft: 0 1px 2px rgba(20, 24, 40, 0.02);
+  --shadow-focus: 0 0 0 3px rgba(124, 77, 255, 0.10);
+  --shadow-dropdown: 0 12px 30px rgba(20, 24, 40, 0.10);
+  --shadow-modal: 0 24px 70px rgba(20, 24, 40, 0.18);
+
+  --animate-float: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  width: 100%;
+  min-height: 100%;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  width: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+#root {
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+select {
+  max-width: 100%;
+  min-width: 0;
+}
+
+@media screen and (max-width: 480px) {
+  select {
+    width: 100% !important;
+    max-width: 100% !important;
+    font-size: 16px;
+    padding: 14px 12px;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D9DAE3;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #C5C6D0;
+}
+
+select {
+  max-width: 100%;
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%238C93A6' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 10px center;
+  background-repeat: no-repeat;
+  background-size: 14px 14px;
+  padding-right: 32px;
+  appearance: none;
+  cursor: pointer;
+}
+
+/* Prevent native select dropdowns from overflowing viewport — constraint only,
+   browser handles actual positioning for native <select> */
+@media screen and (max-width: 768px) {
+  select {
+    font-size: 16px; /* prevent iOS zoom */
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+/* Constrained native select in narrow containers */
+.card select, 
+[class*="max-w-"] select {
+  max-width: calc(100% - 4px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Normalize native date/time inputs to match the design system */
+input[type="date"],
+input[type="time"] {
+  color-scheme: light;
+  font-family: inherit;
+  min-width: 0;
+}
+
+/* Chrome/Safari date picker indicator — match ink-faint */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  opacity: 0.5;
+  cursor: pointer;
+  filter: invert(45%) sepia(5%) saturate(500%) hue-rotate(180deg);
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 0.8;
+}
+
+/* Firefox date/time picker */
+input[type="date"],
+input[type="time"] {
+  color: #171B35;
+}
+
+/* Prevent iOS zoom on focus for date/time inputs */
+@media screen and (max-width: 480px) {
+  input[type="date"],
+  input[type="time"] {
+    font-size: 16px;
+    width: 100%;
+    min-width: 0;
+  }
+}

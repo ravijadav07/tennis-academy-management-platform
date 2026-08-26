@@ -1,0 +1,37 @@
+export const childData = {
+  id: 'stu-1',
+  name: 'Arjun Mehta',
+  age: 15,
+  ageGroup: 'U-16',
+  level: 'advanced',
+  batch: 'Advanced Tournament',
+  business_entity: 'the-club',
+  joinDate: '2026-01-15',
+  attendance: 92,
+  packageType: 'Monthly',
+  packageExpiry: '2026-09-15',
+  daysUsed: 32,
+  packageDays: 45,
+  assignedCoach: {
+    name: 'Vikram Singh',
+    specialization: 'Advanced Tournament',
+    since: '2026-01-15',
+    nextClass: '2026-08-08T16:00:00',
+  },
+  emailLog: [
+    { type: 'thank_you_admission', sent: true, date: '2026-01-15' },
+    { type: 'parent_welcome_sms', sent: true, date: '2026-01-15' },
+    { type: '45_day_progress', sent: false, scheduled: '2026-08-01' },
+    { type: 'certificate', sent: true, date: '2026-08-02', file: 'cert_arjun_mehta.pdf' },
+  ],
+  progress: [
+    { date: '2026-07-01', category: 'Forehand', rating: 4, note: 'Good consistency, working on topspin' },
+    { date: '2026-07-15', category: 'Backhand', rating: 3, note: 'Improving, needs more follow-through' },
+    { date: '2026-08-01', category: 'Serve', rating: 4, note: 'Great power, improving accuracy' },
+    { date: '2026-08-05', category: 'Footwork', rating: 4, note: 'Excellent court coverage' },
+  ],
+  recentAchievements: [
+    'District U-16 Quarterfinalist - July 2026',
+    'Academy Tournament Runner-up - June 2026',
+  ],
+};

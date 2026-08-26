@@ -1,0 +1,2539 @@
+{
+  "created": "1754800000000",
+  "updated": "1754800000000",
+  "name": "WF-H Renewal Drip Campaign [DEPRECATED]",
+  "description": "DEPRECATED — Superseded by UC-4 Renewal & Reminder Engine. This workflow used start_date instead of expiry_date, had unfiltered queries, and used phone as email receiver. Do not activate.",
+  "tags": [
+    "deprecated",
+    "superseded"
+  ],
+  "pieces": [
+    "@puchoaistudio/tool-schedule",
+    "@puchoaistudio/tool-supabase",
+    "@puchoaistudio/tool-gmail"
+  ],
+  "template": {
+    "displayName": "WF-H Renewal Drip Campaign [DEPRECATED]",
+    "trigger": {
+      "name": "trigger",
+      "type": "TOOL_TRIGGER",
+      "displayName": "Daily Schedule",
+      "valid": true,
+      "settings": {
+        "pieceName": "@puchoaistudio/tool-schedule",
+        "pieceVersion": "^2.0.0",
+        "triggerName": "every_day",
+        "input": {
+          "timezone": "Asia/Kolkata",
+          "hour_of_the_day": 10,
+          "run_on_weekends": true
+        },
+        "propertySettings": {
+          "timezone": {
+            "type": "MANUAL"
+          },
+          "hour_of_the_day": {
+            "type": "MANUAL"
+          },
+          "run_on_weekends": {
+            "type": "MANUAL"
+          }
+        },
+        "sampleData": {}
+      },
+      "nextAction": {
+        "name": "step_1",
+        "type": "PIECE",
+        "displayName": "Find Pending Packages",
+        "valid": true,
+        "skip": false,
+        "settings": {
+          "input": {
+            "auth": "",
+            "table_name": "packages",
+            "page": 1,
+            "pageSize": 20,
+            "filters": []
+          },
+          "pieceName": "@puchoaistudio/tool-supabase",
+          "actionName": "search_rows",
+          "pieceVersion": "^2.0.1",
+          "propertySettings": {
+            "auth": {
+              "type": "MANUAL"
+            },
+            "page": {
+              "type": "MANUAL"
+            },
+            "columns": {
+              "type": "MANUAL"
+            },
+            "filters": {
+              "type": "MANUAL"
+            },
+            "pageSize": {
+              "type": "MANUAL"
+            },
+            "table_name": {
+              "type": "MANUAL"
+            },
+            "countOption": {
+              "type": "MANUAL"
+            }
+          },
+          "sampleData": {},
+          "errorHandlingOptions": {
+            "retryOnFailure": {
+              "value": true
+            },
+            "continueOnFailure": {
+              "value": false
+            }
+          }
+        },
+        "nextAction": {
+          "name": "step_2",
+          "type": "CODE",
+          "displayName": "Determine Drip Stage",
+          "valid": true,
+          "skip": false,
+          "settings": {
+            "input": {
+              "packages": "{{step_1}}"
+            },
+            "sourceCode": {
+              "code": "export const code = async (inputs) => {\n  const pkgs = Array.isArray(inputs.packages) ? inputs.packages : [];\n  const today = new Date();\n  today.setHours(0, 0, 0, 0);\n  const stages = ['d_minus_6', 'd_minus_1', 'd_plus_1', 'd_plus_7', 'd_plus_14', 'd_plus_21', 'd_plus_28'];\n  const thresholds = { d_minus_6: 39, d_minus_1: 44, d_plus_1: 46, d_plus_7: 52, d_plus_14: 59, d_plus_21: 66, d_plus_28: 73 };\n  const messages = {\n    d_minus_6: \"Friendly reminder: Your child's tennis package expires in 6 days. Please renew to continue training at Arnav Jain Tennis Academy.\",\n    d_minus_1: \"Urgent: Your child's tennis package expires tomorrow! Renew now to avoid disruption at Arnav Jain Tennis Academy.\",\n    d_plus_1: \"Your child's tennis package has expired. Renew today to resume training at Arnav Jain Tennis Academy.\",\n    d_plus_7: \"It has been a week since your package expired. We miss your child! Renew now for special rates at Arnav Jain Tennis Academy.\",\n    d_plus_14: \"Your child has been away for 2 weeks. Come back with our renewal offer at Arnav Jain Tennis Academy!\",\n    d_plus_21: \"Three weeks since expiry. Your child's spot is waiting. Renew today at Arnav Jain Tennis Academy!\",\n    d_plus_28: \"Last reminder: Your package expired a month ago. Final renewal notice from Arnav Jain Tennis Academy.\"\n  };\n  let stage = 'fallback';\n  let pkgId = '';\n  let studentId = '';\n  let message = '';\n  for (const s of stages) {\n    const candidates = pkgs.filter(p => {\n      const start = new Date(p.start_date);\n      start.setHours(0, 0, 0, 0);\n      const diffMs = today.getTime() - start.getTime();\n      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));\n      return diffDays >= thresholds[s] && p.reminder_stage !== s && p.status !== 'expired';\n    });\n    if (candidates.length > 0) {\n      stage = s;\n      pkgId = String(candidates[0].id || '');\n      studentId = String(candidates[0].student_id || '');\n      message = messages[s] || '';\n      break;\n    }\n  }\n  const isFallback = stage === 'fallback';\n  return {\n    stage: stage,\n    is_fallback: isFallback ? 'true' : 'false',\n    package_id: pkgId,\n    student_id: studentId,\n    message: message\n  };\n};",
+              "packageJson": "{}"
+            },
+            "propertySettings": {
+              "packages": {
+                "type": "MANUAL"
+              }
+            },
+            "sampleData": {},
+            "errorHandlingOptions": {
+              "retryOnFailure": {
+                "value": false
+              },
+              "continueOnFailure": {
+                "value": false
+              }
+            }
+          },
+          "nextAction": {
+            "name": "step_router",
+            "type": "ROUTER",
+            "displayName": "Route by Drip Stage",
+            "valid": true,
+            "skip": false,
+            "settings": {
+              "branches": [
+                {
+                  "branchName": "D-6",
+                  "branchType": "CONDITION",
+                  "conditions": [
+                    [
+                      {
+                        "operator": "TEXT_EXACTLY_MATCHES",
+                        "firstValue": "{{step_2['stage']}}",
+                        "secondValue": "d_minus_6",
+                        "caseSensitive": false
+                      }
+                    ]
+                  ]
+                },
+                {
+                  "branchName": "D-1",
+                  "branchType": "CONDITION",
+                  "conditions": [
+                    [
+                      {
+                        "operator": "TEXT_EXACTLY_MATCHES",
+                        "firstValue": "{{step_2['stage']}}",
+                        "secondValue": "d_minus_1",
+                        "caseSensitive": false
+                      }
+                    ]
+                  ]
+                },
+                {
+                  "branchName": "D+1",
+                  "branchType": "CONDITION",
+                  "conditions": [
+                    [
+                      {
+                        "operator": "TEXT_EXACTLY_MATCHES",
+                        "firstValue": "{{step_2['stage']}}",
+                        "secondValue": "d_plus_1",
+                        "caseSensitive": false
+                      }
+                    ]
+                  ]
+                },
+                {
+                  "branchName": "D+7",
+                  "branchType": "CONDITION",
+                  "conditions": [
+                    [
+                      {
+                        "operator": "TEXT_EXACTLY_MATCHES",
+                        "firstValue": "{{step_2['stage']}}",
+                        "secondValue": "d_plus_7",
+                        "caseSensitive": false
+                      }
+                    ]
+                  ]
+                },
+                {
+                  "branchName": "D+14",
+                  "branchType": "CONDITION",
+                  "conditions": [
+                    [
+                      {
+                        "operator": "TEXT_EXACTLY_MATCHES",
+                        "firstValue": "{{step_2['stage']}}",
+                        "secondValue": "d_plus_14",
+                        "caseSensitive": false
+                      }
+                    ]
+                  ]
+                },
+                {
+                  "branchName": "D+21",
+                  "branchType": "CONDITION",
+                  "conditions": [
+                    [
+                      {
+                        "operator": "TEXT_EXACTLY_MATCHES",
+                        "firstValue": "{{step_2['stage']}}",
+                        "secondValue": "d_plus_21",
+                        "caseSensitive": false
+                      }
+                    ]
+                  ]
+                },
+                {
+                  "branchName": "D+28",
+                  "branchType": "CONDITION",
+                  "conditions": [
+                    [
+                      {
+                        "operator": "TEXT_EXACTLY_MATCHES",
+                        "firstValue": "{{step_2['stage']}}",
+                        "secondValue": "d_plus_28",
+                        "caseSensitive": false
+                      }
+                    ]
+                  ]
+                },
+                {
+                  "branchName": "No Action",
+                  "branchType": "FALLBACK"
+                }
+              ],
+              "executionType": "EXECUTE_FIRST_MATCH"
+            },
+            "children": [
+              {
+                "name": "step_d1_a",
+                "type": "PIECE",
+                "displayName": "Find Student",
+                "valid": true,
+                "skip": false,
+                "settings": {
+                  "input": {
+                    "auth": "",
+                    "table_name": "students",
+                    "page": 1,
+                    "pageSize": 20,
+                    "filters": []
+                  },
+                  "pieceName": "@puchoaistudio/tool-supabase",
+                  "actionName": "search_rows",
+                  "pieceVersion": "^2.0.1",
+                  "propertySettings": {
+                    "auth": {
+                      "type": "MANUAL"
+                    },
+                    "page": {
+                      "type": "MANUAL"
+                    },
+                    "columns": {
+                      "type": "MANUAL"
+                    },
+                    "filters": {
+                      "type": "MANUAL"
+                    },
+                    "pageSize": {
+                      "type": "MANUAL"
+                    },
+                    "table_name": {
+                      "type": "MANUAL"
+                    },
+                    "countOption": {
+                      "type": "MANUAL"
+                    }
+                  },
+                  "sampleData": {},
+                  "errorHandlingOptions": {
+                    "retryOnFailure": {
+                      "value": true
+                    },
+                    "continueOnFailure": {
+                      "value": false
+                    }
+                  }
+                },
+                "nextAction": {
+                  "name": "step_d1_b",
+                  "type": "PIECE",
+                  "displayName": "Find Parent",
+                  "valid": true,
+                  "skip": false,
+                  "settings": {
+                    "input": {
+                      "auth": "",
+                      "table_name": "parents",
+                      "page": 1,
+                      "pageSize": 20,
+                      "filters": []
+                    },
+                    "pieceName": "@puchoaistudio/tool-supabase",
+                    "actionName": "search_rows",
+                    "pieceVersion": "^2.0.1",
+                    "propertySettings": {
+                      "auth": {
+                        "type": "MANUAL"
+                      },
+                      "page": {
+                        "type": "MANUAL"
+                      },
+                      "columns": {
+                        "type": "MANUAL"
+                      },
+                      "filters": {
+                        "type": "MANUAL"
+                      },
+                      "pageSize": {
+                        "type": "MANUAL"
+                      },
+                      "table_name": {
+                        "type": "MANUAL"
+                      },
+                      "countOption": {
+                        "type": "MANUAL"
+                      }
+                    },
+                    "sampleData": {},
+                    "errorHandlingOptions": {
+                      "retryOnFailure": {
+                        "value": true
+                      },
+                      "continueOnFailure": {
+                        "value": false
+                      }
+                    }
+                  },
+                  "nextAction": {
+                    "name": "step_d1_c",
+                    "type": "PIECE",
+                    "displayName": "Send Renewal Reminder Email",
+                    "valid": true,
+                    "skip": false,
+                    "settings": {
+                      "input": {
+                        "auth": "",
+                        "receiver": [
+                          "{{step_d1_b[0]['phone']}}"
+                        ],
+                        "subject": "Renewal Reminder - Arnav Jain Tennis Academy",
+                        "body": "{{step_2['message']}}",
+                        "body_type": "text",
+                        "cc": [],
+                        "bcc": [],
+                        "reply_to": [],
+                        "draft": false
+                      },
+                      "pieceName": "@puchoaistudio/tool-gmail",
+                      "actionName": "send_email",
+                      "pieceVersion": "^2.0.4",
+                      "propertySettings": {
+                        "auth": {
+                          "type": "MANUAL"
+                        },
+                        "receiver": {
+                          "type": "MANUAL"
+                        },
+                        "subject": {
+                          "type": "MANUAL"
+                        },
+                        "body": {
+                          "type": "MANUAL"
+                        },
+                        "body_type": {
+                          "type": "MANUAL"
+                        },
+                        "cc": {
+                          "type": "MANUAL"
+                        },
+                        "bcc": {
+                          "type": "MANUAL"
+                        },
+                        "reply_to": {
+                          "type": "MANUAL"
+                        },
+                        "draft": {
+                          "type": "MANUAL"
+                        },
+                        "from": {
+                          "type": "MANUAL"
+                        },
+                        "sender_name": {
+                          "type": "MANUAL"
+                        },
+                        "attachment": {
+                          "type": "MANUAL"
+                        },
+                        "attachment_name": {
+                          "type": "MANUAL"
+                        }
+                      },
+                      "sampleData": {},
+                      "errorHandlingOptions": {
+                        "retryOnFailure": {
+                          "value": false
+                        },
+                        "continueOnFailure": {
+                          "value": true
+                        }
+                      }
+                    },
+                    "nextAction": {
+                      "name": "step_d1_d",
+                      "type": "PIECE",
+                      "displayName": "Update Package Stage",
+                      "valid": true,
+                      "skip": false,
+                      "settings": {
+                        "input": {
+                          "auth": "",
+                          "table_name": "packages",
+                          "update_data": {
+                            "reminder_stage": "{{step_2['stage']}}"
+                          },
+                          "filter_column": "id",
+                          "filter_value": "{{step_2['package_id']}}",
+                          "filter_type": "eq",
+                          "count_updated": false,
+                          "filter_values": [],
+                          "return_updated": false
+                        },
+                        "pieceName": "@puchoaistudio/tool-supabase",
+                        "actionName": "update_row",
+                        "pieceVersion": "^2.0.1",
+                        "propertySettings": {
+                          "auth": {
+                            "type": "MANUAL"
+                          },
+                          "table_name": {
+                            "type": "MANUAL"
+                          },
+                          "filter_type": {
+                            "type": "MANUAL"
+                          },
+                          "update_data": {
+                            "type": "MANUAL",
+                            "schema": {
+                              "reminder_stage": {
+                                "type": "SHORT_TEXT",
+                                "required": false,
+                                "displayName": "reminder_stage",
+                                "defaultValue": ""
+                              }
+                            }
+                          },
+                          "filter_value": {
+                            "type": "MANUAL"
+                          },
+                          "count_updated": {
+                            "type": "MANUAL"
+                          },
+                          "filter_column": {
+                            "type": "MANUAL"
+                          },
+                          "filter_values": {
+                            "type": "MANUAL"
+                          },
+                          "return_updated": {
+                            "type": "MANUAL"
+                          }
+                        },
+                        "sampleData": {},
+                        "errorHandlingOptions": {
+                          "retryOnFailure": {
+                            "value": true
+                          },
+                          "continueOnFailure": {
+                            "value": false
+                          }
+                        }
+                      },
+                      "nextAction": {
+                        "name": "step_d1_e",
+                        "type": "PIECE",
+                        "displayName": "Log Reminder",
+                        "valid": true,
+                        "skip": false,
+                        "settings": {
+                          "input": {
+                            "auth": "",
+                            "table_name": "reminders",
+                            "row_data": {
+                              "student_id": "{{step_2['student_id']}}",
+                              "package_id": "{{step_2['package_id']}}",
+                              "channel": "email",
+                              "stage": "{{step_2['stage']}}",
+                              "status": "sent"
+                            },
+                            "return_row": true
+                          },
+                          "pieceName": "@puchoaistudio/tool-supabase",
+                          "actionName": "create_row",
+                          "pieceVersion": "^2.0.1",
+                          "propertySettings": {
+                            "auth": {
+                              "type": "MANUAL"
+                            },
+                            "row_data": {
+                              "type": "MANUAL",
+                              "schema": {
+                                "student_id": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "student_id",
+                                  "defaultValue": ""
+                                },
+                                "package_id": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "package_id",
+                                  "defaultValue": ""
+                                },
+                                "channel": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "channel",
+                                  "defaultValue": ""
+                                },
+                                "stage": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "stage",
+                                  "defaultValue": ""
+                                },
+                                "status": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "status",
+                                  "defaultValue": ""
+                                }
+                              }
+                            },
+                            "return_row": {
+                              "type": "MANUAL"
+                            },
+                            "table_name": {
+                              "type": "MANUAL"
+                            }
+                          },
+                          "sampleData": {},
+                          "errorHandlingOptions": {
+                            "retryOnFailure": {
+                              "value": true
+                            },
+                            "continueOnFailure": {
+                              "value": false
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "name": "step_d2_a",
+                "type": "PIECE",
+                "displayName": "Find Student",
+                "valid": true,
+                "skip": false,
+                "settings": {
+                  "input": {
+                    "auth": "",
+                    "table_name": "students",
+                    "page": 1,
+                    "pageSize": 20,
+                    "filters": []
+                  },
+                  "pieceName": "@puchoaistudio/tool-supabase",
+                  "actionName": "search_rows",
+                  "pieceVersion": "^2.0.1",
+                  "propertySettings": {
+                    "auth": {
+                      "type": "MANUAL"
+                    },
+                    "page": {
+                      "type": "MANUAL"
+                    },
+                    "columns": {
+                      "type": "MANUAL"
+                    },
+                    "filters": {
+                      "type": "MANUAL"
+                    },
+                    "pageSize": {
+                      "type": "MANUAL"
+                    },
+                    "table_name": {
+                      "type": "MANUAL"
+                    },
+                    "countOption": {
+                      "type": "MANUAL"
+                    }
+                  },
+                  "sampleData": {},
+                  "errorHandlingOptions": {
+                    "retryOnFailure": {
+                      "value": true
+                    },
+                    "continueOnFailure": {
+                      "value": false
+                    }
+                  }
+                },
+                "nextAction": {
+                  "name": "step_d2_b",
+                  "type": "PIECE",
+                  "displayName": "Find Parent",
+                  "valid": true,
+                  "skip": false,
+                  "settings": {
+                    "input": {
+                      "auth": "",
+                      "table_name": "parents",
+                      "page": 1,
+                      "pageSize": 20,
+                      "filters": []
+                    },
+                    "pieceName": "@puchoaistudio/tool-supabase",
+                    "actionName": "search_rows",
+                    "pieceVersion": "^2.0.1",
+                    "propertySettings": {
+                      "auth": {
+                        "type": "MANUAL"
+                      },
+                      "page": {
+                        "type": "MANUAL"
+                      },
+                      "columns": {
+                        "type": "MANUAL"
+                      },
+                      "filters": {
+                        "type": "MANUAL"
+                      },
+                      "pageSize": {
+                        "type": "MANUAL"
+                      },
+                      "table_name": {
+                        "type": "MANUAL"
+                      },
+                      "countOption": {
+                        "type": "MANUAL"
+                      }
+                    },
+                    "sampleData": {},
+                    "errorHandlingOptions": {
+                      "retryOnFailure": {
+                        "value": true
+                      },
+                      "continueOnFailure": {
+                        "value": false
+                      }
+                    }
+                  },
+                  "nextAction": {
+                    "name": "step_d2_c",
+                    "type": "PIECE",
+                    "displayName": "Send Renewal Reminder Email",
+                    "valid": true,
+                    "skip": false,
+                    "settings": {
+                      "input": {
+                        "auth": "",
+                        "receiver": [
+                          "{{step_d2_b[0]['phone']}}"
+                        ],
+                        "subject": "Renewal Reminder - Arnav Jain Tennis Academy",
+                        "body": "{{step_2['message']}}",
+                        "body_type": "text",
+                        "cc": [],
+                        "bcc": [],
+                        "reply_to": [],
+                        "draft": false
+                      },
+                      "pieceName": "@puchoaistudio/tool-gmail",
+                      "actionName": "send_email",
+                      "pieceVersion": "^2.0.4",
+                      "propertySettings": {
+                        "auth": {
+                          "type": "MANUAL"
+                        },
+                        "receiver": {
+                          "type": "MANUAL"
+                        },
+                        "subject": {
+                          "type": "MANUAL"
+                        },
+                        "body": {
+                          "type": "MANUAL"
+                        },
+                        "body_type": {
+                          "type": "MANUAL"
+                        },
+                        "cc": {
+                          "type": "MANUAL"
+                        },
+                        "bcc": {
+                          "type": "MANUAL"
+                        },
+                        "reply_to": {
+                          "type": "MANUAL"
+                        },
+                        "draft": {
+                          "type": "MANUAL"
+                        },
+                        "from": {
+                          "type": "MANUAL"
+                        },
+                        "sender_name": {
+                          "type": "MANUAL"
+                        },
+                        "attachment": {
+                          "type": "MANUAL"
+                        },
+                        "attachment_name": {
+                          "type": "MANUAL"
+                        }
+                      },
+                      "sampleData": {},
+                      "errorHandlingOptions": {
+                        "retryOnFailure": {
+                          "value": false
+                        },
+                        "continueOnFailure": {
+                          "value": true
+                        }
+                      }
+                    },
+                    "nextAction": {
+                      "name": "step_d2_d",
+                      "type": "PIECE",
+                      "displayName": "Update Package Stage",
+                      "valid": true,
+                      "skip": false,
+                      "settings": {
+                        "input": {
+                          "auth": "",
+                          "table_name": "packages",
+                          "update_data": {
+                            "reminder_stage": "{{step_2['stage']}}"
+                          },
+                          "filter_column": "id",
+                          "filter_value": "{{step_2['package_id']}}",
+                          "filter_type": "eq",
+                          "count_updated": false,
+                          "filter_values": [],
+                          "return_updated": false
+                        },
+                        "pieceName": "@puchoaistudio/tool-supabase",
+                        "actionName": "update_row",
+                        "pieceVersion": "^2.0.1",
+                        "propertySettings": {
+                          "auth": {
+                            "type": "MANUAL"
+                          },
+                          "table_name": {
+                            "type": "MANUAL"
+                          },
+                          "filter_type": {
+                            "type": "MANUAL"
+                          },
+                          "update_data": {
+                            "type": "MANUAL",
+                            "schema": {
+                              "reminder_stage": {
+                                "type": "SHORT_TEXT",
+                                "required": false,
+                                "displayName": "reminder_stage",
+                                "defaultValue": ""
+                              }
+                            }
+                          },
+                          "filter_value": {
+                            "type": "MANUAL"
+                          },
+                          "count_updated": {
+                            "type": "MANUAL"
+                          },
+                          "filter_column": {
+                            "type": "MANUAL"
+                          },
+                          "filter_values": {
+                            "type": "MANUAL"
+                          },
+                          "return_updated": {
+                            "type": "MANUAL"
+                          }
+                        },
+                        "sampleData": {},
+                        "errorHandlingOptions": {
+                          "retryOnFailure": {
+                            "value": true
+                          },
+                          "continueOnFailure": {
+                            "value": false
+                          }
+                        }
+                      },
+                      "nextAction": {
+                        "name": "step_d2_e",
+                        "type": "PIECE",
+                        "displayName": "Log Reminder",
+                        "valid": true,
+                        "skip": false,
+                        "settings": {
+                          "input": {
+                            "auth": "",
+                            "table_name": "reminders",
+                            "row_data": {
+                              "student_id": "{{step_2['student_id']}}",
+                              "package_id": "{{step_2['package_id']}}",
+                              "channel": "email",
+                              "stage": "{{step_2['stage']}}",
+                              "status": "sent"
+                            },
+                            "return_row": true
+                          },
+                          "pieceName": "@puchoaistudio/tool-supabase",
+                          "actionName": "create_row",
+                          "pieceVersion": "^2.0.1",
+                          "propertySettings": {
+                            "auth": {
+                              "type": "MANUAL"
+                            },
+                            "row_data": {
+                              "type": "MANUAL",
+                              "schema": {
+                                "student_id": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "student_id",
+                                  "defaultValue": ""
+                                },
+                                "package_id": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "package_id",
+                                  "defaultValue": ""
+                                },
+                                "channel": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "channel",
+                                  "defaultValue": ""
+                                },
+                                "stage": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "stage",
+                                  "defaultValue": ""
+                                },
+                                "status": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "status",
+                                  "defaultValue": ""
+                                }
+                              }
+                            },
+                            "return_row": {
+                              "type": "MANUAL"
+                            },
+                            "table_name": {
+                              "type": "MANUAL"
+                            }
+                          },
+                          "sampleData": {},
+                          "errorHandlingOptions": {
+                            "retryOnFailure": {
+                              "value": true
+                            },
+                            "continueOnFailure": {
+                              "value": false
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "name": "step_d3_a",
+                "type": "PIECE",
+                "displayName": "Find Student",
+                "valid": true,
+                "skip": false,
+                "settings": {
+                  "input": {
+                    "auth": "",
+                    "table_name": "students",
+                    "page": 1,
+                    "pageSize": 20,
+                    "filters": []
+                  },
+                  "pieceName": "@puchoaistudio/tool-supabase",
+                  "actionName": "search_rows",
+                  "pieceVersion": "^2.0.1",
+                  "propertySettings": {
+                    "auth": {
+                      "type": "MANUAL"
+                    },
+                    "page": {
+                      "type": "MANUAL"
+                    },
+                    "columns": {
+                      "type": "MANUAL"
+                    },
+                    "filters": {
+                      "type": "MANUAL"
+                    },
+                    "pageSize": {
+                      "type": "MANUAL"
+                    },
+                    "table_name": {
+                      "type": "MANUAL"
+                    },
+                    "countOption": {
+                      "type": "MANUAL"
+                    }
+                  },
+                  "sampleData": {},
+                  "errorHandlingOptions": {
+                    "retryOnFailure": {
+                      "value": true
+                    },
+                    "continueOnFailure": {
+                      "value": false
+                    }
+                  }
+                },
+                "nextAction": {
+                  "name": "step_d3_b",
+                  "type": "PIECE",
+                  "displayName": "Find Parent",
+                  "valid": true,
+                  "skip": false,
+                  "settings": {
+                    "input": {
+                      "auth": "",
+                      "table_name": "parents",
+                      "page": 1,
+                      "pageSize": 20,
+                      "filters": []
+                    },
+                    "pieceName": "@puchoaistudio/tool-supabase",
+                    "actionName": "search_rows",
+                    "pieceVersion": "^2.0.1",
+                    "propertySettings": {
+                      "auth": {
+                        "type": "MANUAL"
+                      },
+                      "page": {
+                        "type": "MANUAL"
+                      },
+                      "columns": {
+                        "type": "MANUAL"
+                      },
+                      "filters": {
+                        "type": "MANUAL"
+                      },
+                      "pageSize": {
+                        "type": "MANUAL"
+                      },
+                      "table_name": {
+                        "type": "MANUAL"
+                      },
+                      "countOption": {
+                        "type": "MANUAL"
+                      }
+                    },
+                    "sampleData": {},
+                    "errorHandlingOptions": {
+                      "retryOnFailure": {
+                        "value": true
+                      },
+                      "continueOnFailure": {
+                        "value": false
+                      }
+                    }
+                  },
+                  "nextAction": {
+                    "name": "step_d3_c",
+                    "type": "PIECE",
+                    "displayName": "Send Renewal Reminder Email",
+                    "valid": true,
+                    "skip": false,
+                    "settings": {
+                      "input": {
+                        "auth": "",
+                        "receiver": [
+                          "{{step_d3_b[0]['phone']}}"
+                        ],
+                        "subject": "Renewal Reminder - Arnav Jain Tennis Academy",
+                        "body": "{{step_2['message']}}",
+                        "body_type": "text",
+                        "cc": [],
+                        "bcc": [],
+                        "reply_to": [],
+                        "draft": false
+                      },
+                      "pieceName": "@puchoaistudio/tool-gmail",
+                      "actionName": "send_email",
+                      "pieceVersion": "^2.0.4",
+                      "propertySettings": {
+                        "auth": {
+                          "type": "MANUAL"
+                        },
+                        "receiver": {
+                          "type": "MANUAL"
+                        },
+                        "subject": {
+                          "type": "MANUAL"
+                        },
+                        "body": {
+                          "type": "MANUAL"
+                        },
+                        "body_type": {
+                          "type": "MANUAL"
+                        },
+                        "cc": {
+                          "type": "MANUAL"
+                        },
+                        "bcc": {
+                          "type": "MANUAL"
+                        },
+                        "reply_to": {
+                          "type": "MANUAL"
+                        },
+                        "draft": {
+                          "type": "MANUAL"
+                        },
+                        "from": {
+                          "type": "MANUAL"
+                        },
+                        "sender_name": {
+                          "type": "MANUAL"
+                        },
+                        "attachment": {
+                          "type": "MANUAL"
+                        },
+                        "attachment_name": {
+                          "type": "MANUAL"
+                        }
+                      },
+                      "sampleData": {},
+                      "errorHandlingOptions": {
+                        "retryOnFailure": {
+                          "value": false
+                        },
+                        "continueOnFailure": {
+                          "value": true
+                        }
+                      }
+                    },
+                    "nextAction": {
+                      "name": "step_d3_d",
+                      "type": "PIECE",
+                      "displayName": "Update Package Stage",
+                      "valid": true,
+                      "skip": false,
+                      "settings": {
+                        "input": {
+                          "auth": "",
+                          "table_name": "packages",
+                          "update_data": {
+                            "reminder_stage": "{{step_2['stage']}}"
+                          },
+                          "filter_column": "id",
+                          "filter_value": "{{step_2['package_id']}}",
+                          "filter_type": "eq",
+                          "count_updated": false,
+                          "filter_values": [],
+                          "return_updated": false
+                        },
+                        "pieceName": "@puchoaistudio/tool-supabase",
+                        "actionName": "update_row",
+                        "pieceVersion": "^2.0.1",
+                        "propertySettings": {
+                          "auth": {
+                            "type": "MANUAL"
+                          },
+                          "table_name": {
+                            "type": "MANUAL"
+                          },
+                          "filter_type": {
+                            "type": "MANUAL"
+                          },
+                          "update_data": {
+                            "type": "MANUAL",
+                            "schema": {
+                              "reminder_stage": {
+                                "type": "SHORT_TEXT",
+                                "required": false,
+                                "displayName": "reminder_stage",
+                                "defaultValue": ""
+                              }
+                            }
+                          },
+                          "filter_value": {
+                            "type": "MANUAL"
+                          },
+                          "count_updated": {
+                            "type": "MANUAL"
+                          },
+                          "filter_column": {
+                            "type": "MANUAL"
+                          },
+                          "filter_values": {
+                            "type": "MANUAL"
+                          },
+                          "return_updated": {
+                            "type": "MANUAL"
+                          }
+                        },
+                        "sampleData": {},
+                        "errorHandlingOptions": {
+                          "retryOnFailure": {
+                            "value": true
+                          },
+                          "continueOnFailure": {
+                            "value": false
+                          }
+                        }
+                      },
+                      "nextAction": {
+                        "name": "step_d3_e",
+                        "type": "PIECE",
+                        "displayName": "Log Reminder",
+                        "valid": true,
+                        "skip": false,
+                        "settings": {
+                          "input": {
+                            "auth": "",
+                            "table_name": "reminders",
+                            "row_data": {
+                              "student_id": "{{step_2['student_id']}}",
+                              "package_id": "{{step_2['package_id']}}",
+                              "channel": "email",
+                              "stage": "{{step_2['stage']}}",
+                              "status": "sent"
+                            },
+                            "return_row": true
+                          },
+                          "pieceName": "@puchoaistudio/tool-supabase",
+                          "actionName": "create_row",
+                          "pieceVersion": "^2.0.1",
+                          "propertySettings": {
+                            "auth": {
+                              "type": "MANUAL"
+                            },
+                            "row_data": {
+                              "type": "MANUAL",
+                              "schema": {
+                                "student_id": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "student_id",
+                                  "defaultValue": ""
+                                },
+                                "package_id": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "package_id",
+                                  "defaultValue": ""
+                                },
+                                "channel": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "channel",
+                                  "defaultValue": ""
+                                },
+                                "stage": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "stage",
+                                  "defaultValue": ""
+                                },
+                                "status": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "status",
+                                  "defaultValue": ""
+                                }
+                              }
+                            },
+                            "return_row": {
+                              "type": "MANUAL"
+                            },
+                            "table_name": {
+                              "type": "MANUAL"
+                            }
+                          },
+                          "sampleData": {},
+                          "errorHandlingOptions": {
+                            "retryOnFailure": {
+                              "value": true
+                            },
+                            "continueOnFailure": {
+                              "value": false
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "name": "step_d4_a",
+                "type": "PIECE",
+                "displayName": "Find Student",
+                "valid": true,
+                "skip": false,
+                "settings": {
+                  "input": {
+                    "auth": "",
+                    "table_name": "students",
+                    "page": 1,
+                    "pageSize": 20,
+                    "filters": []
+                  },
+                  "pieceName": "@puchoaistudio/tool-supabase",
+                  "actionName": "search_rows",
+                  "pieceVersion": "^2.0.1",
+                  "propertySettings": {
+                    "auth": {
+                      "type": "MANUAL"
+                    },
+                    "page": {
+                      "type": "MANUAL"
+                    },
+                    "columns": {
+                      "type": "MANUAL"
+                    },
+                    "filters": {
+                      "type": "MANUAL"
+                    },
+                    "pageSize": {
+                      "type": "MANUAL"
+                    },
+                    "table_name": {
+                      "type": "MANUAL"
+                    },
+                    "countOption": {
+                      "type": "MANUAL"
+                    }
+                  },
+                  "sampleData": {},
+                  "errorHandlingOptions": {
+                    "retryOnFailure": {
+                      "value": true
+                    },
+                    "continueOnFailure": {
+                      "value": false
+                    }
+                  }
+                },
+                "nextAction": {
+                  "name": "step_d4_b",
+                  "type": "PIECE",
+                  "displayName": "Find Parent",
+                  "valid": true,
+                  "skip": false,
+                  "settings": {
+                    "input": {
+                      "auth": "",
+                      "table_name": "parents",
+                      "page": 1,
+                      "pageSize": 20,
+                      "filters": []
+                    },
+                    "pieceName": "@puchoaistudio/tool-supabase",
+                    "actionName": "search_rows",
+                    "pieceVersion": "^2.0.1",
+                    "propertySettings": {
+                      "auth": {
+                        "type": "MANUAL"
+                      },
+                      "page": {
+                        "type": "MANUAL"
+                      },
+                      "columns": {
+                        "type": "MANUAL"
+                      },
+                      "filters": {
+                        "type": "MANUAL"
+                      },
+                      "pageSize": {
+                        "type": "MANUAL"
+                      },
+                      "table_name": {
+                        "type": "MANUAL"
+                      },
+                      "countOption": {
+                        "type": "MANUAL"
+                      }
+                    },
+                    "sampleData": {},
+                    "errorHandlingOptions": {
+                      "retryOnFailure": {
+                        "value": true
+                      },
+                      "continueOnFailure": {
+                        "value": false
+                      }
+                    }
+                  },
+                  "nextAction": {
+                    "name": "step_d4_c",
+                    "type": "PIECE",
+                    "displayName": "Send Renewal Reminder Email",
+                    "valid": true,
+                    "skip": false,
+                    "settings": {
+                      "input": {
+                        "auth": "",
+                        "receiver": [
+                          "{{step_d4_b[0]['phone']}}"
+                        ],
+                        "subject": "Renewal Reminder - Arnav Jain Tennis Academy",
+                        "body": "{{step_2['message']}}",
+                        "body_type": "text",
+                        "cc": [],
+                        "bcc": [],
+                        "reply_to": [],
+                        "draft": false
+                      },
+                      "pieceName": "@puchoaistudio/tool-gmail",
+                      "actionName": "send_email",
+                      "pieceVersion": "^2.0.4",
+                      "propertySettings": {
+                        "auth": {
+                          "type": "MANUAL"
+                        },
+                        "receiver": {
+                          "type": "MANUAL"
+                        },
+                        "subject": {
+                          "type": "MANUAL"
+                        },
+                        "body": {
+                          "type": "MANUAL"
+                        },
+                        "body_type": {
+                          "type": "MANUAL"
+                        },
+                        "cc": {
+                          "type": "MANUAL"
+                        },
+                        "bcc": {
+                          "type": "MANUAL"
+                        },
+                        "reply_to": {
+                          "type": "MANUAL"
+                        },
+                        "draft": {
+                          "type": "MANUAL"
+                        },
+                        "from": {
+                          "type": "MANUAL"
+                        },
+                        "sender_name": {
+                          "type": "MANUAL"
+                        },
+                        "attachment": {
+                          "type": "MANUAL"
+                        },
+                        "attachment_name": {
+                          "type": "MANUAL"
+                        }
+                      },
+                      "sampleData": {},
+                      "errorHandlingOptions": {
+                        "retryOnFailure": {
+                          "value": false
+                        },
+                        "continueOnFailure": {
+                          "value": true
+                        }
+                      }
+                    },
+                    "nextAction": {
+                      "name": "step_d4_d",
+                      "type": "PIECE",
+                      "displayName": "Update Package Stage",
+                      "valid": true,
+                      "skip": false,
+                      "settings": {
+                        "input": {
+                          "auth": "",
+                          "table_name": "packages",
+                          "update_data": {
+                            "reminder_stage": "{{step_2['stage']}}"
+                          },
+                          "filter_column": "id",
+                          "filter_value": "{{step_2['package_id']}}",
+                          "filter_type": "eq",
+                          "count_updated": false,
+                          "filter_values": [],
+                          "return_updated": false
+                        },
+                        "pieceName": "@puchoaistudio/tool-supabase",
+                        "actionName": "update_row",
+                        "pieceVersion": "^2.0.1",
+                        "propertySettings": {
+                          "auth": {
+                            "type": "MANUAL"
+                          },
+                          "table_name": {
+                            "type": "MANUAL"
+                          },
+                          "filter_type": {
+                            "type": "MANUAL"
+                          },
+                          "update_data": {
+                            "type": "MANUAL",
+                            "schema": {
+                              "reminder_stage": {
+                                "type": "SHORT_TEXT",
+                                "required": false,
+                                "displayName": "reminder_stage",
+                                "defaultValue": ""
+                              }
+                            }
+                          },
+                          "filter_value": {
+                            "type": "MANUAL"
+                          },
+                          "count_updated": {
+                            "type": "MANUAL"
+                          },
+                          "filter_column": {
+                            "type": "MANUAL"
+                          },
+                          "filter_values": {
+                            "type": "MANUAL"
+                          },
+                          "return_updated": {
+                            "type": "MANUAL"
+                          }
+                        },
+                        "sampleData": {},
+                        "errorHandlingOptions": {
+                          "retryOnFailure": {
+                            "value": true
+                          },
+                          "continueOnFailure": {
+                            "value": false
+                          }
+                        }
+                      },
+                      "nextAction": {
+                        "name": "step_d4_e",
+                        "type": "PIECE",
+                        "displayName": "Log Reminder",
+                        "valid": true,
+                        "skip": false,
+                        "settings": {
+                          "input": {
+                            "auth": "",
+                            "table_name": "reminders",
+                            "row_data": {
+                              "student_id": "{{step_2['student_id']}}",
+                              "package_id": "{{step_2['package_id']}}",
+                              "channel": "email",
+                              "stage": "{{step_2['stage']}}",
+                              "status": "sent"
+                            },
+                            "return_row": true
+                          },
+                          "pieceName": "@puchoaistudio/tool-supabase",
+                          "actionName": "create_row",
+                          "pieceVersion": "^2.0.1",
+                          "propertySettings": {
+                            "auth": {
+                              "type": "MANUAL"
+                            },
+                            "row_data": {
+                              "type": "MANUAL",
+                              "schema": {
+                                "student_id": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "student_id",
+                                  "defaultValue": ""
+                                },
+                                "package_id": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "package_id",
+                                  "defaultValue": ""
+                                },
+                                "channel": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "channel",
+                                  "defaultValue": ""
+                                },
+                                "stage": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "stage",
+                                  "defaultValue": ""
+                                },
+                                "status": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "status",
+                                  "defaultValue": ""
+                                }
+                              }
+                            },
+                            "return_row": {
+                              "type": "MANUAL"
+                            },
+                            "table_name": {
+                              "type": "MANUAL"
+                            }
+                          },
+                          "sampleData": {},
+                          "errorHandlingOptions": {
+                            "retryOnFailure": {
+                              "value": true
+                            },
+                            "continueOnFailure": {
+                              "value": false
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "name": "step_d5_a",
+                "type": "PIECE",
+                "displayName": "Find Student",
+                "valid": true,
+                "skip": false,
+                "settings": {
+                  "input": {
+                    "auth": "",
+                    "table_name": "students",
+                    "page": 1,
+                    "pageSize": 20,
+                    "filters": []
+                  },
+                  "pieceName": "@puchoaistudio/tool-supabase",
+                  "actionName": "search_rows",
+                  "pieceVersion": "^2.0.1",
+                  "propertySettings": {
+                    "auth": {
+                      "type": "MANUAL"
+                    },
+                    "page": {
+                      "type": "MANUAL"
+                    },
+                    "columns": {
+                      "type": "MANUAL"
+                    },
+                    "filters": {
+                      "type": "MANUAL"
+                    },
+                    "pageSize": {
+                      "type": "MANUAL"
+                    },
+                    "table_name": {
+                      "type": "MANUAL"
+                    },
+                    "countOption": {
+                      "type": "MANUAL"
+                    }
+                  },
+                  "sampleData": {},
+                  "errorHandlingOptions": {
+                    "retryOnFailure": {
+                      "value": true
+                    },
+                    "continueOnFailure": {
+                      "value": false
+                    }
+                  }
+                },
+                "nextAction": {
+                  "name": "step_d5_b",
+                  "type": "PIECE",
+                  "displayName": "Find Parent",
+                  "valid": true,
+                  "skip": false,
+                  "settings": {
+                    "input": {
+                      "auth": "",
+                      "table_name": "parents",
+                      "page": 1,
+                      "pageSize": 20,
+                      "filters": []
+                    },
+                    "pieceName": "@puchoaistudio/tool-supabase",
+                    "actionName": "search_rows",
+                    "pieceVersion": "^2.0.1",
+                    "propertySettings": {
+                      "auth": {
+                        "type": "MANUAL"
+                      },
+                      "page": {
+                        "type": "MANUAL"
+                      },
+                      "columns": {
+                        "type": "MANUAL"
+                      },
+                      "filters": {
+                        "type": "MANUAL"
+                      },
+                      "pageSize": {
+                        "type": "MANUAL"
+                      },
+                      "table_name": {
+                        "type": "MANUAL"
+                      },
+                      "countOption": {
+                        "type": "MANUAL"
+                      }
+                    },
+                    "sampleData": {},
+                    "errorHandlingOptions": {
+                      "retryOnFailure": {
+                        "value": true
+                      },
+                      "continueOnFailure": {
+                        "value": false
+                      }
+                    }
+                  },
+                  "nextAction": {
+                    "name": "step_d5_c",
+                    "type": "PIECE",
+                    "displayName": "Send Renewal Reminder Email",
+                    "valid": true,
+                    "skip": false,
+                    "settings": {
+                      "input": {
+                        "auth": "",
+                        "receiver": [
+                          "{{step_d5_b[0]['phone']}}"
+                        ],
+                        "subject": "Renewal Reminder - Arnav Jain Tennis Academy",
+                        "body": "{{step_2['message']}}",
+                        "body_type": "text",
+                        "cc": [],
+                        "bcc": [],
+                        "reply_to": [],
+                        "draft": false
+                      },
+                      "pieceName": "@puchoaistudio/tool-gmail",
+                      "actionName": "send_email",
+                      "pieceVersion": "^2.0.4",
+                      "propertySettings": {
+                        "auth": {
+                          "type": "MANUAL"
+                        },
+                        "receiver": {
+                          "type": "MANUAL"
+                        },
+                        "subject": {
+                          "type": "MANUAL"
+                        },
+                        "body": {
+                          "type": "MANUAL"
+                        },
+                        "body_type": {
+                          "type": "MANUAL"
+                        },
+                        "cc": {
+                          "type": "MANUAL"
+                        },
+                        "bcc": {
+                          "type": "MANUAL"
+                        },
+                        "reply_to": {
+                          "type": "MANUAL"
+                        },
+                        "draft": {
+                          "type": "MANUAL"
+                        },
+                        "from": {
+                          "type": "MANUAL"
+                        },
+                        "sender_name": {
+                          "type": "MANUAL"
+                        },
+                        "attachment": {
+                          "type": "MANUAL"
+                        },
+                        "attachment_name": {
+                          "type": "MANUAL"
+                        }
+                      },
+                      "sampleData": {},
+                      "errorHandlingOptions": {
+                        "retryOnFailure": {
+                          "value": false
+                        },
+                        "continueOnFailure": {
+                          "value": true
+                        }
+                      }
+                    },
+                    "nextAction": {
+                      "name": "step_d5_d",
+                      "type": "PIECE",
+                      "displayName": "Update Package Stage",
+                      "valid": true,
+                      "skip": false,
+                      "settings": {
+                        "input": {
+                          "auth": "",
+                          "table_name": "packages",
+                          "update_data": {
+                            "reminder_stage": "{{step_2['stage']}}"
+                          },
+                          "filter_column": "id",
+                          "filter_value": "{{step_2['package_id']}}",
+                          "filter_type": "eq",
+                          "count_updated": false,
+                          "filter_values": [],
+                          "return_updated": false
+                        },
+                        "pieceName": "@puchoaistudio/tool-supabase",
+                        "actionName": "update_row",
+                        "pieceVersion": "^2.0.1",
+                        "propertySettings": {
+                          "auth": {
+                            "type": "MANUAL"
+                          },
+                          "table_name": {
+                            "type": "MANUAL"
+                          },
+                          "filter_type": {
+                            "type": "MANUAL"
+                          },
+                          "update_data": {
+                            "type": "MANUAL",
+                            "schema": {
+                              "reminder_stage": {
+                                "type": "SHORT_TEXT",
+                                "required": false,
+                                "displayName": "reminder_stage",
+                                "defaultValue": ""
+                              }
+                            }
+                          },
+                          "filter_value": {
+                            "type": "MANUAL"
+                          },
+                          "count_updated": {
+                            "type": "MANUAL"
+                          },
+                          "filter_column": {
+                            "type": "MANUAL"
+                          },
+                          "filter_values": {
+                            "type": "MANUAL"
+                          },
+                          "return_updated": {
+                            "type": "MANUAL"
+                          }
+                        },
+                        "sampleData": {},
+                        "errorHandlingOptions": {
+                          "retryOnFailure": {
+                            "value": true
+                          },
+                          "continueOnFailure": {
+                            "value": false
+                          }
+                        }
+                      },
+                      "nextAction": {
+                        "name": "step_d5_e",
+                        "type": "PIECE",
+                        "displayName": "Log Reminder",
+                        "valid": true,
+                        "skip": false,
+                        "settings": {
+                          "input": {
+                            "auth": "",
+                            "table_name": "reminders",
+                            "row_data": {
+                              "student_id": "{{step_2['student_id']}}",
+                              "package_id": "{{step_2['package_id']}}",
+                              "channel": "email",
+                              "stage": "{{step_2['stage']}}",
+                              "status": "sent"
+                            },
+                            "return_row": true
+                          },
+                          "pieceName": "@puchoaistudio/tool-supabase",
+                          "actionName": "create_row",
+                          "pieceVersion": "^2.0.1",
+                          "propertySettings": {
+                            "auth": {
+                              "type": "MANUAL"
+                            },
+                            "row_data": {
+                              "type": "MANUAL",
+                              "schema": {
+                                "student_id": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "student_id",
+                                  "defaultValue": ""
+                                },
+                                "package_id": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "package_id",
+                                  "defaultValue": ""
+                                },
+                                "channel": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "channel",
+                                  "defaultValue": ""
+                                },
+                                "stage": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "stage",
+                                  "defaultValue": ""
+                                },
+                                "status": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "status",
+                                  "defaultValue": ""
+                                }
+                              }
+                            },
+                            "return_row": {
+                              "type": "MANUAL"
+                            },
+                            "table_name": {
+                              "type": "MANUAL"
+                            }
+                          },
+                          "sampleData": {},
+                          "errorHandlingOptions": {
+                            "retryOnFailure": {
+                              "value": true
+                            },
+                            "continueOnFailure": {
+                              "value": false
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "name": "step_d6_a",
+                "type": "PIECE",
+                "displayName": "Find Student",
+                "valid": true,
+                "skip": false,
+                "settings": {
+                  "input": {
+                    "auth": "",
+                    "table_name": "students",
+                    "page": 1,
+                    "pageSize": 20,
+                    "filters": []
+                  },
+                  "pieceName": "@puchoaistudio/tool-supabase",
+                  "actionName": "search_rows",
+                  "pieceVersion": "^2.0.1",
+                  "propertySettings": {
+                    "auth": {
+                      "type": "MANUAL"
+                    },
+                    "page": {
+                      "type": "MANUAL"
+                    },
+                    "columns": {
+                      "type": "MANUAL"
+                    },
+                    "filters": {
+                      "type": "MANUAL"
+                    },
+                    "pageSize": {
+                      "type": "MANUAL"
+                    },
+                    "table_name": {
+                      "type": "MANUAL"
+                    },
+                    "countOption": {
+                      "type": "MANUAL"
+                    }
+                  },
+                  "sampleData": {},
+                  "errorHandlingOptions": {
+                    "retryOnFailure": {
+                      "value": true
+                    },
+                    "continueOnFailure": {
+                      "value": false
+                    }
+                  }
+                },
+                "nextAction": {
+                  "name": "step_d6_b",
+                  "type": "PIECE",
+                  "displayName": "Find Parent",
+                  "valid": true,
+                  "skip": false,
+                  "settings": {
+                    "input": {
+                      "auth": "",
+                      "table_name": "parents",
+                      "page": 1,
+                      "pageSize": 20,
+                      "filters": []
+                    },
+                    "pieceName": "@puchoaistudio/tool-supabase",
+                    "actionName": "search_rows",
+                    "pieceVersion": "^2.0.1",
+                    "propertySettings": {
+                      "auth": {
+                        "type": "MANUAL"
+                      },
+                      "page": {
+                        "type": "MANUAL"
+                      },
+                      "columns": {
+                        "type": "MANUAL"
+                      },
+                      "filters": {
+                        "type": "MANUAL"
+                      },
+                      "pageSize": {
+                        "type": "MANUAL"
+                      },
+                      "table_name": {
+                        "type": "MANUAL"
+                      },
+                      "countOption": {
+                        "type": "MANUAL"
+                      }
+                    },
+                    "sampleData": {},
+                    "errorHandlingOptions": {
+                      "retryOnFailure": {
+                        "value": true
+                      },
+                      "continueOnFailure": {
+                        "value": false
+                      }
+                    }
+                  },
+                  "nextAction": {
+                    "name": "step_d6_c",
+                    "type": "PIECE",
+                    "displayName": "Send Renewal Reminder Email",
+                    "valid": true,
+                    "skip": false,
+                    "settings": {
+                      "input": {
+                        "auth": "",
+                        "receiver": [
+                          "{{step_d6_b[0]['phone']}}"
+                        ],
+                        "subject": "Renewal Reminder - Arnav Jain Tennis Academy",
+                        "body": "{{step_2['message']}}",
+                        "body_type": "text",
+                        "cc": [],
+                        "bcc": [],
+                        "reply_to": [],
+                        "draft": false
+                      },
+                      "pieceName": "@puchoaistudio/tool-gmail",
+                      "actionName": "send_email",
+                      "pieceVersion": "^2.0.4",
+                      "propertySettings": {
+                        "auth": {
+                          "type": "MANUAL"
+                        },
+                        "receiver": {
+                          "type": "MANUAL"
+                        },
+                        "subject": {
+                          "type": "MANUAL"
+                        },
+                        "body": {
+                          "type": "MANUAL"
+                        },
+                        "body_type": {
+                          "type": "MANUAL"
+                        },
+                        "cc": {
+                          "type": "MANUAL"
+                        },
+                        "bcc": {
+                          "type": "MANUAL"
+                        },
+                        "reply_to": {
+                          "type": "MANUAL"
+                        },
+                        "draft": {
+                          "type": "MANUAL"
+                        },
+                        "from": {
+                          "type": "MANUAL"
+                        },
+                        "sender_name": {
+                          "type": "MANUAL"
+                        },
+                        "attachment": {
+                          "type": "MANUAL"
+                        },
+                        "attachment_name": {
+                          "type": "MANUAL"
+                        }
+                      },
+                      "sampleData": {},
+                      "errorHandlingOptions": {
+                        "retryOnFailure": {
+                          "value": false
+                        },
+                        "continueOnFailure": {
+                          "value": true
+                        }
+                      }
+                    },
+                    "nextAction": {
+                      "name": "step_d6_d",
+                      "type": "PIECE",
+                      "displayName": "Update Package Stage",
+                      "valid": true,
+                      "skip": false,
+                      "settings": {
+                        "input": {
+                          "auth": "",
+                          "table_name": "packages",
+                          "update_data": {
+                            "reminder_stage": "{{step_2['stage']}}"
+                          },
+                          "filter_column": "id",
+                          "filter_value": "{{step_2['package_id']}}",
+                          "filter_type": "eq",
+                          "count_updated": false,
+                          "filter_values": [],
+                          "return_updated": false
+                        },
+                        "pieceName": "@puchoaistudio/tool-supabase",
+                        "actionName": "update_row",
+                        "pieceVersion": "^2.0.1",
+                        "propertySettings": {
+                          "auth": {
+                            "type": "MANUAL"
+                          },
+                          "table_name": {
+                            "type": "MANUAL"
+                          },
+                          "filter_type": {
+                            "type": "MANUAL"
+                          },
+                          "update_data": {
+                            "type": "MANUAL",
+                            "schema": {
+                              "reminder_stage": {
+                                "type": "SHORT_TEXT",
+                                "required": false,
+                                "displayName": "reminder_stage",
+                                "defaultValue": ""
+                              }
+                            }
+                          },
+                          "filter_value": {
+                            "type": "MANUAL"
+                          },
+                          "count_updated": {
+                            "type": "MANUAL"
+                          },
+                          "filter_column": {
+                            "type": "MANUAL"
+                          },
+                          "filter_values": {
+                            "type": "MANUAL"
+                          },
+                          "return_updated": {
+                            "type": "MANUAL"
+                          }
+                        },
+                        "sampleData": {},
+                        "errorHandlingOptions": {
+                          "retryOnFailure": {
+                            "value": true
+                          },
+                          "continueOnFailure": {
+                            "value": false
+                          }
+                        }
+                      },
+                      "nextAction": {
+                        "name": "step_d6_e",
+                        "type": "PIECE",
+                        "displayName": "Log Reminder",
+                        "valid": true,
+                        "skip": false,
+                        "settings": {
+                          "input": {
+                            "auth": "",
+                            "table_name": "reminders",
+                            "row_data": {
+                              "student_id": "{{step_2['student_id']}}",
+                              "package_id": "{{step_2['package_id']}}",
+                              "channel": "email",
+                              "stage": "{{step_2['stage']}}",
+                              "status": "sent"
+                            },
+                            "return_row": true
+                          },
+                          "pieceName": "@puchoaistudio/tool-supabase",
+                          "actionName": "create_row",
+                          "pieceVersion": "^2.0.1",
+                          "propertySettings": {
+                            "auth": {
+                              "type": "MANUAL"
+                            },
+                            "row_data": {
+                              "type": "MANUAL",
+                              "schema": {
+                                "student_id": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "student_id",
+                                  "defaultValue": ""
+                                },
+                                "package_id": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "package_id",
+                                  "defaultValue": ""
+                                },
+                                "channel": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "channel",
+                                  "defaultValue": ""
+                                },
+                                "stage": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "stage",
+                                  "defaultValue": ""
+                                },
+                                "status": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "status",
+                                  "defaultValue": ""
+                                }
+                              }
+                            },
+                            "return_row": {
+                              "type": "MANUAL"
+                            },
+                            "table_name": {
+                              "type": "MANUAL"
+                            }
+                          },
+                          "sampleData": {},
+                          "errorHandlingOptions": {
+                            "retryOnFailure": {
+                              "value": true
+                            },
+                            "continueOnFailure": {
+                              "value": false
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "name": "step_d7_a",
+                "type": "PIECE",
+                "displayName": "Find Student",
+                "valid": true,
+                "skip": false,
+                "settings": {
+                  "input": {
+                    "auth": "",
+                    "table_name": "students",
+                    "page": 1,
+                    "pageSize": 20,
+                    "filters": []
+                  },
+                  "pieceName": "@puchoaistudio/tool-supabase",
+                  "actionName": "search_rows",
+                  "pieceVersion": "^2.0.1",
+                  "propertySettings": {
+                    "auth": {
+                      "type": "MANUAL"
+                    },
+                    "page": {
+                      "type": "MANUAL"
+                    },
+                    "columns": {
+                      "type": "MANUAL"
+                    },
+                    "filters": {
+                      "type": "MANUAL"
+                    },
+                    "pageSize": {
+                      "type": "MANUAL"
+                    },
+                    "table_name": {
+                      "type": "MANUAL"
+                    },
+                    "countOption": {
+                      "type": "MANUAL"
+                    }
+                  },
+                  "sampleData": {},
+                  "errorHandlingOptions": {
+                    "retryOnFailure": {
+                      "value": true
+                    },
+                    "continueOnFailure": {
+                      "value": false
+                    }
+                  }
+                },
+                "nextAction": {
+                  "name": "step_d7_b",
+                  "type": "PIECE",
+                  "displayName": "Find Parent",
+                  "valid": true,
+                  "skip": false,
+                  "settings": {
+                    "input": {
+                      "auth": "",
+                      "table_name": "parents",
+                      "page": 1,
+                      "pageSize": 20,
+                      "filters": []
+                    },
+                    "pieceName": "@puchoaistudio/tool-supabase",
+                    "actionName": "search_rows",
+                    "pieceVersion": "^2.0.1",
+                    "propertySettings": {
+                      "auth": {
+                        "type": "MANUAL"
+                      },
+                      "page": {
+                        "type": "MANUAL"
+                      },
+                      "columns": {
+                        "type": "MANUAL"
+                      },
+                      "filters": {
+                        "type": "MANUAL"
+                      },
+                      "pageSize": {
+                        "type": "MANUAL"
+                      },
+                      "table_name": {
+                        "type": "MANUAL"
+                      },
+                      "countOption": {
+                        "type": "MANUAL"
+                      }
+                    },
+                    "sampleData": {},
+                    "errorHandlingOptions": {
+                      "retryOnFailure": {
+                        "value": true
+                      },
+                      "continueOnFailure": {
+                        "value": false
+                      }
+                    }
+                  },
+                  "nextAction": {
+                    "name": "step_d7_c",
+                    "type": "PIECE",
+                    "displayName": "Send Renewal Reminder Email",
+                    "valid": true,
+                    "skip": false,
+                    "settings": {
+                      "input": {
+                        "auth": "",
+                        "receiver": [
+                          "{{step_d7_b[0]['phone']}}"
+                        ],
+                        "subject": "Renewal Reminder - Arnav Jain Tennis Academy",
+                        "body": "{{step_2['message']}}",
+                        "body_type": "text",
+                        "cc": [],
+                        "bcc": [],
+                        "reply_to": [],
+                        "draft": false
+                      },
+                      "pieceName": "@puchoaistudio/tool-gmail",
+                      "actionName": "send_email",
+                      "pieceVersion": "^2.0.4",
+                      "propertySettings": {
+                        "auth": {
+                          "type": "MANUAL"
+                        },
+                        "receiver": {
+                          "type": "MANUAL"
+                        },
+                        "subject": {
+                          "type": "MANUAL"
+                        },
+                        "body": {
+                          "type": "MANUAL"
+                        },
+                        "body_type": {
+                          "type": "MANUAL"
+                        },
+                        "cc": {
+                          "type": "MANUAL"
+                        },
+                        "bcc": {
+                          "type": "MANUAL"
+                        },
+                        "reply_to": {
+                          "type": "MANUAL"
+                        },
+                        "draft": {
+                          "type": "MANUAL"
+                        },
+                        "from": {
+                          "type": "MANUAL"
+                        },
+                        "sender_name": {
+                          "type": "MANUAL"
+                        },
+                        "attachment": {
+                          "type": "MANUAL"
+                        },
+                        "attachment_name": {
+                          "type": "MANUAL"
+                        }
+                      },
+                      "sampleData": {},
+                      "errorHandlingOptions": {
+                        "retryOnFailure": {
+                          "value": false
+                        },
+                        "continueOnFailure": {
+                          "value": true
+                        }
+                      }
+                    },
+                    "nextAction": {
+                      "name": "step_d7_d",
+                      "type": "PIECE",
+                      "displayName": "Update Package Stage",
+                      "valid": true,
+                      "skip": false,
+                      "settings": {
+                        "input": {
+                          "auth": "",
+                          "table_name": "packages",
+                          "update_data": {
+                            "reminder_stage": "{{step_2['stage']}}"
+                          },
+                          "filter_column": "id",
+                          "filter_value": "{{step_2['package_id']}}",
+                          "filter_type": "eq",
+                          "count_updated": false,
+                          "filter_values": [],
+                          "return_updated": false
+                        },
+                        "pieceName": "@puchoaistudio/tool-supabase",
+                        "actionName": "update_row",
+                        "pieceVersion": "^2.0.1",
+                        "propertySettings": {
+                          "auth": {
+                            "type": "MANUAL"
+                          },
+                          "table_name": {
+                            "type": "MANUAL"
+                          },
+                          "filter_type": {
+                            "type": "MANUAL"
+                          },
+                          "update_data": {
+                            "type": "MANUAL",
+                            "schema": {
+                              "reminder_stage": {
+                                "type": "SHORT_TEXT",
+                                "required": false,
+                                "displayName": "reminder_stage",
+                                "defaultValue": ""
+                              }
+                            }
+                          },
+                          "filter_value": {
+                            "type": "MANUAL"
+                          },
+                          "count_updated": {
+                            "type": "MANUAL"
+                          },
+                          "filter_column": {
+                            "type": "MANUAL"
+                          },
+                          "filter_values": {
+                            "type": "MANUAL"
+                          },
+                          "return_updated": {
+                            "type": "MANUAL"
+                          }
+                        },
+                        "sampleData": {},
+                        "errorHandlingOptions": {
+                          "retryOnFailure": {
+                            "value": true
+                          },
+                          "continueOnFailure": {
+                            "value": false
+                          }
+                        }
+                      },
+                      "nextAction": {
+                        "name": "step_d7_e",
+                        "type": "PIECE",
+                        "displayName": "Log Reminder",
+                        "valid": true,
+                        "skip": false,
+                        "settings": {
+                          "input": {
+                            "auth": "",
+                            "table_name": "reminders",
+                            "row_data": {
+                              "student_id": "{{step_2['student_id']}}",
+                              "package_id": "{{step_2['package_id']}}",
+                              "channel": "email",
+                              "stage": "{{step_2['stage']}}",
+                              "status": "sent"
+                            },
+                            "return_row": true
+                          },
+                          "pieceName": "@puchoaistudio/tool-supabase",
+                          "actionName": "create_row",
+                          "pieceVersion": "^2.0.1",
+                          "propertySettings": {
+                            "auth": {
+                              "type": "MANUAL"
+                            },
+                            "row_data": {
+                              "type": "MANUAL",
+                              "schema": {
+                                "student_id": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "student_id",
+                                  "defaultValue": ""
+                                },
+                                "package_id": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "package_id",
+                                  "defaultValue": ""
+                                },
+                                "channel": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "channel",
+                                  "defaultValue": ""
+                                },
+                                "stage": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "stage",
+                                  "defaultValue": ""
+                                },
+                                "status": {
+                                  "type": "SHORT_TEXT",
+                                  "required": false,
+                                  "displayName": "status",
+                                  "defaultValue": ""
+                                }
+                              }
+                            },
+                            "return_row": {
+                              "type": "MANUAL"
+                            },
+                            "table_name": {
+                              "type": "MANUAL"
+                            }
+                          },
+                          "sampleData": {},
+                          "errorHandlingOptions": {
+                            "retryOnFailure": {
+                              "value": true
+                            },
+                            "continueOnFailure": {
+                              "value": false
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              null
+            ],
+            "nextAction": null
+          }
+        }
+      }
+    },
+    "valid": true,
+    "agentIds": [],
+    "connectionIds": [],
+    "schemaVersion": "7"
+  },
+  "blogUrl": ""
+}

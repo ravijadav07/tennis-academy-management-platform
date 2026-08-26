@@ -1,0 +1,14 @@
+export const scheduleItems = [
+  { id: 'sched-1', type: 'group', batch: 'Advanced Tournament', coach: 'Vikram Singh', business_entity: 'the-club', day: 'Mon', time: '4:00 PM - 6:00 PM', students: 18, location: 'Court 1', status: 'confirmed', session_period: 'full_day' },
+  { id: 'sched-2', type: 'group', batch: 'Intermediate Group', coach: 'Sania Mirza', business_entity: 'the-club', day: 'Tue', time: '4:00 PM - 6:00 PM', students: 22, location: 'Court 2', status: 'confirmed', session_period: 'full_day' },
+  { id: 'sched-3', type: 'group', batch: 'Beginner Batch A', coach: 'Rajesh Kumar', business_entity: 'tots-tennis', day: 'Mon', time: '4:00 PM - 5:00 PM', students: 15, location: 'Court 3', status: 'confirmed', session_period: 'half_day' },
+  { id: 'sched-4', type: 'one_on_one', student: 'Arjun Mehta', coach: 'Vikram Singh', business_entity: 'the-club', day: 'Mon', time: '6:30 PM - 7:30 PM', status: 'confirmed_yes', confirmation: 'confirmed_yes', session_period: 'half_day' },
+  { id: 'sched-5', type: 'one_on_one', student: 'Kavya Reddy', coach: 'Sania Mirza', business_entity: 'the-club', day: 'Tue', time: '6:30 PM - 7:30 PM', status: 'sent_no_reply', confirmation: 'sent_no_reply', session_period: 'half_day' },
+  { id: 'sched-6', type: 'one_on_one', student: 'Rohit Desai', coach: 'Vikram Singh', business_entity: 'tots-tennis', day: 'Wed', time: '6:30 PM - 7:30 PM', status: 'declined_no', confirmation: 'declined_no', session_period: 'half_day' },
+  { id: 'sched-7', type: 'group', batch: 'Beginner Batch B', coach: 'Rajesh Kumar', business_entity: 'tots-tennis', day: 'Tue', time: '4:00 PM - 5:00 PM', students: 14, location: 'Court 3', status: 'confirmed', session_period: 'half_day' },
+  { id: 'sched-8', type: 'one_on_one', student: 'Simran Kaur', coach: 'Sania Mirza', business_entity: 'tots-tennis', day: 'Thu', time: '6:30 PM - 7:30 PM', status: 'not_sent', confirmation: 'not_sent', session_period: 'half_day' },
+  { id: 'sched-9', type: 'cancelled', batch: 'Advanced Tournament', coach: 'Vikram Singh', business_entity: 'the-club', day: 'Wed', time: '4:00 PM - 6:00 PM', reason: 'Coach unavailable', cancelledType: 'advance', status: 'cancelled', session_period: 'full_day' },
+  { id: 'sched-10', type: 'cancelled', batch: 'Beginner Batch A', coach: 'Rajesh Kumar', business_entity: 'tots-tennis', day: 'Fri', time: '4:00 PM - 5:00 PM', reason: 'Rain', cancelledType: 'same_day', status: 'cancelled_charged', session_period: 'half_day' },
+  { id: 'sched-11', type: 'group', batch: 'Advanced Tournament (TT)', coach: 'Deepak Verma', business_entity: 'tots-tennis', day: 'Tue', time: '4:00 PM - 6:00 PM', students: 15, location: 'Court 4', status: 'confirmed', session_period: 'full_day' },
+  { id: 'sched-12', type: 'one_on_one', student: 'Ishaan Gupta', coach: 'Vikram Singh', business_entity: 'the-club', day: 'Fri', time: '6:30 PM - 7:30 PM', status: 'confirmed_yes', confirmation: 'confirmed_yes', session_period: 'half_day' },
+];

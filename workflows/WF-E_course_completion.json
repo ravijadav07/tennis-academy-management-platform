@@ -1,0 +1,521 @@
+﻿{
+  "created": 1754800000000,
+  "updated": 1755200000000,
+  "name": "WF-E Course Completion & Certification",
+  "description": "Marks student as completed, updates package, sends certificate email on webhook trigger. Looks up parent email for notification.",
+  "tags": [],
+  "pieces": [
+    "@puchoaistudio/tool-webhook",
+    "@puchoaistudio/tool-supabase",
+    "@puchoaistudio/tool-gmail"
+  ],
+  "template": {
+    "displayName": "WF-E Course Completion & Certification",
+    "trigger": {
+      "name": "trigger",
+      "type": "TOOL_TRIGGER",
+      "displayName": "Parse Completion Payload",
+      "valid": true,
+      "settings": {
+        "pieceName": "@puchoaistudio/tool-webhook",
+        "pieceVersion": "^2.0.4",
+        "triggerName": "catch_webhook",
+        "input": { "authType": "none", "authFields": {} },
+        "propertySettings": {
+          "authType": { "type": "MANUAL" },
+          "authFields": { "type": "MANUAL", "schema": {} },
+          "liveMarkdown": { "type": "MANUAL" },
+          "syncMarkdown": { "type": "MANUAL" },
+          "testMarkdown": { "type": "MANUAL" }
+        },
+        "sampleData": {}
+      },
+      "nextAction": {
+        "name": "step_1",
+        "type": "CODE",
+        "displayName": "Validate Completion Payload",
+        "valid": true,
+        "skip": false,
+        "settings": {
+          "input": { "payload": "{{trigger['body']}}" },
+          "sourceCode": {
+            "code": "export const code = async (inputs) => {\n  const p = typeof inputs.payload === 'string' ? JSON.parse(inputs.payload) : inputs.payload;\n  const student_id = p.student_id || '';\n  const package_id = p.package_id || '';\n  const entity = p.entity || 'tots-tennis';\n  const today = new Date().toISOString().split('T')[0];\n  return {\n    student_id: String(student_id),\n    package_id: String(package_id),\n    entity: entity,\n    completion_date: today,\n    valid: student_id !== '' && package_id !== ''\n  };\n};",
+            "packageJson": "{}"
+          },
+          "propertySettings": {
+            "payload": { "type": "MANUAL" }
+          },
+          "sampleData": {},
+          "errorHandlingOptions": {
+            "retryOnFailure": { "value": false },
+            "continueOnFailure": { "value": false }
+          }
+        },
+        "nextAction": {
+          "name": "step_router",
+          "type": "ROUTER",
+          "displayName": "Route by Validity",
+          "valid": true,
+          "skip": false,
+          "settings": {
+            "branches": [
+              {
+                "branchName": "Valid Request",
+                "branchType": "CONDITION",
+                "conditions": [[
+                  { "operator": "TEXT_EXACTLY_MATCHES", "firstValue": "{{step_1['valid']}}", "secondValue": "true", "caseSensitive": false }
+                ]]
+              },
+              {
+                "branchName": "Invalid",
+                "branchType": "FALLBACK"
+              }
+            ],
+            "executionType": "EXECUTE_FIRST_MATCH"
+          },
+          "children": [
+            {
+              "name": "step_2",
+              "type": "PIECE",
+              "displayName": "Find Student",
+              "valid": true,
+              "skip": false,
+              "settings": {
+                "input": {
+                  "auth": "",
+                  "table_name": "students",
+                  "page": 1,
+                  "pageSize": 1,
+"filters": [
+                      {
+                        "column": "id",
+                        "operator": "eq",
+                        "value": "{{step_1['student_id']}}"
+                      }
+                    ]
+                  },
+                  "pieceName": "@puchoaistudio/tool-supabase",
+                  "actionName": "search_rows",
+                  "pieceVersion": "^2.0.1",
+                  "propertySettings": {
+                    "auth": { "type": "MANUAL" },
+                    "page": { "type": "MANUAL" },
+                    "columns": { "type": "MANUAL" },
+                    "filters": { "type": "MANUAL" },
+                    "pageSize": { "type": "MANUAL" },
+                    "table_name": { "type": "MANUAL" },
+                    "countOption": { "type": "MANUAL" }
+                  },
+                  "sampleData": {},
+                  "errorHandlingOptions": { "retryOnFailure": { "value": true }, "continueOnFailure": { "value": false } }
+                },
+                "nextAction": {
+                  "name": "step_3",
+                "type": "PIECE",
+                "displayName": "Mark Student Completed",
+                "valid": true,
+                "skip": false,
+                "settings": {
+                  "input": {
+                    "auth": "",
+                    "table_name": "students",
+                    "update_data": { "status": "completed" },
+                    "filter_column": "id",
+                    "filter_value": "{{step_1['student_id']}}",
+                    "filter_type": "eq",
+                    "count_updated": false,
+                    "filter_values": [],
+                    "return_updated": false
+                  },
+                  "pieceName": "@puchoaistudio/tool-supabase",
+                  "actionName": "update_row",
+                  "pieceVersion": "^2.0.1",
+                  "propertySettings": {
+                    "auth": { "type": "MANUAL" },
+                    "table_name": { "type": "MANUAL" },
+                    "filter_type": { "type": "MANUAL" },
+                    "update_data": {
+                      "type": "MANUAL",
+                      "schema": {
+                        "status": { "type": "SHORT_TEXT", "required": false, "displayName": "status", "defaultValue": "" }
+                      }
+                    },
+                    "filter_value": { "type": "MANUAL" },
+                    "count_updated": { "type": "MANUAL" },
+                    "filter_column": { "type": "MANUAL" },
+                    "filter_values": { "type": "MANUAL" },
+                    "return_updated": { "type": "MANUAL" }
+                  },
+                  "sampleData": {},
+                  "errorHandlingOptions": { "retryOnFailure": { "value": true }, "continueOnFailure": { "value": false } }
+                },
+                "nextAction": {
+                  "name": "step_4",
+                  "type": "PIECE",
+                  "displayName": "Find Package",
+                  "valid": true,
+                  "skip": false,
+                  "settings": {
+                    "input": {
+                      "auth": "",
+                      "table_name": "packages",
+                      "page": 1,
+                      "pageSize": 1,
+                      "filters": [
+                        {
+                          "column": "id",
+                          "operator": "eq",
+                          "value": "{{step_1['package_id']}}"
+                        }
+                      ]
+                    },
+                    "pieceName": "@puchoaistudio/tool-supabase",
+                    "actionName": "search_rows",
+                    "pieceVersion": "^2.0.1",
+                    "propertySettings": {
+                      "auth": { "type": "MANUAL" },
+                      "page": { "type": "MANUAL" },
+                      "columns": { "type": "MANUAL" },
+                      "filters": { "type": "MANUAL" },
+                      "pageSize": { "type": "MANUAL" },
+                      "table_name": { "type": "MANUAL" },
+                      "countOption": { "type": "MANUAL" }
+                    },
+                    "sampleData": {},
+                    "errorHandlingOptions": { "retryOnFailure": { "value": true }, "continueOnFailure": { "value": false } }
+                  },
+                  "nextAction": {
+                    "name": "step_5",
+                    "type": "PIECE",
+                    "displayName": "Mark Package Completed",
+                    "valid": true,
+                    "skip": false,
+                    "settings": {
+                      "input": {
+                        "auth": "",
+                        "table_name": "packages",
+                        "update_data": {
+                          "status": "completed",
+                          "payment_status": "paid"
+                        },
+                        "filter_column": "id",
+                        "filter_value": "{{step_1['package_id']}}",
+                        "filter_type": "eq",
+                        "count_updated": false,
+                        "filter_values": [],
+                        "return_updated": false
+                      },
+                      "pieceName": "@puchoaistudio/tool-supabase",
+                      "actionName": "update_row",
+                      "pieceVersion": "^2.0.1",
+                      "propertySettings": {
+                        "auth": { "type": "MANUAL" },
+                        "table_name": { "type": "MANUAL" },
+                        "filter_type": { "type": "MANUAL" },
+                        "update_data": {
+                          "type": "MANUAL",
+                          "schema": {
+                            "status": { "type": "SHORT_TEXT", "required": false, "displayName": "status", "defaultValue": "" },
+                            "payment_status": { "type": "SHORT_TEXT", "required": false, "displayName": "payment_status", "defaultValue": "" }
+                          }
+                        },
+                        "filter_value": { "type": "MANUAL" },
+                        "count_updated": { "type": "MANUAL" },
+                        "filter_column": { "type": "MANUAL" },
+                        "filter_values": { "type": "MANUAL" },
+                        "return_updated": { "type": "MANUAL" }
+                      },
+                      "sampleData": {},
+                      "errorHandlingOptions": { "retryOnFailure": { "value": true }, "continueOnFailure": { "value": false } }
+                    },
+                    "nextAction": {
+                      "name": "step_5b",
+                      "type": "PIECE",
+                      "displayName": "Find Student Parent Link",
+                      "valid": true,
+                      "skip": false,
+                      "settings": {
+                        "input": {
+                          "auth": "",
+                          "table_name": "student_parents",
+                          "page": 1,
+                          "pageSize": 1,
+                          "filters": [
+                            {
+                              "field": "student_id",
+                              "operator": "eq",
+                              "value": "{{step_1['student_id']}}"
+                            }
+                          ]
+                        },
+                        "pieceName": "@puchoaistudio/tool-supabase",
+                        "actionName": "search_rows",
+                        "pieceVersion": "^2.0.1",
+                        "propertySettings": {
+                          "auth": { "type": "MANUAL" },
+                          "page": { "type": "MANUAL" },
+                          "columns": { "type": "MANUAL" },
+                          "filters": { "type": "MANUAL" },
+                          "pageSize": { "type": "MANUAL" },
+                          "table_name": { "type": "MANUAL" },
+                          "countOption": { "type": "MANUAL" }
+                        },
+                        "sampleData": {},
+                        "errorHandlingOptions": { "retryOnFailure": { "value": true }, "continueOnFailure": { "value": false } }
+                      },
+                      "nextAction": {
+                        "name": "step_5c",
+                        "type": "PIECE",
+                        "displayName": "Find Parent Email",
+                        "valid": true,
+                        "skip": false,
+                        "settings": {
+                          "input": {
+                            "auth": "",
+                            "table_name": "parents",
+                            "page": 1,
+                            "pageSize": 1,
+                            "filters": [
+                              {
+                                "column": "id",
+                                "operator": "eq",
+                                "value": "{{step_5b[0]['parent_id']}}"
+                              }
+                            ]
+                          },
+                          "pieceName": "@puchoaistudio/tool-supabase",
+                          "actionName": "search_rows",
+                          "pieceVersion": "^2.0.1",
+                          "propertySettings": {
+                            "auth": { "type": "MANUAL" },
+                            "page": { "type": "MANUAL" },
+                            "columns": { "type": "MANUAL" },
+                            "filters": { "type": "MANUAL" },
+                            "pageSize": { "type": "MANUAL" },
+                            "table_name": { "type": "MANUAL" },
+                            "countOption": { "type": "MANUAL" }
+                          },
+                          "sampleData": {},
+                          "errorHandlingOptions": { "retryOnFailure": { "value": true }, "continueOnFailure": { "value": false } }
+                        },
+                        "nextAction": {
+                          "name": "step_cert_check",
+                          "type": "CODE",
+                          "displayName": "Generate Certificate (Idempotent)",
+                          "valid": true,
+                          "skip": false,
+                          "settings": {
+                            "input": {
+                              "student_id": "{{step_1['student_id']}}",
+                              "package_id": "{{step_1['package_id']}}",
+                              "student_name": "{{step_2[0]['name']}}",
+                              "course_name": "{{step_4[0]['plan_type']}}",
+                              "completion_date": "{{step_1['completion_date']}}",
+                              "coach_name": "{{step_2[0]['coach_id']}}",
+                              "entity": "{{step_1['entity']}}",
+                              "completion_id": "{{step_1['student_id']}}_{{step_1['package_id']}}"
+                            },
+                            "sourceCode": {
+                              "code": "export const code = async (inputs) => {\n  const supabaseBase = 'https://zxbrvjhgbxwrizyrmvjy.supabase.co';\n  const serviceKey = '{{ENV.SUPABASE_SERVICE_ROLE_KEY}}';\n  const pdfServiceUrl = '{{ENV.PDF_SERVICE_URL}}';\n  const pdfServiceKey = '{{ENV.PDF_SERVICE_API_KEY}}';\n  const studentId = inputs.student_id;\n  const packageId = inputs.package_id;\n\n  // 1. Idempotency: check if certificate already exists\n  try {\n    const checkRes = await fetch(\n      `${supabaseBase}/rest/v1/certificates?student_id=eq.${studentId}&package_id=eq.${packageId}&select=file_path`,\n      { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }\n    );\n    const existingCerts = await checkRes.json();\n    if (Array.isArray(existingCerts) && existingCerts.length > 0) {\n      return {\n        file_path: existingCerts[0].file_path,\n        certificate_id: existingCerts[0].file_path.split('/').pop()?.replace('.pdf', '') || 'REUSE',\n        is_new: false\n      };\n    }\n  } catch (e) {\n    console.warn('Certificate idempotency check failed, proceeding with generation:', e.message);\n  }\n\n  // 2. Generate new certificate via PDF microservice\n  const pdfRes = await fetch(`${pdfServiceUrl}/api/generate-certificate`, {\n    method: 'POST',\n    headers: {\n      'Content-Type': 'application/json',\n      'x-api-key': pdfServiceKey\n    },\n    body: JSON.stringify({\n      student_id: studentId,\n      package_id: packageId,\n      student_name: inputs.student_name,\n      course_name: inputs.course_name,\n      completion_date: inputs.completion_date,\n      coach_name: inputs.coach_name,\n      entity: inputs.entity\n    })\n  });\n\n  if (!pdfRes.ok) {\n    const errBody = await pdfRes.text();\n    throw new Error(`PDF service returned ${pdfRes.status}: ${errBody}`);\n  }\n\n  const pdfData = await pdfRes.json();\n  return {\n    file_path: pdfData.file_path,\n    certificate_id: pdfData.certificate_id,\n    is_new: true\n  };\n};",
+                              "packageJson": "{}"
+                            },
+                            "propertySettings": {
+                              "student_id": { "type": "MANUAL" },
+                              "package_id": { "type": "MANUAL" },
+                              "student_name": { "type": "MANUAL" },
+                              "course_name": { "type": "MANUAL" },
+                              "completion_date": { "type": "MANUAL" },
+                              "coach_name": { "type": "MANUAL" },
+                              "entity": { "type": "MANUAL" },
+                              "completion_id": { "type": "MANUAL" }
+                            },
+                            "sampleData": {},
+                            "errorHandlingOptions": {
+                              "retryOnFailure": { "value": true },
+                              "continueOnFailure": { "value": false }
+                            }
+                          },
+                          "nextAction": {
+                            "name": "step_6",
+                            "type": "PIECE",
+                            "displayName": "Log Certificate Communication",
+                            "valid": true,
+                            "skip": false,
+                            "settings": {
+                              "input": {
+                                "auth": "",
+                                "table_name": "communications_log",
+                                "row_data": {
+                                  "student_id": "{{step_1['student_id']}}",
+                                  "parent_id": "{{step_5b[0]['parent_id']}}",
+                                  "type": "certificate",
+                                  "channel": "email",
+                                  "status": "sent",
+                                  "date": "{{step_1['completion_date']}}",
+                                  "file_link": "{{step_cert_check['file_path']}}"
+                                },
+                                "return_row": true
+                              },
+                              "pieceName": "@puchoaistudio/tool-supabase",
+                              "actionName": "create_row",
+                              "pieceVersion": "^2.0.1",
+                              "propertySettings": {
+                                "auth": { "type": "MANUAL" },
+                                "row_data": {
+                                  "type": "MANUAL",
+                                  "schema": {
+                                    "student_id": { "type": "SHORT_TEXT", "required": false, "displayName": "student_id", "defaultValue": "" },
+                                    "parent_id": { "type": "SHORT_TEXT", "required": false, "displayName": "parent_id", "defaultValue": "" },
+                                    "type": { "type": "SHORT_TEXT", "required": false, "displayName": "type", "defaultValue": "" },
+                                    "channel": { "type": "SHORT_TEXT", "required": false, "displayName": "channel", "defaultValue": "" },
+                                    "status": { "type": "SHORT_TEXT", "required": false, "displayName": "status", "defaultValue": "" },
+                                    "date": { "type": "SHORT_TEXT", "required": false, "displayName": "date", "defaultValue": "" },
+                                    "file_link": { "type": "SHORT_TEXT", "required": false, "displayName": "file_link", "defaultValue": "" }
+                                  }
+                                },
+                                "return_row": { "type": "MANUAL" },
+                                "table_name": { "type": "MANUAL" }
+                              },
+                              "sampleData": {},
+                              "errorHandlingOptions": { "retryOnFailure": { "value": true }, "continueOnFailure": { "value": false } }
+                            },
+                            "nextAction": {
+                              "name": "step_7",
+                              "type": "PIECE",
+                              "displayName": "Send Certificate Email with Attachment",
+                              "valid": true,
+                              "skip": false,
+                              "settings": {
+                                "input": {
+                                  "auth": "",
+                                  "receiver": ["{{step_5c[0]['email']}}"],
+                                  "subject": "Congratulations! Course Completed - Arnav Jain Tennis Academy",
+                                  "body": "Dear {{step_5c[0]['name']}},\n\nYour child {{step_2[0]['name']}} has successfully completed the tennis program at Arnav Jain Tennis Academy!\n\nCompletion Date: {{step_1['completion_date']}}\n\nYour certificate is attached to this email. You can also download it anytime from your parent portal.\n\nWe are proud of this achievement and wish them the very best in their future tennis journey.\n\nBest regards,\nArnav Jain Tennis Academy",
+                                  "body_type": "text",
+                                  "cc": [], "bcc": [], "reply_to": [],
+                                  "draft": false,
+                                  "attachment": "{{step_cert_check['file_path']}}",
+                                  "attachment_name": "Certificate_{{step_2[0]['name']}}_{{step_1['completion_date']}}.pdf"
+                                },
+                                "pieceName": "@puchoaistudio/tool-gmail",
+                                "actionName": "send_email",
+                                "pieceVersion": "^2.0.4",
+                                "propertySettings": {
+                                  "auth": { "type": "MANUAL" },
+                                  "receiver": { "type": "MANUAL" },
+                                  "subject": { "type": "MANUAL" },
+                                  "body": { "type": "MANUAL" },
+                                  "body_type": { "type": "MANUAL" },
+                                  "cc": { "type": "MANUAL" },
+                                  "bcc": { "type": "MANUAL" },
+                                  "reply_to": { "type": "MANUAL" },
+                                  "draft": { "type": "MANUAL" },
+                                  "from": { "type": "MANUAL" },
+                                  "sender_name": { "type": "MANUAL" },
+                                  "attachment": { "type": "MANUAL" },
+                                  "attachment_name": { "type": "MANUAL" }
+                                },
+                                "sampleData": {},
+                                "errorHandlingOptions": { "retryOnFailure": { "value": false }, "continueOnFailure": { "value": true } }
+                              },
+                              "nextAction": {
+                                "name": "step_8",
+                                "type": "PIECE",
+                                "displayName": "Return Success",
+                                "valid": true,
+                                "skip": false,
+                                "settings": {
+                                  "input": {
+                                    "fields": {
+                                      "body": {
+                                        "success": true,
+                                        "student_id": "{{step_1['student_id']}}",
+                                        "package_id": "{{step_1['package_id']}}",
+                                        "certificate_id": "{{step_cert_check['certificate_id']}}",
+                                        "certificate_new": "{{step_cert_check['is_new']}}",
+                                        "message": "Student marked completed and certificate sent"
+                                      },
+                                      "status": 200,
+                                      "headers": {}
+                                    },
+                                    "respond": "stop",
+                                    "responseType": "json"
+                                  },
+                                  "pieceName": "@puchoaistudio/tool-webhook",
+                                  "actionName": "return_response",
+                                  "pieceVersion": "^2.0.4",
+                                  "propertySettings": {
+                                    "fields": {
+                                      "type": "MANUAL",
+                                      "schema": {
+                                        "body": { "type": "JSON", "required": true, "displayName": "JSON Body" },
+                                        "status": { "type": "NUMBER", "required": false, "displayName": "Status", "defaultValue": 200 },
+                                        "headers": { "type": "OBJECT", "required": false, "displayName": "Headers" }
+                                      }
+                                    },
+                                    "respond": { "type": "MANUAL" },
+                                    "responseType": { "type": "MANUAL" }
+                                  },
+                                  "sampleData": {},
+                                  "errorHandlingOptions": { "retryOnFailure": { "value": false }, "continueOnFailure": { "value": false } }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "step_error",
+              "type": "PIECE",
+              "displayName": "Return Error",
+              "valid": true,
+              "skip": false,
+              "settings": {
+                "input": {
+                  "fields": {
+                    "body": {
+                      "success": false,
+                      "error": "Missing required fields: student_id and package_id"
+                    },
+                    "status": 400,
+                    "headers": {}
+                  },
+                  "respond": "stop",
+                  "responseType": "json"
+                },
+                "pieceName": "@puchoaistudio/tool-webhook",
+                "actionName": "return_response",
+                "pieceVersion": "^2.0.4",
+                "propertySettings": {
+                  "fields": {
+                    "type": "MANUAL",
+                    "schema": {
+                      "body": { "type": "JSON", "required": true, "displayName": "JSON Body" },
+                      "status": { "type": "NUMBER", "required": false, "displayName": "Status", "defaultValue": 200 },
+                      "headers": { "type": "OBJECT", "required": false, "displayName": "Headers" }
+                    }
+                  },
+                  "respond": { "type": "MANUAL" },
+                  "responseType": { "type": "MANUAL" }
+                },
+                "sampleData": {},
+                "errorHandlingOptions": { "retryOnFailure": { "value": false }, "continueOnFailure": { "value": false } }
+              }
+            }
+          ],
+          "nextAction": null
+        }
+      }
+    },
+    "valid": true,
+    "agentIds": [],
+    "connectionIds": [],
+    "schemaVersion": "7"
+  },
+  "blogUrl": ""
+}

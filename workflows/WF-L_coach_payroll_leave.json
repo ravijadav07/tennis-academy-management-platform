@@ -1,0 +1,398 @@
+{
+  "created": "1754800000004",
+  "updated": "1755300000000",
+  "name": "WF-L Coach Payroll & Leave Rollup",
+  "description": "Generates monthly coach payroll report with entity-specific paths: The Club (session-based, half_day/full_day, approval-gated) and TOTS Tennis (hourly billing, hours_logged x hourly_rate). Triggered via webhook with month/year params.",
+  "tags": [],
+  "pieces": [
+    "@puchoaistudio/tool-webhook",
+    "@puchoaistudio/tool-supabase",
+    "@puchoaistudio/tool-gmail"
+  ],
+  "template": {
+    "displayName": "WF-L Coach Payroll & Leave Rollup",
+    "trigger": {
+      "name": "trigger",
+      "type": "TOOL_TRIGGER",
+      "displayName": "Catch Payroll Webhook",
+      "valid": true,
+      "settings": {
+        "pieceName": "@puchoaistudio/tool-webhook",
+        "pieceVersion": "^2.0.4",
+        "triggerName": "catch_webhook",
+        "input": {
+          "authType": "none",
+          "authFields": {}
+        },
+        "propertySettings": {
+          "authType": { "type": "MANUAL" },
+          "authFields": { "type": "MANUAL", "schema": {} },
+          "liveMarkdown": { "type": "MANUAL" },
+          "syncMarkdown": { "type": "MANUAL" },
+          "testMarkdown": { "type": "MANUAL" }
+        },
+        "sampleData": {}
+      },
+      "nextAction": {
+        "name": "step_1",
+        "type": "CODE",
+        "displayName": "Determine Payroll Month",
+        "valid": true,
+        "skip": false,
+        "settings": {
+          "input": {
+            "payload": "{{trigger['body']}}"
+          },
+          "sourceCode": {
+            "code": "export const code = async (inputs) => {\n  const p = typeof inputs.payload === 'string' ? JSON.parse(inputs.payload) : (inputs.payload || {});\n  const now = new Date();\n  const month = parseInt(p.month || (now.getMonth() + 1));\n  const year = parseInt(p.year || now.getFullYear());\n  const startDate = year + '-' + String(month).padStart(2, '0') + '-01';\n  const endDate = new Date(year, month, 0).toISOString().split('T')[0];\n  const monthName = new Date(year, month - 1, 1).toLocaleString('default', { month: 'long' });\n  return { month: month, year: year, start_date: startDate, end_date: endDate, month_name: monthName };\n};",
+            "packageJson": "{}"
+          },
+          "propertySettings": {
+            "payload": { "type": "MANUAL" }
+          },
+          "sampleData": {},
+          "errorHandlingOptions": {
+            "retryOnFailure": { "value": false },
+            "continueOnFailure": { "value": false }
+          }
+        },
+        "nextAction": {
+          "name": "step_2",
+          "type": "PIECE",
+          "displayName": "Query All Active Coaches",
+          "valid": true,
+          "skip": false,
+          "settings": {
+            "input": {
+              "auth": "",
+              "table_name": "coaches",
+              "page": 1,
+              "pageSize": 50,
+              "filters": [
+                {
+                  "column": "status",
+                  "operator": "neq",
+                  "value": "inactive"
+                }
+              ]
+            },
+            "pieceName": "@puchoaistudio/tool-supabase",
+            "actionName": "search_rows",
+            "pieceVersion": "^2.0.1",
+            "propertySettings": {
+              "auth": { "type": "MANUAL" },
+              "page": { "type": "MANUAL" },
+              "columns": { "type": "MANUAL" },
+              "filters": { "type": "MANUAL" },
+              "pageSize": { "type": "MANUAL" },
+              "table_name": { "type": "MANUAL" },
+              "countOption": { "type": "MANUAL" }
+            },
+            "sampleData": {},
+            "errorHandlingOptions": {
+              "retryOnFailure": { "value": true },
+              "continueOnFailure": { "value": false }
+            }
+          },
+          "nextAction": {
+            "name": "step_3",
+            "type": "PIECE",
+            "displayName": "Query Coach Attendance for Month",
+            "valid": true,
+            "skip": false,
+            "settings": {
+              "input": {
+                "auth": "",
+                "table_name": "coach_attendance",
+                "page": 1,
+                "pageSize": 200,
+                "filters": [
+                  {
+                    "column": "date",
+                    "operator": "gte",
+                    "value": "{{step_1['start_date']}}"
+                  },
+                  {
+                    "column": "date",
+                    "operator": "lte",
+                    "value": "{{step_1['end_date']}}"
+                  }
+                ]
+              },
+              "pieceName": "@puchoaistudio/tool-supabase",
+              "actionName": "search_rows",
+              "pieceVersion": "^2.0.1",
+              "propertySettings": {
+                "auth": { "type": "MANUAL" },
+                "page": { "type": "MANUAL" },
+                "columns": { "type": "MANUAL" },
+                "filters": { "type": "MANUAL" },
+                "pageSize": { "type": "MANUAL" },
+                "table_name": { "type": "MANUAL" },
+                "countOption": { "type": "MANUAL" }
+              },
+              "sampleData": {},
+              "errorHandlingOptions": {
+                "retryOnFailure": { "value": true },
+                "continueOnFailure": { "value": false }
+              }
+            },
+            "nextAction": {
+              "name": "step_4",
+              "type": "PIECE",
+              "displayName": "Query Approved Leaves for Month",
+              "valid": true,
+              "skip": false,
+              "settings": {
+                "input": {
+                  "auth": "",
+                  "table_name": "leave_requests",
+                  "page": 1,
+                  "pageSize": 100,
+                  "filters": [
+                    {
+                      "column": "status",
+                      "operator": "eq",
+                      "value": "approved"
+                    },
+                    {
+                      "column": "start_date",
+                      "operator": "lte",
+                      "value": "{{step_1['end_date']}}"
+                    },
+                    {
+                      "column": "end_date",
+                      "operator": "gte",
+                      "value": "{{step_1['start_date']}}"
+                    }
+                  ]
+                },
+                "pieceName": "@puchoaistudio/tool-supabase",
+                "actionName": "search_rows",
+                "pieceVersion": "^2.0.1",
+                "propertySettings": {
+                  "auth": { "type": "MANUAL" },
+                  "page": { "type": "MANUAL" },
+                  "columns": { "type": "MANUAL" },
+                  "filters": { "type": "MANUAL" },
+                  "pageSize": { "type": "MANUAL" },
+                  "table_name": { "type": "MANUAL" },
+                  "countOption": { "type": "MANUAL" }
+                },
+                "sampleData": {},
+                "errorHandlingOptions": {
+                  "retryOnFailure": { "value": true },
+                  "continueOnFailure": { "value": false }
+                }
+              },
+              "nextAction": {
+                "name": "step_5_check_approval",
+                "type": "CODE",
+                "displayName": "Check Club Payroll Approval Status",
+                "valid": true,
+                "skip": false,
+                "settings": {
+                  "input": {
+                    "coaches_json": "{{step_2}}",
+                    "attendance": "{{step_3}}",
+                    "month_name": "{{step_1['month_name']}}",
+                    "year": "{{step_1['year']}}"
+                  },
+                  "sourceCode": {
+                    "code": "export const code = async (inputs) => {\n  const coachesRaw = typeof inputs.coaches_json === 'string' ? JSON.parse(inputs.coaches_json) : (inputs.coaches_json || []);\n  const coaches = Array.isArray(coachesRaw) ? coachesRaw : [];\n  const attendance = Array.isArray(inputs.attendance) ? inputs.attendance : [];\n\n  // Separate coaches by entity\n  const clubCoaches = coaches.filter(c => c.entity === 'the-club');\n  const totsCoaches = coaches.filter(c => c.entity === 'tots-tennis');\n\n  // Check Club coaches: any unapproved attendance?\n  const clubCoachIds = new Set(clubCoaches.map(c => c.id));\n  const unapproved = [];\n  attendance.forEach(a => {\n    if (clubCoachIds.has(a.coach_id) && a.approval_status !== 'approved') {\n      const coach = clubCoaches.find(c => c.id === a.coach_id);\n      unapproved.push({ coach_id: a.coach_id, coach_name: coach ? coach.name : 'Unknown', date: a.date, status: a.approval_status || 'pending' });\n    }\n  });\n\n  return {\n    club_coach_count: clubCoaches.length,\n    tots_coach_count: totsCoaches.length,\n    unapproved_count: unapproved.length,\n    unapproved: unapproved,\n    ready_for_club: unapproved.length === 0,  // Club requires all approvals\n    ready_for_tots: totsCoaches.length > 0\n  };\n};",
+                    "packageJson": "{}"
+                  },
+                  "propertySettings": {
+                    "coaches_json": { "type": "MANUAL" },
+                    "attendance": { "type": "MANUAL" },
+                    "month_name": { "type": "MANUAL" },
+                    "year": { "type": "MANUAL" }
+                  },
+                  "sampleData": {},
+                  "errorHandlingOptions": {
+                    "retryOnFailure": { "value": false },
+                    "continueOnFailure": { "value": false }
+                  }
+                },
+                "nextAction": {
+                  "name": "step_5_aggregate",
+                  "type": "CODE",
+                  "displayName": "Aggregate Coach Payroll (Entity-Specific)",
+                  "valid": true,
+                  "skip": false,
+                  "settings": {
+                    "input": {
+                      "coaches_json": "{{step_2}}",
+                      "attendance": "{{step_3}}",
+                      "leaves": "{{step_4}}",
+                      "approval_check": "{{step_5_check_approval}}",
+                      "month_name": "{{step_1['month_name']}}",
+                      "year": "{{step_1['year']}}",
+                      "month": "{{step_1['month']}}"
+                    },
+                    "sourceCode": {
+                      "code": "export const code = async (inputs) => {\n  const coachesRaw = typeof inputs.coaches_json === 'string' ? JSON.parse(inputs.coaches_json) : (inputs.coaches_json || []);\n  const coaches = Array.isArray(coachesRaw) ? coachesRaw : [];\n  const attendance = Array.isArray(inputs.attendance) ? inputs.attendance : [];\n  const leaves = Array.isArray(inputs.leaves) ? inputs.leaves : [];\n  const approvalCheck = inputs.approval_check || {};\n  const monthName = inputs.month_name;\n  const year = parseInt(inputs.year || new Date().getFullYear());\n  const month = parseInt(inputs.month || new Date().getMonth() + 1);\n\n  const daysInMonth = new Date(year, month, 0).getDate();\n  let workingDays = 26;\n  for (let d = 1; d <= daysInMonth; d++) {\n    const dayOfWeek = new Date(year, month - 1, d).getDay();\n    if (dayOfWeek === 0) workingDays--;\n  }\n\n  const results = [];\n  let totalPayroll = 0;\n  let pendingApproval = false;\n\n  coaches.forEach(coach => {\n    const isClub = coach.entity === 'the-club';\n    const coachAtt = attendance.filter(a => a.coach_id === coach.id);\n    const coachLeaves = leaves.filter(l => l.coach_id === coach.id);\n\n    let leaveDays = 0;\n    coachLeaves.forEach(l => {\n      const start = new Date(l.start_date);\n      const end = new Date(l.end_date);\n      leaveDays += Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;\n    });\n\n    let payrollAmount = 0;\n    let calculationMethod = '';\n    let details = {};\n\n    if (isClub) {\n      // THE CLUB: Session-based payroll with half_day/full_day distinction\n      let halfDaySessions = 0;\n      let fullDaySessions = 0;\n      let hasUnapproved = false;\n\n      coachAtt.forEach(a => {\n        if (a.approval_status !== 'approved') {\n          hasUnapproved = true;\n          return;  // Skip unapproved sessions\n        }\n        if (a.session_period === 'half_day') {\n          halfDaySessions += (parseInt(a.sessions_count) || 0);\n        } else {\n          fullDaySessions += (parseInt(a.sessions_count) || 0);\n        }\n      });\n\n      const monthlySalary = parseInt(coach.payroll_rate || 0);\n      const dailyRate = workingDays > 0 ? Math.round(monthlySalary / workingDays) : 0;\n      const leaveDeduction = leaveDays * dailyRate;\n      payrollAmount = monthlySalary - leaveDeduction;\n      if (payrollAmount < 0) payrollAmount = 0;\n\n      calculationMethod = 'Salary (Club)';\n      details = {\n        entity: 'the-club',\n        method: 'session_based',\n        monthly_salary: monthlySalary,\n        daily_rate: dailyRate,\n        working_days: workingDays,\n        half_day_sessions: halfDaySessions,\n        full_day_sessions: fullDaySessions,\n        total_sessions: halfDaySessions + fullDaySessions,\n        leave_days: leaveDays,\n        leave_deduction: leaveDeduction,\n        net_payable: payrollAmount,\n        approval_status: hasUnapproved ? 'pending_approval' : 'approved'\n      };\n\n      if (hasUnapproved) {\n        pendingApproval = true;\n        details.approval_note = 'Payroll pending — some attendance records await admin/head coach approval';\n      }\n    } else {\n      // TOTS TENNIS: Hourly billing model\n      const hoursLogged = parseInt(coach.hours_logged || 0);\n      const hourlyRate = parseInt(coach.hourly_rate || 0);\n      payrollAmount = hoursLogged * hourlyRate;\n\n      calculationMethod = 'Hourly (TOTS)';\n      details = {\n        entity: 'tots-tennis',\n        method: 'hourly',\n        hours_logged: hoursLogged,\n        hourly_rate: hourlyRate,\n        net_payable: payrollAmount\n      };\n    }\n\n    totalPayroll += payrollAmount;\n\n    results.push({\n      coach_id: coach.id,\n      coach_name: coach.name || 'Unknown',\n      entity: coach.entity,\n      calculation_method: calculationMethod,\n      payroll_amount: payrollAmount,\n      details: details\n    });\n  });\n\n  return {\n    month_name: monthName,\n    year: year,\n    working_days: workingDays,\n    coach_count: results.length,\n    total_payroll: totalPayroll,\n    pending_approval: pendingApproval,\n    coaches: results\n  };\n};",
+                      "packageJson": "{}"
+                    },
+                    "propertySettings": {
+                      "coaches_json": { "type": "MANUAL" },
+                      "attendance": { "type": "MANUAL" },
+                      "leaves": { "type": "MANUAL" },
+                      "approval_check": { "type": "MANUAL" },
+                      "month_name": { "type": "MANUAL" },
+                      "year": { "type": "MANUAL" },
+                      "month": { "type": "MANUAL" }
+                    },
+                    "sampleData": {},
+                    "errorHandlingOptions": {
+                      "retryOnFailure": { "value": false },
+                      "continueOnFailure": { "value": false }
+                    }
+                  },
+                  "nextAction": {
+                    "name": "step_6",
+                    "type": "PIECE",
+                    "displayName": "Log Payroll Run",
+                    "valid": true,
+                    "skip": false,
+                    "settings": {
+                      "input": {
+                        "auth": "",
+                        "table_name": "communications_log",
+                        "row_data": {
+                          "type": "payroll",
+                          "channel": "email",
+                          "status": "sent",
+                          "date": "{{step_1['start_date']}}"
+                        },
+                        "return_row": false
+                      },
+                      "pieceName": "@puchoaistudio/tool-supabase",
+                      "actionName": "create_row",
+                      "pieceVersion": "^2.0.1",
+                      "propertySettings": {
+                        "auth": { "type": "MANUAL" },
+                        "row_data": {
+                          "type": "MANUAL",
+                          "schema": {
+                            "type": { "type": "SHORT_TEXT", "required": false, "displayName": "type", "defaultValue": "" },
+                            "channel": { "type": "SHORT_TEXT", "required": false, "displayName": "channel", "defaultValue": "" },
+                            "status": { "type": "SHORT_TEXT", "required": false, "displayName": "status", "defaultValue": "" },
+                            "date": { "type": "SHORT_TEXT", "required": false, "displayName": "date", "defaultValue": "" }
+                          }
+                        },
+                        "return_row": { "type": "MANUAL" },
+                        "table_name": { "type": "MANUAL" }
+                      },
+                      "sampleData": {},
+                      "errorHandlingOptions": {
+                        "retryOnFailure": { "value": true },
+                        "continueOnFailure": { "value": false }
+                      }
+                    },
+                    "nextAction": {
+                      "name": "step_7",
+                      "type": "PIECE",
+                      "displayName": "Send Payroll Report Email",
+                      "valid": true,
+                      "skip": false,
+                      "settings": {
+                        "input": {
+                          "auth": "",
+                          "receiver": [
+                            "admin@arnavtennis.com"
+                          ],
+                          "subject": "Coach Payroll Report - {{step_5_aggregate['month_name']}} {{step_5_aggregate['year']}} {% if step_5_aggregate['pending_approval'] %}[PENDING APPROVAL]{% endif %}",
+                          "body": "Coach Payroll Report for {{step_5_aggregate['month_name']}} {{step_5_aggregate['year']}}\n\nTotal Coaches: {{step_5_aggregate['coach_count']}}\nWorking Days: {{step_5_aggregate['working_days']}}\nTotal Payroll: Rs.{{step_5_aggregate['total_payroll']}}\n{% if step_5_aggregate['pending_approval'] %}\n\n## WARNING: PENDING APPROVALS ##\nSome Club coaches have attendance records awaiting head coach or admin approval.\nPayroll amounts for those coaches are provisional and will not be finalized\nuntil all attendance records are approved.\n\n{% endif %}\nBreakdown:\n{% for coach in step_5_aggregate['coaches'] %}\n\n--- {{coach.coach_name}} ({{coach.calculation_method}}) ---\n{% if coach.details.method == 'session_based' %}\n  Monthly Salary: Rs.{{coach.details.monthly_salary}}\n  Daily Rate: Rs.{{coach.details.daily_rate}} ({{coach.details.working_days}} working days)\n  Half-Day Sessions: {{coach.details.half_day_sessions}} | Full-Day Sessions: {{coach.details.full_day_sessions}}\n  Total Sessions: {{coach.details.total_sessions}}\n  Leave: {{coach.details.leave_days}} days | Deduction: Rs.{{coach.details.leave_deduction}}\n  Approval Status: {{coach.details.approval_status}}\n{% if coach.details.approval_note %}\n  NOTE: {{coach.details.approval_note}}\n{% endif %}\n{% else %}\n  Hours Logged: {{coach.details.hours_logged}}\n  Hourly Rate: Rs.{{coach.details.hourly_rate}}\n{% endif %}\n  Net Payable: Rs.{{coach.payroll_amount}}\n{% endfor %}\n\nCalculation Methods:\n- The Club coaches: Monthly Salary - (Leave Days x Daily Rate)\n  Session periods (half_day/full_day) tracked for payroll accuracy.\n  Requires admin/head coach approval before finalization.\n- TOTS Tennis coaches: Hours Logged x Hourly Rate\n\nThis report was auto-generated. Please verify before processing payouts.\n\nGenerated by Arnav Jain Tennis Academy",
+                          "body_type": "text",
+                          "cc": [],
+                          "bcc": [],
+                          "reply_to": [],
+                          "draft": false
+                        },
+                        "pieceName": "@puchoaistudio/tool-gmail",
+                        "actionName": "send_email",
+                        "pieceVersion": "^2.0.4",
+                        "propertySettings": {
+                          "auth": { "type": "MANUAL" },
+                          "receiver": { "type": "MANUAL" },
+                          "subject": { "type": "MANUAL" },
+                          "body": { "type": "MANUAL" },
+                          "body_type": { "type": "MANUAL" },
+                          "cc": { "type": "MANUAL" },
+                          "bcc": { "type": "MANUAL" },
+                          "reply_to": { "type": "MANUAL" },
+                          "draft": { "type": "MANUAL" },
+                          "from": { "type": "MANUAL" },
+                          "sender_name": { "type": "MANUAL" },
+                          "attachment": { "type": "MANUAL" },
+                          "attachment_name": { "type": "MANUAL" }
+                        },
+                        "sampleData": {},
+                        "errorHandlingOptions": {
+                          "retryOnFailure": { "value": false },
+                          "continueOnFailure": { "value": true }
+                        }
+                      },
+                      "nextAction": {
+                        "name": "step_8",
+                        "type": "PIECE",
+                        "displayName": "Return Payroll Response",
+                        "valid": true,
+                        "skip": false,
+                        "settings": {
+                          "input": {
+                            "fields": {
+                              "body": {
+                                "success": true,
+                                "month": "{{step_5_aggregate['month_name']}}",
+                                "year": "{{step_5_aggregate['year']}}",
+                                "total_payroll": "{{step_5_aggregate['total_payroll']}}",
+                                "coach_count": "{{step_5_aggregate['coach_count']}}",
+                                "pending_approval": "{{step_5_aggregate['pending_approval']}}",
+                                "message": "Coach payroll report generated and emailed successfully"
+                              },
+                              "status": 200,
+                              "headers": {}
+                            },
+                            "respond": "stop",
+                            "responseType": "json"
+                          },
+                          "pieceName": "@puchoaistudio/tool-webhook",
+                          "actionName": "return_response",
+                          "pieceVersion": "^2.0.4",
+                          "propertySettings": {
+                            "fields": {
+                              "type": "MANUAL",
+                              "schema": {
+                                "body": { "type": "JSON", "required": true, "displayName": "JSON Body" },
+                                "status": { "type": "NUMBER", "required": false, "displayName": "Status", "defaultValue": 200 },
+                                "headers": { "type": "OBJECT", "required": false, "displayName": "Headers" }
+                              }
+                            },
+                            "respond": { "type": "MANUAL" },
+                            "responseType": { "type": "MANUAL" }
+                          },
+                          "sampleData": {},
+                          "errorHandlingOptions": {
+                            "retryOnFailure": { "value": false },
+                            "continueOnFailure": { "value": false }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "valid": true,
+    "agentIds": [],
+    "connectionIds": [],
+    "schemaVersion": "7"
+  },
+  "blogUrl": ""
+}
