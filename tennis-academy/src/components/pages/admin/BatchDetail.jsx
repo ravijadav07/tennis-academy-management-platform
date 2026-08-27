@@ -14,7 +14,18 @@ import { ArrowLeft, Clock, MapPin, Pencil, Archive } from 'lucide-react';
 const FIELD = 'w-full h-[38px] px-3 rounded-lg border border-line bg-white text-[13px] text-ink outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand transition-all';
 const LBL = 'block text-[10px] font-semibold text-ink-muted uppercase tracking-[0.04em] mb-1';
 const PATTERNS = ['MWF', 'TTS', 'WEEKEND'];
-const PROGRAMS = ['ADV', 'INT', 'ADULT', 'GREEN', 'ORANGE', 'RED', 'JDP', 'HPP', 'WEEKEND', 'FITNESS'];
+const CATEGORY_OPTIONS = [
+  { value: 'ADV', label: 'Advance' },
+  { value: 'INT', label: 'Intermediate' },
+  { value: 'ADULT', label: 'Adults' },
+  { value: 'JDP', label: 'JDP' },
+  { value: 'HPP', label: 'HPP' },
+  { value: 'WEEKEND', label: 'Weekend' },
+  { value: 'FITNESS', label: 'Fitness' },
+  { value: 'GREEN', label: 'Green' },
+  { value: 'ORANGE', label: 'Orange' },
+  { value: 'RED', label: 'Red' },
+];
 const BALL_COLORS = ['Yellow', 'Green', 'Orange', 'Red'];
 const CATEGORIES_WITH_BALL = new Set(['ADV', 'INT']);
 const CATEGORIES_AUTO_BALL = { GREEN: 'Green', ORANGE: 'Orange', RED: 'Red' };
@@ -49,6 +60,32 @@ export default function BatchDetail() {
     capacity: '', primaryCoachId: '', supportCoachId: '', isSemiBatch: false,
   }));
 
+  const handleNfCategoryChange = (v) => {
+    const prog = typeof v === 'object' ? (v?.value || '') : (v || '');
+    let nextBall = '';
+    if (CATEGORIES_WITH_BALL.has(prog)) {
+      nextBall = '';
+    } else if (CATEGORIES_AUTO_BALL[prog]) {
+      nextBall = CATEGORIES_AUTO_BALL[prog];
+    } else {
+      nextBall = null;
+    }
+    setNf((f) => ({ ...f, program: prog, ballLevel: nextBall }));
+  };
+
+  const handleEfCategoryChange = (v) => {
+    const prog = typeof v === 'object' ? (v?.value || '') : (v || '');
+    let nextBall = '';
+    if (CATEGORIES_WITH_BALL.has(prog)) {
+      nextBall = '';
+    } else if (CATEGORIES_AUTO_BALL[prog]) {
+      nextBall = CATEGORIES_AUTO_BALL[prog];
+    } else {
+      nextBall = null;
+    }
+    setEf((f) => ({ ...f, program: prog, ballLevel: nextBall }));
+  };
+
   const handleCreate = async () => {
     if (!nf.program || !nf.startTime) { toast.error('Category and start time are required'); return; }
     const ballForCreate = CATEGORIES_WITH_BALL.has(nf.program) && !nf.ballLevel ? null : resolveBallColor(nf.program, nf.ballLevel);
@@ -74,20 +111,40 @@ export default function BatchDetail() {
           <ArrowLeft className="w-4 h-4" /> Back to Schedule
         </button>
         <Card>
-          <h3 className="text-sm font-semibold text-ink mb-4">Add Batch</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <Sel label="Category *" value={nf.program} onChange={(v) => setNf((f) => ({ ...f, program: v }))} options={PROGRAMS.map((p) => ({ value: p, label: p }))} />
-            {CATEGORIES_WITH_BALL.has(nf.program) && (
-              <Sel label="Ball Color *" value={nf.ballLevel || ''} onChange={(v) => setNf((f) => ({ ...f, ballLevel: v }))}
-                options={BALL_COLORS.map((b) => ({ value: b, label: b }))} emptyOption="Select..." />
-            )}
-            <Sel label="Court" value={nf.courtId} onChange={(v) => setNf((f) => ({ ...f, courtId: v }))} options={courts.map((c) => ({ value: c.id, label: c.name }))} />
-            <Sel label="Day Pattern" value={nf.dayPattern} onChange={(v) => setNf((f) => ({ ...f, dayPattern: v }))} options={PATTERNS.map((p) => ({ value: p, label: p === 'WEEKEND' ? 'Sat-Sun' : p }))} />
-            <Field label="Capacity" type="number" value={nf.capacity} onChange={(v) => setNf((f) => ({ ...f, capacity: v }))} />
-            <Field label="Start Time *" type="time" value={nf.startTime} onChange={(v) => setNf((f) => ({ ...f, startTime: v }))} />
-            <Field label="End Time" type="time" value={nf.endTime} onChange={(v) => setNf((f) => ({ ...f, endTime: v }))} />
-            <Sel label="Primary Coach" value={nf.primaryCoachId} onChange={(v) => setNf((f) => ({ ...f, primaryCoachId: v }))} options={coaches.map((c) => ({ value: c.id, label: c.name }))} emptyOption="Select..." />
-            <Sel label="Support Coach" value={nf.supportCoachId} onChange={(v) => setNf((f) => ({ ...f, supportCoachId: v }))} options={coaches.map((c) => ({ value: c.id, label: c.name }))} emptyOption="None" />
+          <div className="space-y-3">
+            {/* Connected Category & Ball Color Classification Group */}
+            <div className="rounded-xl border border-line bg-canvas-soft/40 p-3">
+              <div className={CATEGORIES_WITH_BALL.has(nf.program) ? "grid grid-cols-2 gap-3 items-center" : "space-y-1"}>
+                <Sel label="Category *" value={nf.program} onChange={handleNfCategoryChange} options={CATEGORY_OPTIONS} emptyOption="Select Category..." />
+                {CATEGORIES_WITH_BALL.has(nf.program) && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1 mb-1">
+                      <span className="text-brand text-xs font-bold leading-none">›</span>
+                      <label className={LBL + " !mb-0 text-brand-600 font-bold"}>Ball Color *</label>
+                    </div>
+                    <Dropdown
+                      value={nf.ballLevel || ''}
+                      onChange={(v) => setNf((f) => ({ ...f, ballLevel: typeof v === 'object' ? (v.value || v) : v }))}
+                      placeholder="Select ball color..."
+                      options={BALL_COLORS.map((b) => ({ value: b, label: b }))}
+                      getOptionLabel={(o) => (o && o.label) || ''}
+                      getOptionValue={(o) => (o && o.value) || ''}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Batch Details Group */}
+            <div className="grid grid-cols-2 gap-3">
+              <Sel label="Court" value={nf.courtId} onChange={(v) => setNf((f) => ({ ...f, courtId: v }))} options={courts.map((c) => ({ value: c.id, label: c.name }))} />
+              <Sel label="Day Pattern" value={nf.dayPattern} onChange={(v) => setNf((f) => ({ ...f, dayPattern: v }))} options={PATTERNS.map((p) => ({ value: p, label: p === 'WEEKEND' ? 'Sat-Sun' : p }))} />
+              <Field label="Capacity" type="number" value={nf.capacity} onChange={(v) => setNf((f) => ({ ...f, capacity: v }))} />
+              <Field label="Start Time *" type="time" value={nf.startTime} onChange={(v) => setNf((f) => ({ ...f, startTime: v }))} />
+              <Field label="End Time" type="time" value={nf.endTime} onChange={(v) => setNf((f) => ({ ...f, endTime: v }))} />
+              <Sel label="Primary Coach" value={nf.primaryCoachId} onChange={(v) => setNf((f) => ({ ...f, primaryCoachId: v }))} options={coaches.map((c) => ({ value: c.id, label: c.name }))} emptyOption="Select..." />
+              <Sel label="Support Coach" value={nf.supportCoachId} onChange={(v) => setNf((f) => ({ ...f, supportCoachId: v }))} options={coaches.map((c) => ({ value: c.id, label: c.name }))} emptyOption="None" />
+            </div>
           </div>
           <label className="flex items-center gap-2 text-xs mt-3">
             <input type="checkbox" checked={nf.isSemiBatch || false} onChange={(e) => setNf((f) => ({ ...f, isSemiBatch: e.target.checked }))} />
@@ -202,19 +259,40 @@ export default function BatchDetail() {
       </Card>
 
       <Modal open={showEdit} onClose={() => setShowEdit(false)} title="Edit Batch" size="md">
-        <div className="grid grid-cols-2 gap-3">
-          <Sel label="Category" value={ef.program || ''} onChange={(v) => setEf((f) => ({ ...f, program: v }))} options={PROGRAMS.map((p) => ({ value: p, label: p }))} />
-          {CATEGORIES_WITH_BALL.has(ef.program) && (
-            <Sel label="Ball Color" value={ef.ballLevel || ''} onChange={(v) => setEf((f) => ({ ...f, ballLevel: v }))}
-              options={BALL_COLORS.map((b) => ({ value: b, label: b }))} emptyOption="Select..." />
-          )}
-          <Sel label="Court" value={ef.courtId || ''} onChange={(v) => setEf((f) => ({ ...f, courtId: v }))} options={courts.map((c) => ({ value: c.id, label: c.name }))} />
-          <Sel label="Day Pattern" value={ef.dayPattern || 'MWF'} onChange={(v) => setEf((f) => ({ ...f, dayPattern: v }))} options={PATTERNS.map((p) => ({ value: p, label: p === 'WEEKEND' ? 'Sat-Sun' : p }))} />
-          <Field label="Capacity" type="number" value={ef.capacity || ''} onChange={(v) => setEf((f) => ({ ...f, capacity: v }))} />
-          <Field label="Start Time" type="time" value={ef.startTime || ''} onChange={(v) => setEf((f) => ({ ...f, startTime: v }))} />
-          <Field label="End Time" type="time" value={ef.endTime || ''} onChange={(v) => setEf((f) => ({ ...f, endTime: v }))} />
-          <Sel label="Primary Coach" value={ef.primaryCoachId || ''} onChange={(v) => setEf((f) => ({ ...f, primaryCoachId: v }))} options={coaches.map((c) => ({ value: c.id, label: c.name }))} emptyOption="Select..." />
-          <Sel label="Support Coach" value={ef.supportCoachId || ''} onChange={(v) => setEf((f) => ({ ...f, supportCoachId: v }))} options={coaches.map((c) => ({ value: c.id, label: c.name }))} emptyOption="None" />
+        <div className="space-y-3">
+          {/* Connected Category & Ball Color Classification Group */}
+          <div className="rounded-xl border border-line bg-canvas-soft/40 p-3">
+            <div className={CATEGORIES_WITH_BALL.has(ef.program) ? "grid grid-cols-2 gap-3 items-center" : "space-y-1"}>
+              <Sel label="Category" value={ef.program || ''} onChange={handleEfCategoryChange} options={CATEGORY_OPTIONS} emptyOption="Select Category..." />
+              {CATEGORIES_WITH_BALL.has(ef.program) && (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1 mb-1">
+                    <span className="text-brand text-xs font-bold leading-none">›</span>
+                    <label className={LBL + " !mb-0 text-brand-600 font-bold"}>Ball Color *</label>
+                  </div>
+                  <Dropdown
+                    value={ef.ballLevel || ''}
+                    onChange={(v) => setEf((f) => ({ ...f, ballLevel: typeof v === 'object' ? (v.value || v) : v }))}
+                    placeholder="Select ball color..."
+                    options={BALL_COLORS.map((b) => ({ value: b, label: b }))}
+                    getOptionLabel={(o) => (o && o.label) || ''}
+                    getOptionValue={(o) => (o && o.value) || ''}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Batch Details Group */}
+          <div className="grid grid-cols-2 gap-3">
+            <Sel label="Court" value={ef.courtId || ''} onChange={(v) => setEf((f) => ({ ...f, courtId: v }))} options={courts.map((c) => ({ value: c.id, label: c.name }))} />
+            <Sel label="Day Pattern" value={ef.dayPattern || 'MWF'} onChange={(v) => setEf((f) => ({ ...f, dayPattern: v }))} options={PATTERNS.map((p) => ({ value: p, label: p === 'WEEKEND' ? 'Sat-Sun' : p }))} />
+            <Field label="Capacity" type="number" value={ef.capacity || ''} onChange={(v) => setEf((f) => ({ ...f, capacity: v }))} />
+            <Field label="Start Time" type="time" value={ef.startTime || ''} onChange={(v) => setEf((f) => ({ ...f, startTime: v }))} />
+            <Field label="End Time" type="time" value={ef.endTime || ''} onChange={(v) => setEf((f) => ({ ...f, endTime: v }))} />
+            <Sel label="Primary Coach" value={ef.primaryCoachId || ''} onChange={(v) => setEf((f) => ({ ...f, primaryCoachId: v }))} options={coaches.map((c) => ({ value: c.id, label: c.name }))} emptyOption="Select..." />
+            <Sel label="Support Coach" value={ef.supportCoachId || ''} onChange={(v) => setEf((f) => ({ ...f, supportCoachId: v }))} options={coaches.map((c) => ({ value: c.id, label: c.name }))} emptyOption="None" />
+          </div>
         </div>
         <label className="flex items-center gap-2 text-xs mt-3">
           <input type="checkbox" checked={ef.isSemiBatch || false} onChange={(e) => setEf((f) => ({ ...f, isSemiBatch: e.target.checked }))} />

@@ -24,7 +24,7 @@ export default function AdminStudents() {
 
   // Add Student modal
   const [showAdd, setShowAdd] = useState(false);
-  const [addForm, setAddForm] = useState({ name: '', guardianName: '', guardianPhone: '', isGuest: false, program: '', batchId: '', sessionsPurchased: '', amount: '', paymentStatus: 'PAID' });
+  const [addForm, setAddForm] = useState({ name: '', guardianName: '', guardianPhone: '', isGuest: false, program: '', ballColor: '', batchId: '', sessionsPurchased: '', amount: '', paymentStatus: 'PAID' });
   const [addErrors, setAddErrors] = useState({});
   const [dupCheck, setDupCheck] = useState(null);
 
@@ -34,7 +34,7 @@ export default function AdminStudents() {
 
   // Add Enrollment modal
   const [showEnroll, setShowEnroll] = useState(false);
-  const [enrollForm, setEnrollForm] = useState({ program: '', batchId: '' });
+  const [enrollForm, setEnrollForm] = useState({ program: '', ballColor: '', batchId: '' });
 
   // Archive modal
   const [showArchive, setShowArchive] = useState(false);
@@ -42,7 +42,96 @@ export default function AdminStudents() {
 
   const state = (() => { try { return db.readAll(); } catch { return { batches: [], coaches: [] }; } })();
   const batchOptions = state.batches?.filter((b) => b.status === 'ACTIVE') || [];
-  const CATEGORIES = ['ADV', 'INT', 'ADULT', 'GREEN', 'ORANGE', 'RED', 'JDP', 'HPP', 'WEEKEND', 'FITNESS'];
+  
+  const CATEGORY_OPTIONS = [
+    { value: 'ADV', label: 'Advance' },
+    { value: 'INT', label: 'Intermediate' },
+    { value: 'ADULT', label: 'Adults' },
+    { value: 'JDP', label: 'JDP' },
+    { value: 'HPP', label: 'HPP' },
+    { value: 'WEEKEND', label: 'Weekend' },
+    { value: 'FITNESS', label: 'Fitness' },
+    { value: 'GREEN', label: 'Green' },
+    { value: 'ORANGE', label: 'Orange' },
+    { value: 'RED', label: 'Red' },
+  ];
+
+  const BALL_COLORS = ['Yellow', 'Green', 'Orange', 'Red'];
+  const CATEGORIES_WITH_BALL = new Set(['ADV', 'INT']);
+  const CATEGORIES_AUTO_BALL = { GREEN: 'Green', ORANGE: 'Orange', RED: 'Red' };
+
+  const handleAddCategoryChange = (v) => {
+    const prog = typeof v === 'object' ? (v?.value || '') : (v || '');
+    let nextBall = '';
+    if (CATEGORIES_WITH_BALL.has(prog)) {
+      nextBall = '';
+    } else if (CATEGORIES_AUTO_BALL[prog]) {
+      nextBall = CATEGORIES_AUTO_BALL[prog];
+    } else {
+      nextBall = null;
+    }
+    setAddForm((f) => ({ ...f, program: prog, ballColor: nextBall, batchId: '' }));
+  };
+
+  const handleAddBallColorChange = (v) => {
+    const color = typeof v === 'object' ? (v?.value || '') : (v || '');
+    setAddForm((f) => ({ ...f, ballColor: color, batchId: '' }));
+  };
+
+  const handleEnrollCategoryChange = (v) => {
+    const prog = typeof v === 'object' ? (v?.value || '') : (v || '');
+    let nextBall = '';
+    if (CATEGORIES_WITH_BALL.has(prog)) {
+      nextBall = '';
+    } else if (CATEGORIES_AUTO_BALL[prog]) {
+      nextBall = CATEGORIES_AUTO_BALL[prog];
+    } else {
+      nextBall = null;
+    }
+    setEnrollForm((f) => ({ ...f, program: prog, ballColor: nextBall, batchId: '' }));
+  };
+
+  const handleEnrollBallColorChange = (v) => {
+    const color = typeof v === 'object' ? (v?.value || '') : (v || '');
+    setEnrollForm((f) => ({ ...f, ballColor: color, batchId: '' }));
+  };
+
+  const getFilteredBatches = (prog, ball) => {
+    if (!prog) return [];
+    if (CATEGORIES_WITH_BALL.has(prog)) {
+      if (!ball) return [];
+      return batchOptions.filter((b) =>
+        b.program === prog && (b.ballLevel || '').toLowerCase() === ball.toLowerCase()
+      );
+    }
+    if (['GREEN', 'ORANGE', 'RED', 'ADULT', 'WEEKEND', 'FITNESS'].includes(prog)) {
+      return batchOptions.filter((b) => b.program === prog);
+    }
+    if (prog === 'JDP' || prog === 'HPP') {
+      return batchOptions;
+    }
+    return batchOptions;
+  };
+
+  const addFilteredBatches = getFilteredBatches(addForm.program, addForm.ballColor);
+  const isAddClassificationReady = Boolean(
+    addForm.program && (!CATEGORIES_WITH_BALL.has(addForm.program) || addForm.ballColor)
+  );
+  const addBatchPlaceholder = !addForm.program
+    ? 'Select Category first'
+    : CATEGORIES_WITH_BALL.has(addForm.program) && !addForm.ballColor
+    ? 'Select Ball Color first'
+    : 'Skip or select batch...';
+
+  const enrollFilteredBatches = getFilteredBatches(enrollForm.program, enrollForm.ballColor);
+  const isEnrollClassificationReady = Boolean(
+    enrollForm.program && (!CATEGORIES_WITH_BALL.has(enrollForm.program) || enrollForm.ballColor)
+  );
+  const enrollBatchPlaceholder = !enrollForm.program
+    ? 'Select Category first'
+    : CATEGORIES_WITH_BALL.has(enrollForm.program) && !enrollForm.ballColor
+    ? 'Select Ball Color first'
+    : 'Select batch...';
 
   // Duplicate check
   const checkDup = async () => {
@@ -74,7 +163,7 @@ export default function AdminStudents() {
       }
       toast.success(`Student "${addForm.name}" created`);
       setShowAdd(false);
-      setAddForm({ name: '', guardianName: '', guardianPhone: '', isGuest: false, program: '', batchId: '', sessionsPurchased: '', amount: '', paymentStatus: 'PAID' });
+      setAddForm({ name: '', guardianName: '', guardianPhone: '', isGuest: false, program: '', ballColor: '', batchId: '', sessionsPurchased: '', amount: '', paymentStatus: 'PAID' });
       setAddErrors({}); setDupCheck(null);
     } catch (e) { toast.error(e.message); }
   };
@@ -215,29 +304,56 @@ export default function AdminStudents() {
 
           <div className="border-t border-line pt-3">
             <p className="text-[10px] font-semibold text-ink-muted uppercase mb-2">Optional: Initial Enrollment</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className={labelCls}>Category</label>
-                <Dropdown
-                  value={addForm.program}
-                  onChange={(v) => setAddForm((f) => ({ ...f, program: typeof v === 'object' ? (v.value || v) : v }))}
-                  placeholder="Skip"
-                  options={CATEGORIES.map((p) => ({ value: p, label: p }))}
-                  getOptionLabel={(o) => o.label}
-                  getOptionValue={(o) => o.value}
-                />
+            
+            {/* Connected Category & Ball Color Classification Group */}
+            <div className="rounded-xl border border-line bg-canvas-soft/40 p-3 mb-3">
+              <div className={CATEGORIES_WITH_BALL.has(addForm.program) ? "grid grid-cols-2 gap-3 items-center" : "space-y-1"}>
+                <div className="space-y-1">
+                  <label className={labelCls}>Category</label>
+                  <Dropdown
+                    value={addForm.program}
+                    onChange={handleAddCategoryChange}
+                    placeholder="Skip or select category..."
+                    options={CATEGORY_OPTIONS}
+                    getOptionLabel={(o) => (o && o.label) || ''}
+                    getOptionValue={(o) => (o && o.value) || ''}
+                  />
+                </div>
+
+                {CATEGORIES_WITH_BALL.has(addForm.program) && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1 mb-1">
+                      <span className="text-brand text-xs font-bold leading-none">›</span>
+                      <label className={labelCls + " !mb-0 text-brand-600 font-bold"}>Ball Color *</label>
+                    </div>
+                    <Dropdown
+                      value={addForm.ballColor}
+                      onChange={handleAddBallColorChange}
+                      placeholder="Select ball color..."
+                      options={BALL_COLORS.map((c) => ({ value: c, label: c }))}
+                      getOptionLabel={(o) => (o && o.label) || ''}
+                      getOptionValue={(o) => (o && o.value) || ''}
+                    />
+                  </div>
+                )}
               </div>
-              <div className="space-y-1">
-                <label className={labelCls}>Batch</label>
-                <Dropdown
-                  value={addForm.batchId}
-                  onChange={(v) => setAddForm((f) => ({ ...f, batchId: typeof v === 'object' ? (v.value || v) : v }))}
-                  placeholder="Skip"
-                  options={batchOptions.map((b) => ({ value: b.id, label: b.program + ' ' + b.dayPattern + ' (' + b.startTime + ')' }))}
-                  getOptionLabel={(o) => o.label}
-                  getOptionValue={(o) => o.value}
-                />
-              </div>
+            </div>
+
+            {/* Batch Selection */}
+            <div className="space-y-1">
+              <label className={labelCls}>Batch</label>
+              <Dropdown
+                value={addForm.batchId}
+                onChange={(v) => setAddForm((f) => ({ ...f, batchId: typeof v === 'object' ? (v.value || v) : v }))}
+                placeholder={addBatchPlaceholder}
+                disabled={!isAddClassificationReady}
+                options={addFilteredBatches.map((b) => ({
+                  value: b.id,
+                  label: `${b.name || (b.program + (b.ballLevel ? ' · ' + b.ballLevel : ''))} (${b.dayPattern} ${b.startTime})`,
+                }))}
+                getOptionLabel={(o) => (o && o.label) || ''}
+                getOptionValue={(o) => (o && o.value) || ''}
+              />
             </div>
           </div>
 
@@ -260,8 +376,8 @@ export default function AdminStudents() {
                   value={addForm.paymentStatus}
                   onChange={(v) => setAddForm((f) => ({ ...f, paymentStatus: typeof v === 'object' ? (v.value || v) : v }))}
                   options={[{ value: 'PAID', label: 'Paid' }, { value: 'PENDING', label: 'Pending' }, { value: 'PARTIAL', label: 'Partial' }]}
-                  getOptionLabel={(o) => o.label}
-                  getOptionValue={(o) => o.value}
+                  getOptionLabel={(o) => (o && o.label) || ''}
+                  getOptionValue={(o) => (o && o.value) || ''}
                 />
               </div>
             </div>
@@ -300,31 +416,58 @@ export default function AdminStudents() {
       {/* Add Enrollment Modal */}
       <Modal open={showEnroll} onClose={() => setShowEnroll(false)} title="Add Enrollment" size="sm">
         <div className="space-y-3">
-          <div className="space-y-1">
-            <label className={labelCls}>Category</label>
-            <Dropdown
-              value={enrollForm.program}
-              onChange={(v) => setEnrollForm((f) => ({ ...f, program: typeof v === 'object' ? (v.value || v) : v }))}
-              placeholder="Select..."
-              options={CATEGORIES.map((p) => ({ value: p, label: p }))}
-              getOptionLabel={(o) => o.label}
-              getOptionValue={(o) => o.value}
-            />
+          {/* Classification Group (Category & Ball Color) */}
+          <div className="rounded-xl border border-line bg-canvas-soft/40 p-3">
+            <div className={CATEGORIES_WITH_BALL.has(enrollForm.program) ? "grid grid-cols-2 gap-3 items-center" : "space-y-1"}>
+              <div className="space-y-1">
+                <label className={labelCls}>Category</label>
+                <Dropdown
+                  value={enrollForm.program}
+                  onChange={handleEnrollCategoryChange}
+                  placeholder="Select category..."
+                  options={CATEGORY_OPTIONS}
+                  getOptionLabel={(o) => (o && o.label) || ''}
+                  getOptionValue={(o) => (o && o.value) || ''}
+                />
+              </div>
+
+              {CATEGORIES_WITH_BALL.has(enrollForm.program) && (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1 mb-1">
+                    <span className="text-brand text-xs font-bold leading-none">›</span>
+                    <label className={labelCls + " !mb-0 text-brand-600 font-bold"}>Ball Color *</label>
+                  </div>
+                  <Dropdown
+                    value={enrollForm.ballColor}
+                    onChange={handleEnrollBallColorChange}
+                    placeholder="Select ball color..."
+                    options={BALL_COLORS.map((c) => ({ value: c, label: c }))}
+                    getOptionLabel={(o) => (o && o.label) || ''}
+                    getOptionValue={(o) => (o && o.value) || ''}
+                  />
+                </div>
+              )}
+            </div>
           </div>
+
           <div className="space-y-1">
             <label className={labelCls}>Batch</label>
             <Dropdown
               value={enrollForm.batchId}
               onChange={(v) => setEnrollForm((f) => ({ ...f, batchId: typeof v === 'object' ? (v.value || v) : v }))}
-              placeholder="Select..."
-              options={batchOptions.map((b) => ({ value: b.id, label: b.program + ' ' + b.dayPattern + ' (' + b.startTime + ')' }))}
-              getOptionLabel={(o) => o.label}
-              getOptionValue={(o) => o.value}
+              placeholder={enrollBatchPlaceholder}
+              disabled={!isEnrollClassificationReady}
+              options={enrollFilteredBatches.map((b) => ({
+                value: b.id,
+                label: `${b.name || (b.program + (b.ballLevel ? ' · ' + b.ballLevel : ''))} (${b.dayPattern} ${b.startTime})`,
+              }))}
+              getOptionLabel={(o) => (o && o.label) || ''}
+              getOptionValue={(o) => (o && o.value) || ''}
             />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="secondary" onClick={() => setShowEnroll(false)}>Cancel</Button>
-            <Button onClick={handleAddEnrollment}>Add Enrollment</Button>
+            <Button onClick={handleAddEnrollment} disabled={!isEnrollClassificationReady || !enrollForm.batchId}>Add Enrollment</Button>
           </div>
         </div>
       </Modal>

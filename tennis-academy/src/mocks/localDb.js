@@ -566,6 +566,23 @@ export const db = {
     });
   },
 
+  async unverifyPrivateSessions({ sessionIds }) {
+    await sleep(LATENCY);
+    return mutate((s) => {
+      const done = [];
+      for (const id of sessionIds) {
+        const p = s.privateSessions.find((x) => x.id === id);
+        if (!p) continue;
+        p.status = 'PENDING_VERIFICATION';
+        p.verifiedBy = null;
+        p.verifiedAt = null;
+        done.push(p);
+      }
+      audit(s, 'UNVERIFY_PRIVATE', 'privateSession', null, null, { count: done.length });
+      return done;
+    });
+  },
+
   // --- reports
   async getSlotAnalysis({ month } = {}) {
     await sleep(LATENCY * 2);

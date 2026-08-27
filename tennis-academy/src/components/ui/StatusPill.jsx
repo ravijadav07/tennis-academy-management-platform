@@ -3,6 +3,7 @@ import { cn } from '../../utils/cn';
 const colorMap = {
   success: 'bg-ok-bg text-ok',
   completed: 'bg-ok-bg text-ok',
+  verified: 'bg-ok-bg text-ok',
   running: 'bg-ok-bg text-ok',
   active: 'bg-ok-bg text-ok',
   paid: 'bg-ok-bg text-ok',
@@ -18,6 +19,7 @@ const colorMap = {
 
   warning: 'bg-warn-bg text-warn',
   pending: 'bg-warn-bg text-warn',
+  pending_verification: 'bg-warn-bg text-warn',
   queued: 'bg-warn-bg text-warn',
   trial_booked: 'bg-warn-bg text-warn',
   enrollment_pending: 'bg-warn-bg text-warn',
