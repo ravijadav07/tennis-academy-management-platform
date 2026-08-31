@@ -1,0 +1,13 @@
+{
+  "name": "Tennis Academy Management",
+  "short_name": "ATA",
+  "description": "Tennis Academy Management — The Club & TOTS Tennis",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAFAFF",
+  "theme_color": "#7C4DFF",
+  "icons": [
+    { "src": "/favicon.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/favicon.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
