@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { useDb } from '../../context/DbContext';
+import { formatTime12h } from '../../utils/formatters';
 
 export default function GlobalSearch() {
   const { db, tick } = useDb();
@@ -16,7 +17,7 @@ export default function GlobalSearch() {
     const state = db.readAll();
     const q = query.toLowerCase();
     const students = state.students.filter((s) => s.name.toLowerCase().includes(q)).map((s) => ({ type: 'Student', id: s.id, name: s.name, path: '/admin/students', detail: s.guardianName }));
-    const batches = state.batches.filter((b) => (b.program || b.name || '').toLowerCase().includes(q)).map((b) => ({ type: 'Batch', id: b.id, name: b.program, path: `/admin/batches/${b.id}`, detail: `${b.dayPattern} ${b.startTime}` }));
+    const batches = state.batches.filter((b) => (b.program || b.name || '').toLowerCase().includes(q)).map((b) => ({ type: 'Batch', id: b.id, name: b.program, path: `/admin/batches/${b.id}`, detail: `${b.dayPattern} ${formatTime12h(b.startTime)}` }));
     const coaches = state.coaches.filter((c) => c.name.toLowerCase().includes(q)).map((c) => ({ type: 'Coach', id: c.id, name: c.name, path: '/admin/coaches', detail: c.designation }));
     return [...students, ...batches, ...coaches].slice(0, 8);
   }, [query, db, tick]);

@@ -8,7 +8,7 @@ import { Clock, User, Plus } from 'lucide-react';
 import CapacityIndicator from '../../ui/CapacityIndicator';
 import { formatTime12h } from '../../../utils/formatters';
 
-const PATTERNS = ['MWF', 'TTS'];
+const PATTERNS = ['MWF', 'TTS', 'SAT_SUN'];
 
 export default function AdminSchedule() {
   const [searchParams] = useSearchParams();
@@ -31,7 +31,7 @@ export default function AdminSchedule() {
         {PATTERNS.map((p) => (
           <button key={p} onClick={() => setPattern(p)}
             className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ${p === pattern ? 'bg-brand-50 text-brand-600' : 'text-ink-muted hover:bg-canvas-soft'}`}
-          >{p === 'WEEKEND' ? 'Sat-Sun' : p}</button>
+          >{p === 'SAT_SUN' ? 'Sat & Sun' : p}</button>
         ))}
         <span className="sm:ml-auto text-xs text-ink-muted self-center">
           {total} batches{privateCount > 0 ? ` · ${privateCount} private` : ''}
@@ -48,7 +48,7 @@ export default function AdminSchedule() {
                 return (
                   <div key={b.id}
                     className="flex flex-wrap items-center gap-2 sm:gap-3 px-3 py-2 rounded-lg bg-[#F5F3FF] border border-brand/10 text-xs">
-                    <span className="font-semibold text-brand-600 min-w-[70px]">Private</span>
+                    <span className="font-semibold text-brand-600 min-w-[70px]">Private Coaching</span>
                     <span className="text-ink-muted"><Clock className="w-3 h-3 inline mr-1" />{formatTime12h(b.startTime)} - {formatTime12h(b.endTime)}</span>
                     <span className="text-ink-muted"><User className="w-3 h-3 inline mr-1" />{b.clientName}</span>
                     <span className="text-ink-muted">Coach: {b.coachName}</span>
@@ -58,13 +58,15 @@ export default function AdminSchedule() {
               }
               return (
                 <div key={b.id} onClick={() => goToBatch(b.id)}
-                  className="flex flex-wrap items-center gap-2 sm:gap-3 px-3 py-2 rounded-lg bg-canvas-soft hover:bg-canvas-soft/70 cursor-pointer transition-colors text-xs">
-                  <span className="font-semibold text-ink min-w-[70px]">{b.program}</span>
-                  <span className="text-ink-muted"><Clock className="w-3 h-3 inline mr-1" />{formatTime12h(b.startTime)} - {formatTime12h(b.endTime)}</span>
+                  className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 px-3 py-2 rounded-lg bg-canvas-soft hover:bg-canvas-soft/70 cursor-pointer transition-colors text-xs">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-ink">{b.name || `${b.program} ${b.ballLevel ? b.ballLevel + ' Ball' : ''}`}</span>
+                    <span className="text-ink-muted"><Clock className="w-3 h-3 inline mr-1" />{formatTime12h(b.startTime)} - {formatTime12h(b.endTime)}</span>
+                    {b.isSemiBatch && <StatusPill status="semi-batch" />}
+                    {b.blockedCount > 0 && <span className="text-[10px] text-err font-medium">{b.blockedCount} unpaid</span>}
+                    {b.supportCoachId && <span className="text-[10px] text-ink-faint">+support</span>}
+                  </div>
                   <CapacityIndicator filled={b.filled} total={b.capacity} />
-                  {b.isSemiBatch && <StatusPill status="semi-batch" />}
-                  {b.blockedCount > 0 && <span className="text-[10px] text-err font-medium">{b.blockedCount} unpaid</span>}
-                  {b.supportCoachId && <span className="text-[10px] text-ink-faint">+support</span>}
                 </div>
               );
             })}

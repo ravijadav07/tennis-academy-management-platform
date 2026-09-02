@@ -7,10 +7,12 @@ import StatusPill from '../../ui/StatusPill';
 import Button from '../../ui/Button';
 import Modal from '../../ui/Modal';
 import Dropdown from '../../ui/Dropdown';
+import CapacityIndicator from '../../ui/CapacityIndicator';
 import { formatTime12h } from '../../../utils/formatters';
 import TimePicker12h from '../../ui/TimePicker12h';
 import { toast } from 'sonner';
-import { Download, AlertTriangle, TrendingUp, Radio, ShieldCheck, Send, Settings, Mail, Clock, CheckCircle } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { Download, AlertTriangle, TrendingUp, Radio, ShieldCheck, Send, Settings, Mail, Clock, CheckCircle, Table, Grid } from 'lucide-react';
 
 function timeAgo(ms) { const sec = Math.floor((Date.now() - ms) / 1000); if (sec < 5) return 'just now'; if (sec < 60) return sec + 's ago'; if (sec < 3600) return Math.floor(sec / 60) + 'm ago'; return Math.floor(sec / 3600) + 'h ago'; }
 
@@ -39,6 +41,7 @@ export default function Reports() {
   const [filterMembership, setFilterMembership] = useState('');
   const [showNonMembers, setShowNonMembers] = useState(false);
   const [nonMemberList, setNonMemberList] = useState([]);
+  const [reportView, setReportView] = useState('matrix'); // 'matrix' (Executive Program Matrix) or 'schedule' (Detailed Slot Schedule)
 
   // --- Verify-then-Send workflow state ---
   const [verification, setVerification] = useState(null);
@@ -191,20 +194,99 @@ export default function Reports() {
     detail: entry.entityType + (entry.entityId ? ' #' + String(entry.entityId).slice(-4) : ''),
   }));
 
-  // Export CSV
-  const handleExportCSV = () => {
-    const header = 'Day/Pattern,Court & Time,Category,Capacity,Enrolled,Attended,Members,Non-members,Guest/Trial,Occupancy %';
-    const csvRows = rows.map((r) => [
-      r.dayPattern, r.courtName + ' ' + formatTime12h(r.startTime) + '-' + formatTime12h(r.endTime),
-      r.program, r.capacity, r.enrolled, r.attended, r.members, r.nonMembers, r.totalGuests, r.occupancy + '%'
-    ].join(','));
-    const csv = [header, ...csvRows].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = 'slot-analysis-' + dateFrom + '.csv'; a.click();
-    URL.revokeObjectURL(url);
-    toast.success('CSV exported');
+  // Generate and export Excel workbook matching exact client layout
+  const handleExportExcel = () => {
+    try {
+      const wb = XLSX.utils.book_new();
+      const m = analysis.matrix || {};
+      const ac = analysis.academy || {};
+
+      // 1. Sheet 1: Slot Analysis (Exact 11 Program Analysis blocks matching Basic Program Details for ATA.xlsx)
+      const wsData = [
+        ['Academy Analysis', '', '', 'Advance Class Analysis', '', '', 'Intermediate Class Analysis', '', '', 'Adults Class Analysis', ''],
+        ['Total Slots MWF', ac.mwf?.total || 0, '', 'Total Advance Class MWF', m.ADV?.mwf?.total || 0, '', 'Total Intermediate Class MWF', m.INT?.mwf?.total || 0, '', 'Total Adults Class MWF', m.ADULT?.mwf?.total || 0],
+        ['Total Slots TTS', ac.tts?.total || 0, '', 'Total Advance Class TTS', m.ADV?.tts?.total || 0, '', 'Total Intermediate Class TTS', m.INT?.tts?.total || 0, '', 'Total Adults Class TTS', m.ADULT?.tts?.total || 0],
+        ['Total Slots Sat & Sun', ac.weekend?.total || 0, '', 'Total Slots Available All Days', m.ADV?.total?.total || 0, '', 'Total Slots Available All Days', m.INT?.total?.total || 0, '', 'Total Slots Available All Days', m.ADULT?.total?.total || 0],
+        ['Total Slots Available All Days', ac.total || 0, '', '', '', '', '', '', '', '', ''],
+        ['', '', '', 'Total Slots Booked MWF', m.ADV?.mwf?.booked || 0, '', 'Total Slots Booked MWF', m.INT?.mwf?.booked || 0, '', 'Total Slots Booked MWF', m.ADULT?.mwf?.booked || 0],
+        ['Total Slots Booked MWF', ac.mwf?.booked || 0, '', 'Total Slots Booked TTS', m.ADV?.tts?.booked || 0, '', 'Total Slots Booked TTS', m.INT?.tts?.booked || 0, '', 'Total Slots Booked TTS', m.ADULT?.tts?.booked || 0],
+        ['Total Slots Booked TTS', ac.tts?.booked || 0, '', 'Total Booked Slots', m.ADV?.total?.booked || 0, '', 'Total Booked Slots', m.INT?.total?.booked || 0, '', 'Total Booked Slots', m.ADULT?.total?.booked || 0],
+        ['Total Slots Booked Sat & Sun', ac.weekend?.booked || 0, '', '', '', '', '', '', '', '', ''],
+        ['Total Booked Slots', ac.booked || 0, '', 'Total Slots Open MWF', m.ADV?.mwf?.open || 0, '', 'Total Slots Open MWF', m.INT?.mwf?.open || 0, '', 'Total Slots Open MWF', m.ADULT?.mwf?.open || 0],
+        ['', '', '', 'Total Slots Open TTS', m.ADV?.tts?.open || 0, '', 'Total Slots Open TTS', m.INT?.tts?.open || 0, '', 'Total Slots Open TTS', m.ADULT?.tts?.open || 0],
+        ['Total Slots Open MWF', ac.mwf?.open || 0, '', 'Total Open Slots', m.ADV?.total?.open || 0, '', 'Total Open Slots', m.INT?.total?.open || 0, '', 'Total Open Slots', m.ADULT?.total?.open || 0],
+        ['Total Slots Open TTS', ac.tts?.open || 0, '', '', '', '', '', '', '', '', ''],
+        ['Total Slots Open Sat & Sun', ac.weekend?.open || 0, '', 'Occupancy %', `${m.ADV?.total?.occupancyPct || 0}%`, '', 'Occupancy %', `${m.INT?.total?.occupancyPct || 0}%`, '', 'Occupancy %', `${m.ADULT?.total?.occupancyPct || 0}%`],
+        ['Total Open Slots', ac.open || 0, '', '', '', '', '', '', '', '', ''],
+        ['Occupancy %', `${ac.occupancyPct || 0}%`, '', '', '', '', '', '', '', '', ''],
+        [],
+        ['Green Ball Class Analysis', '', '', 'Orange Ball Class Analysis', '', '', 'Red Ball Class Analysis', '', '', 'Junior Development Program Analysis (JDP)', ''],
+        ['Total Green Ball Class MWF', m.GREEN?.mwf?.total || 0, '', 'Total Orange Ball Class MWF', m.ORANGE?.mwf?.total || 0, '', 'Total Red Ball Class MWF', m.RED?.mwf?.total || 0, '', 'Total JDP Class MWF', m.JDP?.mwf?.total || 0],
+        ['Total Green Ball Class TTS', m.GREEN?.tts?.total || 0, '', 'Total Orange Ball Class TTS', m.ORANGE?.tts?.total || 0, '', 'Total Red Ball Class TTS', m.RED?.tts?.total || 0, '', 'Total JDP Class TTS', m.JDP?.tts?.total || 0],
+        ['Total Slots Available All Days', m.GREEN?.total?.total || 0, '', 'Total Slots Available All Days', m.ORANGE?.total?.total || 0, '', 'Total Slots Available All Days', m.RED?.total?.total || 0, '', 'Total Slots Available All Days', m.JDP?.total?.total || 0],
+        [],
+        ['Total Slots Booked MWF', m.GREEN?.mwf?.booked || 0, '', 'Total Slots Booked MWF', m.ORANGE?.mwf?.booked || 0, '', 'Total Slots Booked MWF', m.RED?.mwf?.booked || 0, '', 'Total Slots Booked MWF', m.JDP?.mwf?.booked || 0],
+        ['Total Slots Booked TTS', m.GREEN?.tts?.booked || 0, '', 'Total Slots Booked TTS', m.ORANGE?.tts?.booked || 0, '', 'Total Slots Booked TTS', m.RED?.tts?.booked || 0, '', 'Total Slots Booked TTS', m.JDP?.tts?.booked || 0],
+        ['Total Booked Slots', m.GREEN?.total?.booked || 0, '', 'Total Booked Slots', m.ORANGE?.total?.booked || 0, '', 'Total Booked Slots', m.RED?.total?.booked || 0, '', 'Total Booked Slots', m.JDP?.total?.booked || 0],
+        [],
+        ['Total Slots Open MWF', m.GREEN?.mwf?.open || 0, '', 'Total Slots Open MWF', m.ORANGE?.mwf?.open || 0, '', 'Total Slots Open MWF', m.RED?.mwf?.open || 0, '', 'Total Slots Open MWF', m.JDP?.mwf?.open || 0],
+        ['Total Slots Open TTS', m.GREEN?.tts?.open || 0, '', 'Total Slots Open TTS', m.ORANGE?.tts?.open || 0, '', 'Total Slots Open TTS', m.RED?.tts?.open || 0, '', 'Total Slots Open TTS', m.JDP?.tts?.open || 0],
+        ['Total Open Slots', m.GREEN?.total?.open || 0, '', 'Total Open Slots', m.ORANGE?.total?.open || 0, '', 'Total Open Slots', m.RED?.total?.open || 0, '', 'Total Open Slots', m.JDP?.total?.open || 0],
+        [],
+        ['Occupancy %', `${m.GREEN?.total?.occupancyPct || 0}%`, '', 'Occupancy %', `${m.ORANGE?.total?.occupancyPct || 0}%`, '', 'Occupancy %', `${m.RED?.total?.occupancyPct || 0}%`, '', 'Occupancy %', `${m.JDP?.total?.occupancyPct || 0}%`],
+        [],
+        ['High Performance Program Analysis (HPP)', '', '', 'Weekend Coaching Program Analysis', '', '', 'Fitness Program Analysis', ''],
+        ['Total HPP Class MWF', m.HPP?.mwf?.total || 0, '', 'Total Slots at 2:30pm', m.WEEKEND?.slot230?.total || 0, '', 'Total Slots on MWF', m.FITNESS?.mwf?.total || 0],
+        ['Total HPP Class TTS', m.HPP?.tts?.total || 0, '', 'Total Slots at 3:30pm', m.WEEKEND?.slot330?.total || 0, '', 'Total Slots on TTS', m.FITNESS?.tts?.total || 0],
+        ['Total Slots Available All Days', m.HPP?.total?.total || 0, '', 'Total Slots Available All Days', m.WEEKEND?.total?.total || 0, '', 'Total Slots Available All Days', m.FITNESS?.total?.total || 0],
+        [],
+        ['Total Slots Booked MWF', m.HPP?.mwf?.booked || 0, '', 'Total Slots at 2:30pm', m.WEEKEND?.slot230?.booked || 0, '', 'Total Slots Booked MWF', m.FITNESS?.mwf?.booked || 0],
+        ['Total Slots Booked TTS', m.HPP?.tts?.booked || 0, '', 'Total Slots at 3:30pm', m.WEEKEND?.slot330?.booked || 0, '', 'Total Slots Booked TTS', m.FITNESS?.tts?.booked || 0],
+        ['Total Booked Slots', m.HPP?.total?.booked || 0, '', 'Total Booked Slots', m.WEEKEND?.total?.booked || 0, '', 'Total Booked Slots', m.FITNESS?.total?.booked || 0],
+        [],
+        ['Total Slots Open MWF', m.HPP?.mwf?.open || 0, '', 'Total Slots at 2:30pm', m.WEEKEND?.slot230?.open || 0, '', 'Total Slots Open MWF', m.FITNESS?.mwf?.open || 0],
+        ['Total Slots Open TTS', m.HPP?.tts?.open || 0, '', 'Total Slots at 3:30pm', m.WEEKEND?.slot330?.open || 0, '', 'Total Slots Open TTS', m.FITNESS?.tts?.open || 0],
+        ['Total Open Slots', m.HPP?.total?.open || 0, '', 'Total Open Slots', m.WEEKEND?.total?.open || 0, '', 'Total Open Slots', m.FITNESS?.total?.open || 0],
+        [],
+        ['Occupancy %', `${m.HPP?.total?.occupancyPct || 0}%`, '', 'Occupancy %', `${m.WEEKEND?.total?.occupancyPct || 0}%`, '', 'Occupancy %', `${m.FITNESS?.total?.occupancyPct || 0}%`]
+      ];
+
+      const wsSlotAnalysis = XLSX.utils.aoa_to_sheet(wsData);
+      XLSX.utils.book_append_sheet(wb, wsSlotAnalysis, 'Slot Analysis');
+
+      // 2. Sheet 2: Detailed Batch Schedule Breakdown
+      const scheduleData = [
+        ['Day/Pattern', 'Court & Time', 'Batch Name', 'Category', 'Capacity', 'Enrolled', 'Attended', 'Members', 'Non-members', 'Guest/Trial', 'Occupancy %'],
+        ...rows.map((r) => {
+          const b = batches.find((x) => x.id === r.id);
+          return [
+            r.dayPattern,
+            `${r.courtName} ${formatTime12h(r.startTime)}-${formatTime12h(r.endTime)}`,
+            b?.name || `${r.program} ${r.dayPattern}`,
+            r.program,
+            r.capacity,
+            r.enrolled,
+            r.attended,
+            r.members,
+            r.nonMembers,
+            r.totalGuests,
+            `${r.occupancy}%`
+          ];
+        })
+      ];
+      const wsSchedule = XLSX.utils.aoa_to_sheet(scheduleData);
+      XLSX.utils.book_append_sheet(wb, wsSchedule, 'Slot Schedule Details');
+
+      XLSX.writeFile(wb, `Slot-Analysis-${monthName}-${currentYear}.xlsx`);
+      toast.success('Excel workbook exported with Slot Analysis & Schedule sheets');
+    } catch (err) {
+      console.error('Excel export error:', err);
+      toast.error('Failed to export Excel workbook');
+    }
   };
+
+  const handleExportCSV = handleExportExcel;
+
 
   return (
     <div className="space-y-4">
@@ -379,58 +461,323 @@ export default function Reports() {
         </div>
       </Card>
 
-      {/* Slot Analysis Table */}
+      {/* Slot Analysis Section — Toggle between Executive Matrix (Excel Template) & Detailed Batch Schedule */}
       <Card>
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-          <h3 className="text-sm font-semibold text-ink">Slot Analysis</h3>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-line/60">
+          <div className="space-y-1">
+            <h3 className="text-base font-bold text-ink">Slot Analysis & Occupancy Report</h3>
+            <p className="text-xs text-ink-muted">
+              Referencing ATA Program Slot Matrix with MWF, TTS, and Weekend coaching breakdown.
+            </p>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
+            {/* View Mode Toggle */}
+            <div className="flex bg-canvas-soft p-1 rounded-xl border border-line text-xs">
+              <button
+                type="button"
+                onClick={() => setReportView('matrix')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                  reportView === 'matrix' ? 'bg-white text-brand-700 shadow-xs' : 'text-ink-muted hover:text-ink'
+                }`}
+              >
+                <Grid className="w-3.5 h-3.5" />
+                Executive Matrix (Excel Format)
+              </button>
+              <button
+                type="button"
+                onClick={() => setReportView('schedule')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                  reportView === 'schedule' ? 'bg-white text-brand-700 shadow-xs' : 'text-ink-muted hover:text-ink'
+                }`}
+              >
+                <Table className="w-3.5 h-3.5" />
+                Detailed Schedule
+              </button>
+            </div>
+
             <Button size="sm" variant="secondary" icon={Download} onClick={() => window.print()}>PDF</Button>
-            <Button size="sm" variant="secondary" icon={Download} onClick={handleExportCSV}>Excel</Button>
+            <Button size="sm" variant="primary" icon={Download} onClick={handleExportExcel}>Download Excel (.xlsx)</Button>
             <Button size="sm" variant="secondary" icon={Send} onClick={handleSend} disabled={!verification}>Send Excel Report</Button>
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs min-w-[780px]">
-            <thead>
-              <tr className="border-b border-line text-left text-ink-muted bg-canvas-soft/30">
-                <th className="py-2.5 px-3 font-semibold whitespace-nowrap">Day/Pattern</th>
-                <th className="py-2.5 px-3 font-semibold whitespace-nowrap">Court & Time</th>
-                <th className="py-2.5 px-3 font-semibold whitespace-nowrap">Category</th>
-                <th className="py-2.5 px-3 font-semibold whitespace-nowrap text-center">Capacity</th>
-                <th className="py-2.5 px-3 font-semibold whitespace-nowrap text-center">Enrolled</th>
-                <th className="py-2.5 px-3 font-semibold whitespace-nowrap text-center">Attended</th>
-                <th className="py-2.5 px-3 font-semibold whitespace-nowrap text-center">Members</th>
-                <th className="py-2.5 px-3 font-semibold whitespace-nowrap text-center">Non-members</th>
-                <th className="py-2.5 px-3 font-semibold whitespace-nowrap text-center">Guest/Trial</th>
-                <th className="py-2.5 px-3 font-semibold whitespace-nowrap text-center">Occupancy</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id} className="border-b border-line/50 hover:bg-canvas-soft/40 transition-colors">
-                  <td className="py-2.5 px-3 font-semibold text-ink whitespace-nowrap">{r.dayPattern}</td>
-                  <td className="py-2.5 px-3 text-ink-muted whitespace-nowrap">{r.courtName} · {formatTime12h(r.startTime)}-{formatTime12h(r.endTime)}</td>
-                  <td className="py-2.5 px-3 font-semibold text-ink whitespace-nowrap">{r.program}</td>
-                  <td className="py-2.5 px-3 text-center whitespace-nowrap">{r.capacity}</td>
-                  <td className="py-2.5 px-3 text-center whitespace-nowrap">{r.enrolled}</td>
-                  <td className="py-2.5 px-3 text-center whitespace-nowrap">{r.attended}</td>
-                  <td className="py-2.5 px-3 text-center whitespace-nowrap">{r.members}</td>
-                  <td className="py-2.5 px-3 text-center whitespace-nowrap cursor-pointer hover:text-brand-600 font-medium" onClick={() => { setNonMemberList(r.nonMemberNames); setShowNonMembers(true); }}>
-                    <span className="underline decoration-dotted">{r.nonMembers}</span>
-                  </td>
-                  <td className="py-2.5 px-3 text-center whitespace-nowrap">{r.totalGuests}</td>
-                  <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                    <div className="inline-flex items-center justify-center gap-1.5">
-                      <StatusPill status={r.occupancy >= 80 ? 'success' : r.occupancy >= 50 ? 'warning' : 'error'} />
-                      <span className="font-semibold">{r.occupancy}%</span>
-                    </div>
-                  </td>
+
+        {reportView === 'matrix' ? (
+          <div className="space-y-6">
+            {/* Academy Overall Analysis Block (Block 1) */}
+            <div className="rounded-2xl border-2 border-brand/30 bg-gradient-to-br from-brand-50/40 via-white to-purple-50/30 p-4 sm:p-5 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-base font-bold text-ink">Academy Analysis</h4>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-brand text-white shadow-xs">
+                      Primary Matrix
+                    </span>
+                  </div>
+                  <p className="text-xs text-ink-muted mt-0.5">
+                    Consolidated academy capacity across MWF, TTS, and Weekend coaching (Excludes Fitness).
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs font-semibold text-ink-muted uppercase">Overall Occupancy</span>
+                  <div className="text-2xl font-black text-brand tracking-tight">
+                    {analysis.academy?.occupancyPct}%
+                  </div>
+                </div>
+              </div>
+
+              {/* Academy Overview KPI row */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                <div className="bg-white/90 p-3 rounded-xl border border-line/60">
+                  <span className="text-[11px] font-semibold text-ink-muted uppercase">Total Available</span>
+                  <div className="text-xl font-bold text-ink mt-0.5">{analysis.academy?.total} slots</div>
+                </div>
+                <div className="bg-white/90 p-3 rounded-xl border border-line/60">
+                  <span className="text-[11px] font-semibold text-ok uppercase">Booked Slots</span>
+                  <div className="text-xl font-bold text-ok mt-0.5">{analysis.academy?.booked} booked</div>
+                </div>
+                <div className="bg-white/90 p-3 rounded-xl border border-line/60">
+                  <span className="text-[11px] font-semibold text-amber-600 uppercase">Open Slots</span>
+                  <div className="text-xl font-bold text-amber-600 mt-0.5">{analysis.academy?.open} open</div>
+                </div>
+                <div className="bg-white/90 p-3 rounded-xl border border-line/60">
+                  <span className="text-[11px] font-semibold text-brand-600 uppercase">Occupancy Rate</span>
+                  <div className="text-xl font-bold text-brand-700 mt-0.5">{analysis.academy?.occupancyPct}%</div>
+                </div>
+              </div>
+
+              {/* Academy Matrix Table */}
+              <div className="overflow-x-auto rounded-xl border border-line/80 bg-white">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-line text-left text-ink-muted">
+                      <th className="py-2.5 px-3.5 font-bold">Time Segment</th>
+                      <th className="py-2.5 px-3.5 font-bold text-center">Total Capacity</th>
+                      <th className="py-2.5 px-3.5 font-bold text-center text-ok">Booked Slots</th>
+                      <th className="py-2.5 px-3.5 font-bold text-center text-amber-600">Open Slots</th>
+                      <th className="py-2.5 px-3.5 font-bold text-center">Occupancy %</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line/40">
+                    <tr>
+                      <td className="py-2.5 px-3.5 font-semibold text-ink">Total Slots MWF</td>
+                      <td className="py-2.5 px-3.5 text-center font-bold">{analysis.academy?.mwf?.total}</td>
+                      <td className="py-2.5 px-3.5 text-center font-semibold text-ok">{analysis.academy?.mwf?.booked}</td>
+                      <td className="py-2.5 px-3.5 text-center font-semibold text-amber-600">{analysis.academy?.mwf?.open}</td>
+                      <td className="py-2.5 px-3.5 text-center font-bold">
+                        {analysis.academy?.mwf?.total ? ((analysis.academy.mwf.booked / analysis.academy.mwf.total) * 100).toFixed(1) : 0}%
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-3.5 font-semibold text-ink">Total Slots TTS</td>
+                      <td className="py-2.5 px-3.5 text-center font-bold">{analysis.academy?.tts?.total}</td>
+                      <td className="py-2.5 px-3.5 text-center font-semibold text-ok">{analysis.academy?.tts?.booked}</td>
+                      <td className="py-2.5 px-3.5 text-center font-semibold text-amber-600">{analysis.academy?.tts?.open}</td>
+                      <td className="py-2.5 px-3.5 text-center font-bold">
+                        {analysis.academy?.tts?.total ? ((analysis.academy.tts.booked / analysis.academy.tts.total) * 100).toFixed(1) : 0}%
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 px-3.5 font-semibold text-ink">Total Slots Sat & Sun</td>
+                      <td className="py-2.5 px-3.5 text-center font-bold">{analysis.academy?.weekend?.total}</td>
+                      <td className="py-2.5 px-3.5 text-center font-semibold text-ok">{analysis.academy?.weekend?.booked}</td>
+                      <td className="py-2.5 px-3.5 text-center font-semibold text-amber-600">{analysis.academy?.weekend?.open}</td>
+                      <td className="py-2.5 px-3.5 text-center font-bold">
+                        {analysis.academy?.weekend?.total ? ((analysis.academy.weekend.booked / analysis.academy.weekend.total) * 100).toFixed(1) : 0}%
+                      </td>
+                    </tr>
+                    <tr className="bg-brand-50/40 font-bold">
+                      <td className="py-2.5 px-3.5 text-brand-900 font-extrabold">Total Available All Days</td>
+                      <td className="py-2.5 px-3.5 text-center text-brand-900 font-extrabold">{analysis.academy?.total}</td>
+                      <td className="py-2.5 px-3.5 text-center text-ok font-extrabold">{analysis.academy?.booked}</td>
+                      <td className="py-2.5 px-3.5 text-center text-amber-600 font-extrabold">{analysis.academy?.open}</td>
+                      <td className="py-2.5 px-3.5 text-center text-brand-900 font-extrabold">{analysis.academy?.occupancyPct}%</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 10 Program Analysis Blocks Grid (Blocks 2 to 11) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* 1. Advance Class Analysis */}
+              <ProgramAnalysisCard
+                title="Advance Class Analysis"
+                badge="ADV"
+                mwf={analysis.matrix?.ADV?.mwf}
+                tts={analysis.matrix?.ADV?.tts}
+                total={analysis.matrix?.ADV?.total}
+              />
+
+              {/* 2. Intermediate Class Analysis */}
+              <ProgramAnalysisCard
+                title="Intermediate Class Analysis"
+                badge="INT"
+                mwf={analysis.matrix?.INT?.mwf}
+                tts={analysis.matrix?.INT?.tts}
+                total={analysis.matrix?.INT?.total}
+              />
+
+              {/* 3. Adults Class Analysis */}
+              <ProgramAnalysisCard
+                title="Adults Class Analysis"
+                badge="ADULTS"
+                mwf={analysis.matrix?.ADULT?.mwf}
+                tts={analysis.matrix?.ADULT?.tts}
+                total={analysis.matrix?.ADULT?.total}
+              />
+
+              {/* 4. Green Ball Class Analysis */}
+              <ProgramAnalysisCard
+                title="Green Ball Class Analysis"
+                badge="GREEN"
+                mwf={analysis.matrix?.GREEN?.mwf}
+                tts={analysis.matrix?.GREEN?.tts}
+                total={analysis.matrix?.GREEN?.total}
+              />
+
+              {/* 5. Orange Ball Class Analysis */}
+              <ProgramAnalysisCard
+                title="Orange Ball Class Analysis"
+                badge="ORANGE"
+                mwf={analysis.matrix?.ORANGE?.mwf}
+                tts={analysis.matrix?.ORANGE?.tts}
+                total={analysis.matrix?.ORANGE?.total}
+              />
+
+              {/* 6. Red Ball Class Analysis */}
+              <ProgramAnalysisCard
+                title="Red Ball Class Analysis"
+                badge="RED"
+                mwf={analysis.matrix?.RED?.mwf}
+                tts={analysis.matrix?.RED?.tts}
+                total={analysis.matrix?.RED?.total}
+              />
+
+              {/* 7. Junior Development Program (JDP) */}
+              <ProgramAnalysisCard
+                title="Junior Development Program (JDP)"
+                badge="JDP"
+                note="Capacity follows student (seated in ADV/INT/GREEN)"
+                mwf={analysis.matrix?.JDP?.mwf}
+                tts={analysis.matrix?.JDP?.tts}
+                total={analysis.matrix?.JDP?.total}
+                highlightBadge="Special Program"
+              />
+
+              {/* 8. High Performance Program (HPP) */}
+              <ProgramAnalysisCard
+                title="High Performance Program (HPP)"
+                badge="HPP"
+                note="Capacity follows student (seated in ADV)"
+                mwf={analysis.matrix?.HPP?.mwf}
+                tts={analysis.matrix?.HPP?.tts}
+                total={analysis.matrix?.HPP?.total}
+                highlightBadge="Special Program"
+              />
+
+              {/* 9. Weekend Coaching Program Analysis */}
+              <div className="rounded-xl border border-line bg-white p-4 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <h5 className="font-bold text-xs text-ink">Weekend Coaching Program Analysis</h5>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-brand-50 text-brand-700">WEEKEND</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-line text-ink-muted text-left">
+                          <th className="py-1.5 font-medium">Slot Time</th>
+                          <th className="py-1.5 text-center font-medium">Avail</th>
+                          <th className="py-1.5 text-center font-medium text-ok">Booked</th>
+                          <th className="py-1.5 text-center font-medium text-amber-600">Open</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-line/40">
+                        <tr>
+                          <td className="py-1.5 font-medium">2:30pm Slots</td>
+                          <td className="py-1.5 text-center">{analysis.matrix?.WEEKEND?.slot230?.total}</td>
+                          <td className="py-1.5 text-center text-ok font-semibold">{analysis.matrix?.WEEKEND?.slot230?.booked}</td>
+                          <td className="py-1.5 text-center text-amber-600 font-semibold">{analysis.matrix?.WEEKEND?.slot230?.open}</td>
+                        </tr>
+                        <tr>
+                          <td className="py-1.5 font-medium">3:30pm Slots</td>
+                          <td className="py-1.5 text-center">{analysis.matrix?.WEEKEND?.slot330?.total}</td>
+                          <td className="py-1.5 text-center text-ok font-semibold">{analysis.matrix?.WEEKEND?.slot330?.booked}</td>
+                          <td className="py-1.5 text-center text-amber-600 font-semibold">{analysis.matrix?.WEEKEND?.slot330?.open}</td>
+                        </tr>
+                        <tr className="bg-canvas-soft/60 font-bold">
+                          <td className="py-1.5">All Days Total</td>
+                          <td className="py-1.5 text-center">{analysis.matrix?.WEEKEND?.total?.total}</td>
+                          <td className="py-1.5 text-center text-ok">{analysis.matrix?.WEEKEND?.total?.booked}</td>
+                          <td className="py-1.5 text-center text-amber-600">{analysis.matrix?.WEEKEND?.total?.open}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div className="mt-3 pt-2.5 border-t border-line/60 flex items-center justify-between text-xs">
+                  <span className="font-medium text-ink-muted">Occupancy</span>
+                  <span className="font-bold text-ink">{analysis.matrix?.WEEKEND?.total?.occupancyPct}%</span>
+                </div>
+              </div>
+
+              {/* 10. Fitness Program Analysis */}
+              <ProgramAnalysisCard
+                title="Fitness Program Analysis"
+                badge="FITNESS"
+                note="Excluded from Academy total (Support program)"
+                mwf={analysis.matrix?.FITNESS?.mwf}
+                tts={analysis.matrix?.FITNESS?.tts}
+                total={analysis.matrix?.FITNESS?.total}
+              />
+            </div>
+          </div>
+        ) : (
+          /* Detailed Batch-Level Schedule Table */
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs min-w-[780px]">
+              <thead>
+                <tr className="border-b border-line text-left text-ink-muted bg-canvas-soft/30">
+                  <th className="py-2.5 px-3 font-semibold whitespace-nowrap">Day/Pattern</th>
+                  <th className="py-2.5 px-3 font-semibold whitespace-nowrap">Court & Time</th>
+                  <th className="py-2.5 px-3 font-semibold whitespace-nowrap">Category</th>
+                  <th className="py-2.5 px-3 font-semibold whitespace-nowrap text-center">Capacity</th>
+                  <th className="py-2.5 px-3 font-semibold whitespace-nowrap text-center">Enrolled</th>
+                  <th className="py-2.5 px-3 font-semibold whitespace-nowrap text-center">Attended</th>
+                  <th className="py-2.5 px-3 font-semibold whitespace-nowrap text-center">Members</th>
+                  <th className="py-2.5 px-3 font-semibold whitespace-nowrap text-center">Non-members</th>
+                  <th className="py-2.5 px-3 font-semibold whitespace-nowrap text-center">Guest/Trial</th>
+                  <th className="py-2.5 px-3 font-semibold whitespace-nowrap text-center">Occupancy</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id} className="border-b border-line/50 hover:bg-canvas-soft/40 transition-colors">
+                    <td className="py-2.5 px-3 font-semibold text-ink whitespace-nowrap">{r.dayPattern}</td>
+                    <td className="py-2.5 px-3 text-ink-muted whitespace-nowrap">{r.courtName} · {formatTime12h(r.startTime)}-{formatTime12h(r.endTime)}</td>
+                    <td className="py-2.5 px-3 font-semibold text-ink whitespace-nowrap">{r.program}</td>
+                    <td className="py-2.5 px-3 text-center whitespace-nowrap">{r.capacity}</td>
+                    <td className="py-2.5 px-3 text-center whitespace-nowrap">{r.enrolled}</td>
+                    <td className="py-2.5 px-3 text-center whitespace-nowrap">{r.attended}</td>
+                    <td className="py-2.5 px-3 text-center whitespace-nowrap">{r.members}</td>
+                    <td className="py-2.5 px-3 text-center whitespace-nowrap cursor-pointer hover:text-brand-600 font-medium" onClick={() => { setNonMemberList(r.nonMemberNames); setShowNonMembers(true); }}>
+                      <span className="underline decoration-dotted">{r.nonMembers}</span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center whitespace-nowrap">{r.totalGuests}</td>
+                    <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                      <div className="inline-flex items-center justify-center gap-1.5">
+                        <StatusPill status={r.occupancy >= 80 ? 'success' : r.occupancy >= 50 ? 'warning' : 'error'} />
+                        <span className="font-semibold">{r.occupancy}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
+
 
       {/* Non-member drill-down modal */}
       {showNonMembers && (
@@ -498,48 +845,86 @@ export default function Reports() {
         </Card>
       )}
 
-      {/* Slot Analysis Summary (classic table) */}
+      {/* Slot Analysis Summary — segment blocks (same visual language as Overview court cards) */}
       <Card>
         <h3 className="text-sm font-semibold text-ink mb-3">Slot Analysis Summary</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+          {Object.entries(analysis.scopes || {}).map(([scope, data]) => (
+            <div key={scope} className="bg-canvas-soft rounded-lg p-3 min-w-0 flex flex-col justify-between gap-2.5">
+              <p className="text-[10px] font-semibold text-ink-muted uppercase truncate">{scope}</p>
+              <CapacityIndicator variant="segments" maxBlocks={20} filled={data.booked} total={data.total} className="w-full" />
+            </div>
+          ))}
+          <div className="bg-brand-50 rounded-lg p-3 min-w-0 flex flex-col justify-between gap-2.5">
+            <p className="text-[10px] font-semibold text-brand-600 uppercase truncate">ACADEMY</p>
+            <CapacityIndicator variant="segments" maxBlocks={20} filled={analysis.academy.booked} total={analysis.academy.total} className="w-full" />
+          </div>
+        </div>
+      </Card>
+
+
+    </div>
+  );
+}
+
+
+function ProgramAnalysisCard({ title, badge, note, mwf, tts, total, highlightBadge }) {
+  return (
+    <div className="rounded-xl border border-line bg-white p-4 shadow-xs flex flex-col justify-between">
+      <div>
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="min-w-0 flex-1">
+            <h5 className="font-bold text-xs text-ink truncate" title={title}>{title}</h5>
+            {note && <p className="text-[10px] text-ink-faint truncate mt-0.5">{note}</p>}
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            {highlightBadge && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-800">
+                {highlightBadge}
+              </span>
+            )}
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-brand-50 text-brand-700">
+              {badge}
+            </span>
+          </div>
+        </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-xs min-w-[500px]">
+          <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-line text-left text-ink-muted bg-canvas-soft/30">
-                <th className="py-2.5 px-3 font-semibold whitespace-nowrap">Category</th>
-                <th className="py-2.5 px-3 font-semibold whitespace-nowrap text-center">Total</th>
-                <th className="py-2.5 px-3 font-semibold whitespace-nowrap text-center">Booked</th>
-                <th className="py-2.5 px-3 font-semibold whitespace-nowrap text-center">Open</th>
-                <th className="py-2.5 px-3 font-semibold whitespace-nowrap text-center">Occupancy</th>
+              <tr className="border-b border-line text-ink-muted text-left">
+                <th className="py-1.5 font-medium">Segment</th>
+                <th className="py-1.5 text-center font-medium">Avail</th>
+                <th className="py-1.5 text-center font-medium text-ok">Booked</th>
+                <th className="py-1.5 text-center font-medium text-amber-600">Open</th>
               </tr>
             </thead>
-            <tbody>
-              {Object.entries(analysis.scopes || {}).filter(([s]) => s !== 'FITNESS').map(([scope, data]) => (
-                <tr key={scope} className="border-b border-line/50 hover:bg-canvas-soft/40 transition-colors">
-                  <td className="py-2.5 px-3 font-semibold text-ink whitespace-nowrap">{scope}</td>
-                  <td className="py-2.5 px-3 text-center whitespace-nowrap">{data.total}</td>
-                  <td className="py-2.5 px-3 text-center whitespace-nowrap">{data.booked}</td>
-                  <td className="py-2.5 px-3 text-center whitespace-nowrap">{data.open}</td>
-                  <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                    <div className="inline-flex items-center justify-center gap-1.5">
-                      <StatusPill status={data.occupancyPct >= 80 ? 'success' : data.occupancyPct >= 50 ? 'warning' : 'error'} />
-                      <span className="font-semibold">{data.occupancyPct}%</span>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {analysis.scopes?.FITNESS && (
-                <tr className="border-b border-line/50 bg-canvas-soft">
-                  <td className="py-2.5 px-3 font-semibold text-ink-muted whitespace-nowrap">FITNESS</td>
-                  <td className="py-2.5 px-3 text-center text-ink-muted whitespace-nowrap">{analysis.scopes.FITNESS.total}</td>
-                  <td className="py-2.5 px-3 text-center text-ink-muted whitespace-nowrap">{analysis.scopes.FITNESS.booked}</td>
-                  <td className="py-2.5 px-3 text-center text-ink-muted whitespace-nowrap">{analysis.scopes.FITNESS.open}</td>
-                  <td className="py-2.5 px-3 text-center text-ink-muted whitespace-nowrap">{analysis.scopes.FITNESS.occupancyPct}%</td>
-                </tr>
-              )}
+            <tbody className="divide-y divide-line/40">
+              <tr>
+                <td className="py-1.5 font-medium">MWF</td>
+                <td className="py-1.5 text-center">{mwf?.total || 0}</td>
+                <td className="py-1.5 text-center text-ok font-semibold">{mwf?.booked || 0}</td>
+                <td className="py-1.5 text-center text-amber-600 font-semibold">{mwf?.open || 0}</td>
+              </tr>
+              <tr>
+                <td className="py-1.5 font-medium">TTS</td>
+                <td className="py-1.5 text-center">{tts?.total || 0}</td>
+                <td className="py-1.5 text-center text-ok font-semibold">{tts?.booked || 0}</td>
+                <td className="py-1.5 text-center text-amber-600 font-semibold">{tts?.open || 0}</td>
+              </tr>
+              <tr className="bg-canvas-soft/60 font-bold">
+                <td className="py-1.5">All Days</td>
+                <td className="py-1.5 text-center">{total?.total || 0}</td>
+                <td className="py-1.5 text-center text-ok">{total?.booked || 0}</td>
+                <td className="py-1.5 text-center text-amber-600">{total?.open || 0}</td>
+              </tr>
             </tbody>
           </table>
         </div>
-      </Card>
+      </div>
+      <div className="mt-3 pt-2.5 border-t border-line/60 flex items-center justify-between text-xs">
+        <span className="font-medium text-ink-muted">Occupancy</span>
+        <span className="font-bold text-ink">{total?.occupancyPct || 0}%</span>
+      </div>
     </div>
   );
 }

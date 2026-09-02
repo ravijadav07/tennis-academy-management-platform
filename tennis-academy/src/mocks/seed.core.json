@@ -1369,7 +1369,7 @@
   "batches": [
     {
       "id": "b_mwf_adv_c2",
-      "name": "Advanced Yellow \u00b7 Court 2",
+      "name": "Court 2 - Advance Yellow Ball - 3:30 to 5:30pm",
       "dayPattern": "MWF",
       "courtId": "court_2",
       "startTime": "15:30",
@@ -1388,7 +1388,7 @@
     },
     {
       "id": "b_mwf_adv_c3",
-      "name": "Advanced Yellow \u00b7 Court 3",
+      "name": "Court 3 - Advance Yellow Ball - 4:00 to 6:00pm",
       "dayPattern": "MWF",
       "courtId": "court_3",
       "startTime": "16:00",
@@ -1407,7 +1407,7 @@
     },
     {
       "id": "b_mwf_adv_c4",
-      "name": "Advanced Yellow \u00b7 Court 4",
+      "name": "Court 4 - Advance Yellow Ball - 4:00 to 6:00pm",
       "dayPattern": "MWF",
       "courtId": "court_4",
       "startTime": "16:00",
@@ -1426,7 +1426,7 @@
     },
     {
       "id": "b_mwf_adv_c5",
-      "name": "Advanced Yellow \u00b7 Court 5",
+      "name": "Court 5 - Advance Yellow Ball - 3:30 to 5:30pm",
       "dayPattern": "MWF",
       "courtId": "court_5",
       "startTime": "15:30",
@@ -1445,7 +1445,7 @@
     },
     {
       "id": "b_mwf_advgrn_c6",
-      "name": "Advanced Green \u00b7 Court 6",
+      "name": "Court 6 - Advance Green Ball - 3:30 to 5:30pm",
       "dayPattern": "MWF",
       "courtId": "court_6",
       "startTime": "15:30",
@@ -1464,7 +1464,7 @@
     },
     {
       "id": "b_mwf_orange_c5",
-      "name": "Orange Ball \u00b7 Court 5",
+      "name": "Court 5 - Orange Ball - 5:30 to 6:15pm",
       "dayPattern": "MWF",
       "courtId": "court_5",
       "startTime": "17:30",
@@ -1483,7 +1483,7 @@
     },
     {
       "id": "b_mwf_red_c6",
-      "name": "Red Ball \u00b7 Court 6",
+      "name": "Court 6 - Red Ball - 5:30 to 6:15pm",
       "dayPattern": "MWF",
       "courtId": "court_6",
       "startTime": "17:30",
@@ -1502,7 +1502,7 @@
     },
     {
       "id": "b_mwf_green_c3",
-      "name": "Green Ball \u00b7 Court 3",
+      "name": "Court 3 - Green Ball - 6:15 to 7:15pm",
       "dayPattern": "MWF",
       "courtId": "court_3",
       "startTime": "18:15",
@@ -1521,7 +1521,7 @@
     },
     {
       "id": "b_mwf_fit_a",
-      "name": "Fitness \u00b7 Court 6 (early)",
+      "name": "Court 6 - Fitness - 5:30 to 6:15pm",
       "dayPattern": "MWF",
       "courtId": "court_6",
       "startTime": "17:30",
@@ -1540,7 +1540,7 @@
     },
     {
       "id": "b_mwf_fit_b",
-      "name": "Fitness \u00b7 Court 6 (late)",
+      "name": "Court 6 - Fitness - 6:15 to 7:15pm",
       "dayPattern": "MWF",
       "courtId": "court_6",
       "startTime": "18:15",
@@ -1559,7 +1559,7 @@
     },
     {
       "id": "b_tts_int_c3",
-      "name": "Intermediate Yellow \u00b7 Court 3",
+      "name": "Court 3 - Intermediate Yellow Ball - 4:30 to 6:00pm",
       "dayPattern": "TTS",
       "courtId": "court_3",
       "startTime": "16:30",
@@ -1578,7 +1578,7 @@
     },
     {
       "id": "b_tts_int_c4",
-      "name": "Intermediate Yellow \u00b7 Court 4",
+      "name": "Court 4 - Intermediate Yellow Ball - 5:00 to 6:00pm",
       "dayPattern": "TTS",
       "courtId": "court_4",
       "startTime": "17:00",
@@ -1597,9 +1597,9 @@
     },
     {
       "id": "b_tts_int_c5",
-      "name": "Intermediate Yellow \u00b7 Court 5",
+      "name": "Court 4 - Intermediate Yellow Ball - 3:30 to 5:00pm",
       "dayPattern": "TTS",
-      "courtId": "court_5",
+      "courtId": "court_4",
       "startTime": "15:30",
       "endTime": "17:00",
       "program": "INT",
@@ -1616,7 +1616,7 @@
     },
     {
       "id": "b_tts_green_c5",
-      "name": "Beginner Green \u00b7 Court 5",
+      "name": "Court 5 - Beginner Green Ball - 5:00 to 6:00pm",
       "dayPattern": "TTS",
       "courtId": "court_5",
       "startTime": "17:00",
@@ -1635,7 +1635,7 @@
     },
     {
       "id": "b_tts_green_c6",
-      "name": "Intermediate Green \u00b7 Court 6",
+      "name": "Court 6 - Intermediate Green Ball - 4:00 to 5:00pm",
       "dayPattern": "TTS",
       "courtId": "court_6",
       "startTime": "16:00",
@@ -1654,7 +1654,7 @@
     },
     {
       "id": "b_tts_red_c6",
-      "name": "Red Ball \u00b7 Court 6",
+      "name": "Court 6 - Red Ball - 5:00 to 5:45pm",
       "dayPattern": "TTS",
       "courtId": "court_6",
       "startTime": "17:00",
@@ -1673,7 +1673,7 @@
     },
     {
       "id": "b_tts_adult_c4",
-      "name": "Adults \u00b7 Court 4",
+      "name": "Court 4 - Adults - 6:30 to 7:30am",
       "dayPattern": "TTS",
       "courtId": "court_4",
       "startTime": "06:30",
@@ -1692,7 +1692,7 @@
     },
     {
       "id": "b_tts_fit_c6",
-      "name": "Fitness \u00b7 Court 6",
+      "name": "Court 6 - Fitness - 5:00 to 6:00pm",
       "dayPattern": "TTS",
       "courtId": "court_6",
       "startTime": "17:00",
@@ -1711,7 +1711,7 @@
     },
     {
       "id": "b_wk_u8_230",
-      "name": "Weekend U8 \u00b7 2:30pm",
+      "name": "Court 5 - Weekend U8 - 2:30 to 3:30pm",
       "dayPattern": "SAT_SUN",
       "courtId": "court_5",
       "startTime": "14:30",
@@ -1730,7 +1730,7 @@
     },
     {
       "id": "b_wk_8p_230",
-      "name": "Weekend 8+ \u00b7 2:30pm",
+      "name": "Court 6 - Weekend 8+ - 2:30 to 3:30pm",
       "dayPattern": "SAT_SUN",
       "courtId": "court_6",
       "startTime": "14:30",
@@ -1749,7 +1749,7 @@
     },
     {
       "id": "b_wk_u8_330",
-      "name": "Weekend U8 \u00b7 3:30pm",
+      "name": "Court 5 - Weekend U8 - 3:30 to 4:30pm",
       "dayPattern": "SAT_SUN",
       "courtId": "court_5",
       "startTime": "15:30",
@@ -1768,7 +1768,7 @@
     },
     {
       "id": "b_wk_8p_330",
-      "name": "Weekend 8+ \u00b7 3:30pm",
+      "name": "Court 6 - Weekend 8+ - 3:30 to 4:30pm",
       "dayPattern": "SAT_SUN",
       "courtId": "court_6",
       "startTime": "15:30",

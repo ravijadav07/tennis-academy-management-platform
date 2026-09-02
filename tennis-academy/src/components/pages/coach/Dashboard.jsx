@@ -5,6 +5,7 @@ import StatCard from '../../ui/StatCard';
 import Card from '../../ui/Card';
 import StatusPill from '../../ui/StatusPill';
 import { Calendar, Users, TrendingUp, UserCheck } from 'lucide-react';
+import { formatDateDDMMYY, formatTime12h } from '../../../utils/formatters';
 
 export default function CoachDashboard() {
   const { db, tick } = useDb();
@@ -38,7 +39,7 @@ export default function CoachDashboard() {
         <StatCard icon={TrendingUp} label="Coach" value={coach?.name || ''} sublabel={coach?.designation || ''} />
       </div>
       <Card>
-        <h3 className="text-sm font-semibold text-ink mb-3">Today — {today}</h3>
+        <h3 className="text-sm font-semibold text-ink mb-3">Today — {formatDateDDMMYY(today)}</h3>
         <div className="flex items-center gap-2 mb-3">
           <StatusPill status={todayData.checkedIn ? 'active' : 'inactive'} />
           <span className="text-xs text-ink-muted">{todayData.checkedIn ? 'Checked In' : 'Not checked in yet'}</span>
@@ -50,13 +51,14 @@ export default function CoachDashboard() {
             {todayData.batches.map((b) => (
               <div key={b.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-canvas-soft text-xs">
                 <span className="font-semibold text-ink">{b.program} {b.dayPattern}</span>
-                <span className="text-ink-muted">{b.startTime} - {b.endTime}</span>
+                <span className="text-ink-muted">{formatTime12h(b.startTime)} - {formatTime12h(b.endTime)}</span>
                 <StatusPill status="confirmed" />
               </div>
             ))}
           </div>
         )}
       </Card>
+
     </div>
   );
 }

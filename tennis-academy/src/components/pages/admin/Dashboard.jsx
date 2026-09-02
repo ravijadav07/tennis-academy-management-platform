@@ -24,6 +24,20 @@ export default function AdminDashboard() {
     });
   }, [tick]);
 
+  const [agendaPattern, setAgendaPattern] = useState('TODAY');
+
+  const displayByCourt = useMemo(() => {
+    if (agendaPattern === 'TODAY') return todayByCourt;
+    const courtsMap = {};
+    (state.courts || []).filter(c => c.status !== 'INACTIVE').forEach(c => {
+      courtsMap[c.id] = { court: c, batches: [] };
+    });
+    (state.batches || []).filter(b => b.status === 'ACTIVE' && b.dayPattern === agendaPattern).forEach(b => {
+      if (courtsMap[b.courtId]) courtsMap[b.courtId].batches.push(b);
+    });
+    return Object.values(courtsMap).filter(g => g.batches.length > 0);
+  }, [agendaPattern, todayByCourt, state.courts, state.batches]);
+
   return (
     <div className="space-y-4">
       {unverifiedMonth && (
@@ -85,14 +99,37 @@ export default function AdminDashboard() {
         </Card>
       )}
 
-      {/* Today's Agenda */}
+      {/* Today's Agenda with MWF / TTS Toggle and Batch Drilldown */}
       <Card>
-        <h3 className="text-sm font-semibold text-ink mb-3">Today's Agenda</h3>
-        {todayByCourt.length === 0 ? (
-          <p className="text-xs text-ink-muted">No batches scheduled today.</p>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div>
+            <h3 className="text-sm font-semibold text-ink">
+              {agendaPattern === 'TODAY' ? "Today's Agenda" : `${agendaPattern} Pattern Agenda`}
+            </h3>
+            <p className="text-xs text-ink-muted">Click any batch to inspect or edit its roster</p>
+          </div>
+          <div className="flex items-center gap-1.5 p-0.5 bg-canvas-soft rounded-lg border border-line">
+            {['TODAY', 'MWF', 'TTS'].map((p) => (
+              <button
+                key={p}
+                onClick={() => setAgendaPattern(p)}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
+                  agendaPattern === p
+                    ? 'bg-white text-brand shadow-xs font-bold'
+                    : 'text-ink-muted hover:text-ink'
+                }`}
+              >
+                {p === 'TODAY' ? 'Today' : p}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {displayByCourt.length === 0 ? (
+          <p className="text-xs text-ink-muted py-4 text-center">No batches scheduled for {agendaPattern === 'TODAY' ? 'today' : agendaPattern}.</p>
         ) : (
           <div className="space-y-4">
-            {todayByCourt.map(({ court, batches }) => (
+            {displayByCourt.map(({ court, batches }) => (
               <div key={court?.id || 'unknown'}>
                 <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider mb-2">{court?.name || 'Unknown Court'}</p>
                 <div className="space-y-1">
@@ -100,13 +137,18 @@ export default function AdminDashboard() {
                     const coach = state.coaches.find((c) => c.id === b.primaryCoachId);
                     const roster = state.enrollments.filter((e) => e.batchId === b.id && e.status === 'ACTIVE');
                     return (
-                      <div key={b.id} className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 sm:gap-3 px-3 py-2 rounded-lg bg-canvas-soft text-xs">
+                      <div
+                        key={b.id}
+                        onClick={() => navigate('/admin/batches/' + b.id)}
+                        className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 sm:gap-3 px-3 py-2 rounded-lg bg-canvas-soft hover:bg-canvas-soft/80 cursor-pointer border border-transparent hover:border-brand/20 transition-all text-xs group"
+                      >
                         <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-wrap">
-                          <span className="font-semibold text-ink min-w-[70px]">{b.program}</span>
+                          <span className="font-semibold text-ink min-w-[70px] group-hover:text-brand transition-colors">{b.name || `${b.program} ${b.dayPattern}`}</span>
                           <span className="text-ink-muted shrink-0">{formatTime12h(b.startTime)} - {formatTime12h(b.endTime)}</span>
                           <span className="text-ink-muted truncate">Coach: {coach?.name || '—'}</span>
+                          {b.isSemiBatch && <StatusPill status="semi-batch" />}
                         </div>
-                        <CapacityIndicator variant="bar" filled={roster.length} total={b.capacity} className="w-24 sm:w-28 shrink-0 ml-auto sm:ml-0" />
+                        <CapacityIndicator filled={roster.length} total={b.capacity} className="w-24 sm:w-28 shrink-0 ml-auto sm:ml-0" />
                       </div>
                     );
                   })}
@@ -116,6 +158,7 @@ export default function AdminDashboard() {
           </div>
         )}
       </Card>
+
 
       <Card>
         <h3 className="text-sm font-semibold text-ink mb-3">Slot Analysis Summary</h3>

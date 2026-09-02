@@ -7,6 +7,7 @@ import Dropdown from '../../ui/Dropdown';
 import StatCard from '../../ui/StatCard';
 import { toast } from 'sonner';
 import { CheckCircle, Undo2, Clock, MapPin, User, Search, Filter, Layers, CheckSquare, Calendar } from 'lucide-react';
+import { formatDateDDMMYY, formatTime12h } from '../../../utils/formatters';
 
 function getToday() {
   const d = new Date();
@@ -487,13 +488,14 @@ export default function Verification() {
 
                         <div className="flex items-center gap-1 text-ink-muted flex-shrink-0 w-24">
                           <Calendar className="w-3 h-3 text-ink-faint flex-shrink-0" />
-                          <span className="truncate">{s.date}</span>
+                          <span className="truncate">{formatDateDDMMYY(s.date)}</span>
                         </div>
 
-                        <div className="flex items-center gap-1 text-ink-muted flex-shrink-0 w-28">
+                        <div className="flex items-center gap-1 text-ink-muted flex-shrink-0 w-36">
                           <Clock className="w-3 h-3 text-ink-faint flex-shrink-0" />
-                          <span className="truncate">{s.startTime} - {s.endTime}</span>
+                          <span className="truncate">{formatTime12h(s.startTime)} - {formatTime12h(s.endTime)}</span>
                         </div>
+
 
                         {courtName && (
                           <div className="flex items-center gap-1 text-ink-faint flex-shrink-0 w-20 truncate">
@@ -564,12 +566,13 @@ export default function Verification() {
                           <div className="flex items-center gap-3 flex-wrap">
                             <span className="inline-flex items-center gap-1">
                               <Calendar className="w-3 h-3 text-ink-faint" />
-                              {s.date}
+                              {formatDateDDMMYY(s.date)}
                             </span>
                             <span className="inline-flex items-center gap-1">
                               <Clock className="w-3 h-3 text-ink-faint" />
-                              {s.startTime} - {s.endTime}
+                              {formatTime12h(s.startTime)} - {formatTime12h(s.endTime)}
                             </span>
+
                             {courtName && (
                               <span className="inline-flex items-center gap-1 text-ink-faint">
                                 <MapPin className="w-3 h-3" />

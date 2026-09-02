@@ -37,6 +37,15 @@ export function computeSlotAnalysis(batches, enrollments, { month } = {}) {
   const cap = {}, booked = {};
   const bump = (o, k, n) => { o[k] = (o[k] || 0) + n; };
 
+  // Breakdown by pattern matching the client's Excel sheet
+  const patternCap = {
+    MWF: {},
+    TTS: {},
+    WEEKEND: { slot230: { cap: 0, bk: 0 }, slot330: { cap: 0, bk: 0 } },
+    FITNESS: { MWF: { cap: 0, bk: 0 }, TTS: { cap: 0, bk: 0 } }
+  };
+  const patternBk = { MWF: {}, TTS: {} };
+
   for (const b of batches) {
     if (b.status !== 'ACTIVE') continue;
     const roster = enrollments.filter(
@@ -46,6 +55,19 @@ export function computeSlotAnalysis(batches, enrollments, { month } = {}) {
     if (b.program === 'FITNESS') {
       bump(cap, 'FITNESS', b.capacity);
       bump(booked, 'FITNESS', roster.length);
+      const pat = b.dayPattern === 'TTS' ? 'TTS' : 'MWF';
+      patternCap.FITNESS[pat].cap += b.capacity;
+      patternCap.FITNESS[pat].bk += roster.length;
+      continue;
+    }
+
+    if (b.program === 'WEEKEND') {
+      bump(cap, 'WEEKEND', b.capacity);
+      bump(booked, 'WEEKEND', roster.length);
+      const is230 = (b.startTime || '').includes('14:30');
+      const target = is230 ? patternCap.WEEKEND.slot230 : patternCap.WEEKEND.slot330;
+      target.cap += b.capacity;
+      target.bk += roster.length;
       continue;
     }
 
@@ -57,12 +79,21 @@ export function computeSlotAnalysis(batches, enrollments, { month } = {}) {
     }
     const movedOut = Object.values(reallocated).reduce((a, c) => a + c, 0);
 
-    bump(cap, b.program, b.capacity - movedOut);
-    bump(booked, b.program, roster.filter((e) => e.billingProgram === b.program).length);
+    const ownCap = b.capacity - movedOut;
+    const ownBk = roster.filter((e) => e.billingProgram === b.program).length;
+
+    bump(cap, b.program, ownCap);
+    bump(booked, b.program, ownBk);
+
+    const pat = b.dayPattern === 'TTS' ? 'TTS' : 'MWF';
+    bump(patternCap[pat], b.program, ownCap);
+    bump(patternBk[pat], b.program, ownBk);
 
     for (const [p, n] of Object.entries(reallocated)) {
       bump(cap, p, n);
       bump(booked, p, n);
+      bump(patternCap[pat], p, n);
+      bump(patternBk[pat], p, n);
     }
   }
 
@@ -73,14 +104,98 @@ export function computeSlotAnalysis(batches, enrollments, { month } = {}) {
   }
 
   // Academy total EXCLUDES Fitness and Private Coaching.
-  const total  = OCCUPANCY_SCOPES.reduce((a, s) => a + scopes[s].total, 0);
-  const bk     = OCCUPANCY_SCOPES.reduce((a, s) => a + scopes[s].booked, 0);
+  const total = OCCUPANCY_SCOPES.reduce((a, s) => a + scopes[s].total, 0);
+  const bk = OCCUPANCY_SCOPES.reduce((a, s) => a + scopes[s].booked, 0);
+
+  // MWF & TTS totals across Academy
+  const mwfCap = OCCUPANCY_SCOPES.filter((s) => s !== 'WEEKEND').reduce((a, s) => a + (patternCap.MWF[s] || 0), 0);
+  const mwfBk = OCCUPANCY_SCOPES.filter((s) => s !== 'WEEKEND').reduce((a, s) => a + (patternBk.MWF[s] || 0), 0);
+
+  const ttsCap = OCCUPANCY_SCOPES.filter((s) => s !== 'WEEKEND').reduce((a, s) => a + (patternCap.TTS[s] || 0), 0);
+  const ttsBk = OCCUPANCY_SCOPES.filter((s) => s !== 'WEEKEND').reduce((a, s) => a + (patternBk.TTS[s] || 0), 0);
+
+  const wkCap = scopes.WEEKEND?.total || 0;
+  const wkBk = scopes.WEEKEND?.booked || 0;
+
+  // Executive Program Matrix matching the 11 blocks of the client's Excel sheet
+  const matrix = {
+    ADV: {
+      title: 'Advance Class Analysis',
+      mwf: { total: patternCap.MWF.ADV || 0, booked: patternBk.MWF.ADV || 0, open: (patternCap.MWF.ADV || 0) - (patternBk.MWF.ADV || 0) },
+      tts: { total: patternCap.TTS.ADV || 0, booked: patternBk.TTS.ADV || 0, open: (patternCap.TTS.ADV || 0) - (patternBk.TTS.ADV || 0) },
+      total: scopes.ADV
+    },
+    INT: {
+      title: 'Intermediate Class Analysis',
+      mwf: { total: patternCap.MWF.INT || 0, booked: patternBk.MWF.INT || 0, open: (patternCap.MWF.INT || 0) - (patternBk.MWF.INT || 0) },
+      tts: { total: patternCap.TTS.INT || 0, booked: patternBk.TTS.INT || 0, open: (patternCap.TTS.INT || 0) - (patternBk.TTS.INT || 0) },
+      total: scopes.INT
+    },
+    ADULT: {
+      title: 'Adults Class Analysis',
+      mwf: { total: patternCap.MWF.ADULT || 0, booked: patternBk.MWF.ADULT || 0, open: (patternCap.MWF.ADULT || 0) - (patternBk.MWF.ADULT || 0) },
+      tts: { total: patternCap.TTS.ADULT || 0, booked: patternBk.TTS.ADULT || 0, open: (patternCap.TTS.ADULT || 0) - (patternBk.TTS.ADULT || 0) },
+      total: scopes.ADULT
+    },
+    GREEN: {
+      title: 'Green Ball Class Analysis',
+      mwf: { total: patternCap.MWF.GREEN || 0, booked: patternBk.MWF.GREEN || 0, open: (patternCap.MWF.GREEN || 0) - (patternBk.MWF.GREEN || 0) },
+      tts: { total: patternCap.TTS.GREEN || 0, booked: patternBk.TTS.GREEN || 0, open: (patternCap.TTS.GREEN || 0) - (patternBk.TTS.GREEN || 0) },
+      total: scopes.GREEN
+    },
+    ORANGE: {
+      title: 'Orange Ball Class Analysis',
+      mwf: { total: patternCap.MWF.ORANGE || 0, booked: patternBk.MWF.ORANGE || 0, open: (patternCap.MWF.ORANGE || 0) - (patternBk.MWF.ORANGE || 0) },
+      tts: { total: patternCap.TTS.ORANGE || 0, booked: patternBk.TTS.ORANGE || 0, open: (patternCap.TTS.ORANGE || 0) - (patternBk.TTS.ORANGE || 0) },
+      total: scopes.ORANGE
+    },
+    RED: {
+      title: 'Red Ball Class Analysis',
+      mwf: { total: patternCap.MWF.RED || 0, booked: patternBk.MWF.RED || 0, open: (patternCap.MWF.RED || 0) - (patternBk.MWF.RED || 0) },
+      tts: { total: patternCap.TTS.RED || 0, booked: patternBk.TTS.RED || 0, open: (patternCap.TTS.RED || 0) - (patternBk.TTS.RED || 0) },
+      total: scopes.RED
+    },
+    JDP: {
+      title: 'Junior Development Program Analysis',
+      mwf: { total: patternCap.MWF.JDP || 0, booked: patternBk.MWF.JDP || 0, open: (patternCap.MWF.JDP || 0) - (patternBk.MWF.JDP || 0) },
+      tts: { total: patternCap.TTS.JDP || 0, booked: patternBk.TTS.JDP || 0, open: (patternCap.TTS.JDP || 0) - (patternBk.TTS.JDP || 0) },
+      total: scopes.JDP
+    },
+    HPP: {
+      title: 'High Performance Program Analysis',
+      mwf: { total: patternCap.MWF.HPP || 0, booked: patternBk.MWF.HPP || 0, open: (patternCap.MWF.HPP || 0) - (patternBk.MWF.HPP || 0) },
+      tts: { total: patternCap.TTS.HPP || 0, booked: patternBk.TTS.HPP || 0, open: (patternCap.TTS.HPP || 0) - (patternBk.TTS.HPP || 0) },
+      total: scopes.HPP
+    },
+    WEEKEND: {
+      title: 'Weekend Coaching Program Analysis',
+      slot230: { total: patternCap.WEEKEND.slot230.cap, booked: patternCap.WEEKEND.slot230.bk, open: patternCap.WEEKEND.slot230.cap - patternCap.WEEKEND.slot230.bk },
+      slot330: { total: patternCap.WEEKEND.slot330.cap, booked: patternCap.WEEKEND.slot330.bk, open: patternCap.WEEKEND.slot330.cap - patternCap.WEEKEND.slot330.bk },
+      total: scopes.WEEKEND
+    },
+    FITNESS: {
+      title: 'Fitness Program Analysis',
+      mwf: { total: patternCap.FITNESS.MWF.cap, booked: patternCap.FITNESS.MWF.bk, open: patternCap.FITNESS.MWF.cap - patternCap.FITNESS.MWF.bk },
+      tts: { total: patternCap.FITNESS.TTS.cap, booked: patternCap.FITNESS.TTS.bk, open: patternCap.FITNESS.TTS.cap - patternCap.FITNESS.TTS.bk },
+      total: scopes.FITNESS
+    }
+  };
 
   return {
-    academy: { total, booked: bk, open: total - bk, occupancyPct: total ? +(bk / total * 100).toFixed(2) : 0 },
+    academy: {
+      total,
+      booked: bk,
+      open: total - bk,
+      occupancyPct: total ? +(bk / total * 100).toFixed(2) : 0,
+      mwf: { total: mwfCap, booked: mwfBk, open: mwfCap - mwfBk },
+      tts: { total: ttsCap, booked: ttsBk, open: ttsCap - ttsBk },
+      weekend: { total: wkCap, booked: wkBk, open: wkCap - wkBk }
+    },
+    matrix,
     scopes,
   };
 }
+
 
 function activeInMonth(e, month) {
   if (!month) return true;

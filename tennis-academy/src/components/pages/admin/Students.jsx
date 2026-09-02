@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { Search, Plus, Pencil, Archive, UserPlus, FileText, RefreshCw, Mail } from 'lucide-react';
 import { GST_RATE } from '../../../utils/settings';
 import { preparePaymentReminder } from '../../../utils/notificationEngine';
+import { formatDateDDMMYY, formatTime12h } from '../../../utils/formatters';
 
 const fieldBase = 'w-full h-[38px] px-3 rounded-lg border border-line bg-white text-[13px] text-ink outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand transition-all';
 const labelCls = 'block text-[10px] font-semibold text-ink-muted uppercase tracking-[0.04em] mb-1';
@@ -33,14 +34,12 @@ const ENROLLMENT_TYPES = ['Group', 'Private', 'HPP', 'Add-on', 'Customised'];
 const CATEGORY_OPTIONS = [
   { value: 'ADV', label: 'Advance' },
   { value: 'INT', label: 'Intermediate' },
+  { value: 'BEG', label: 'Beginner' },
+  { value: 'JDP', label: 'JDP (Junior Development Program)' },
+  { value: 'HPP', label: 'HPP (High Performance Program)' },
   { value: 'ADULT', label: 'Adults' },
-  { value: 'JDP', label: 'JDP' },
-  { value: 'HPP', label: 'HPP' },
-  { value: 'WEEKEND', label: 'Weekend' },
+  { value: 'WEEKEND', label: 'Weekend Coaching' },
   { value: 'FITNESS', label: 'Fitness' },
-  { value: 'GREEN', label: 'Green' },
-  { value: 'ORANGE', label: 'Orange' },
-  { value: 'RED', label: 'Red' },
 ];
 
 function computeEndDate(joiningDate, durationMonths) {
@@ -75,20 +74,46 @@ function newEnrollmentBlock() {
     nextPaymentDue: '', balanceAmount: 0, customLineItems: [] };
 }
 
-function renderEnrollmentBlock(blk, setBlk, removable, onRemove) {
+function renderEnrollmentBlock(blk, setBlk, removable, onRemove, batchOptions = []) {
   const BALL_COLORS = ['Yellow', 'Green', 'Orange', 'Red'];
-  const CATEGORIES_WITH_BALL = new Set(['ADV', 'INT']);
-  const CATEGORIES_AUTO_BALL = { GREEN: 'Green', ORANGE: 'Orange', RED: 'Red' };
-  const batchOptions = (() => { try { const { db } = require('../../../context/DbContext').useDb?.() || {}; return db?.readAll?.()?.batches?.filter?.((b) => b.status === 'ACTIVE') || []; } catch { return []; } })();
-  function resolveBall(cat) { if (CATEGORIES_WITH_BALL.has(cat)) return ''; if (CATEGORIES_AUTO_BALL[cat]) return CATEGORIES_AUTO_BALL[cat]; return null; }
+  const CATEGORIES_WITH_BALL = new Set(['ADV', 'INT', 'BEG', 'WEEKEND', 'JDP', 'HPP']);
+  
   function filterBatches(prog, ball) {
     if (!prog) return [];
-    if (CATEGORIES_WITH_BALL.has(prog)) { if (!ball) return []; return batchOptions.filter((b) => b.program === prog && (b.ballLevel || '').toLowerCase() === ball.toLowerCase()); }
-    if (['GREEN','ORANGE','RED','ADULT','WEEKEND','FITNESS'].includes(prog)) return batchOptions.filter((b) => b.program === prog);
-    if (prog === 'JDP' || prog === 'HPP') return batchOptions;
+    // For JDP and HPP, students are placed in Advance, Intermediate, or Green Ball batches (Capacity follows student)
+    if (prog === 'JDP' || prog === 'HPP') {
+      if (!ball) {
+        return batchOptions.filter((b) => ['ADV', 'INT', 'GREEN'].includes(b.program) || b.name?.includes('Advance') || b.name?.includes('Intermediate'));
+      }
+      return batchOptions.filter((b) => 
+        (['ADV', 'INT', 'GREEN'].includes(b.program) || b.name?.includes('Advance') || b.name?.includes('Intermediate')) &&
+        (!b.ballLevel || b.ballLevel.toLowerCase() === ball.toLowerCase() || (b.name && b.name.toLowerCase().includes(ball.toLowerCase())))
+      );
+    }
+
+    if (prog === 'BEG') {
+      if (!ball) return batchOptions.filter((b) => (b.name && b.name.toLowerCase().includes('beginner')) || ['GREEN', 'ORANGE', 'RED'].includes(b.program));
+      return batchOptions.filter((b) => 
+        ((b.name && b.name.toLowerCase().includes('beginner')) || ['GREEN', 'ORANGE', 'RED'].includes(b.program)) &&
+        (!b.ballLevel || b.ballLevel.toLowerCase() === ball.toLowerCase() || (b.name && b.name.toLowerCase().includes(ball.toLowerCase())))
+      );
+    }
+
+    if (CATEGORIES_WITH_BALL.has(prog)) {
+      if (!ball) return batchOptions.filter((b) => b.program === prog || (b.name && b.name.toLowerCase().includes(prog.toLowerCase())));
+      return batchOptions.filter((b) => 
+        (b.program === prog || (b.name && b.name.toLowerCase().includes(prog.toLowerCase()))) && 
+        ((b.ballLevel || '').toLowerCase() === ball.toLowerCase() || (b.name && b.name.toLowerCase().includes(ball.toLowerCase())))
+      );
+    }
+
+    if (['ADULT', 'WEEKEND', 'FITNESS'].includes(prog)) {
+      return batchOptions.filter((b) => b.program === prog || (b.name && b.name.toLowerCase().includes(prog.toLowerCase())));
+    }
+
     return batchOptions;
   }
-  const ball = resolveBall(blk.program);
+
   const batches = filterBatches(blk.program, blk.ballColor);
   const isCustomised = blk.enrollmentType === 'Customised';
   const isAddOn = blk.enrollmentType === 'Add-on';
@@ -127,11 +152,12 @@ function renderEnrollmentBlock(blk, setBlk, removable, onRemove) {
     !isCustomised ? React.createElement(React.Fragment, null,
       React.createElement('div', { className: CATEGORIES_WITH_BALL.has(blk.program) ? 'grid grid-cols-2 gap-3 items-center' : 'space-y-1' },
         React.createElement('div', { className: 'space-y-1' },
-          React.createElement('label', { className: labelCls }, 'Category'),
-          React.createElement(Dropdown, { value: blk.program, onChange: (v) => { const p = typeof v === 'object' ? (v?.value || '') : (v || ''); setBlk({ ...blk, program: p, ballColor: resolveBall(p) || '', batchId: '' }); }, placeholder: 'Select category...', options: CATEGORY_OPTIONS, getOptionLabel: (o) => o?.label || '', getOptionValue: (o) => o?.value || '' })),
+          React.createElement('label', { className: labelCls }, 'Category (Priority 1) *'),
+          React.createElement(Dropdown, { value: blk.program, onChange: (v) => { const p = typeof v === 'object' ? (v?.value || '') : (v || ''); setBlk({ ...blk, program: p, ballColor: '', batchId: '' }); }, placeholder: 'Select category...', options: CATEGORY_OPTIONS, getOptionLabel: (o) => o?.label || '', getOptionValue: (o) => o?.value || '' })),
         CATEGORIES_WITH_BALL.has(blk.program) ? React.createElement('div', { className: 'space-y-1' },
-          React.createElement('label', { className: labelCls + ' text-brand-600' }, 'Ball Color *'),
+          React.createElement('label', { className: labelCls + ' text-brand-600 font-bold' }, 'Ball Color (Priority 2) *'),
           React.createElement(Dropdown, { value: blk.ballColor, onChange: (v) => { const c = typeof v === 'object' ? (v?.value || '') : (v || ''); setBlk({ ...blk, ballColor: c, batchId: '' }); }, placeholder: 'Select ball color...', options: BALL_COLORS.map((c) => ({ value: c, label: c })), getOptionLabel: (o) => o?.label || '', getOptionValue: (o) => o?.value || '' })) : null),
+
       isPrivate ? React.createElement('div', { className: 'space-y-3 mt-3' },
         React.createElement('div', { className: 'grid grid-cols-2 gap-3' },
           React.createElement('div', { className: 'space-y-1' },
@@ -157,8 +183,8 @@ function renderEnrollmentBlock(blk, setBlk, removable, onRemove) {
     !isPrivate ? React.createElement(React.Fragment, null,
       React.createElement('div', { className: 'grid grid-cols-2 gap-3 mt-3' },
         React.createElement('div', { className: 'space-y-1' },
-          React.createElement('label', { className: labelCls }, 'Batch'),
-          React.createElement(Dropdown, { value: blk.batchId, onChange: (v) => setBlk({ ...blk, batchId: typeof v === 'object' ? (v?.value || '') : (v || '') }), placeholder: !blk.program ? 'Select Category first' : batches.length === 0 ? 'No batches available' : 'Select batch...', disabled: !blk.program || batches.length === 0, options: batches.map((b) => ({ value: b.id, label: `${b.program}${b.ballLevel ? ' \u00b7 ' + b.ballLevel : ''} (${b.dayPattern} ${b.startTime || ''})` })), getOptionLabel: (o) => o?.label || '', getOptionValue: (o) => o?.value || '' })),
+          React.createElement('label', { className: labelCls }, 'Batch (Priority 3) *'),
+          React.createElement(Dropdown, { value: blk.batchId, onChange: (v) => setBlk({ ...blk, batchId: typeof v === 'object' ? (v?.value || '') : (v || '') }), placeholder: !blk.program ? 'Select Category first' : batches.length === 0 ? 'No batches available' : 'Select batch...', disabled: !blk.program || batches.length === 0, options: batches.map((b) => ({ value: b.id, label: `${b.name || `${b.program}${b.ballLevel ? ' · ' + b.ballLevel : ''} (${b.startTime || ''})`} (${b.dayPattern})` })), getOptionLabel: (o) => o?.label || '', getOptionValue: (o) => o?.value || '' })),
         React.createElement('div', { className: 'space-y-1' },
           React.createElement('label', { className: labelCls }, 'Joining Date'),
           React.createElement('input', { type: 'date', value: blk.joiningDate, onChange: (e) => setBlk({ ...blk, joiningDate: e.target.value }), className: fieldBase }))),
@@ -175,7 +201,7 @@ function renderEnrollmentBlock(blk, setBlk, removable, onRemove) {
           React.createElement('div', { className: 'space-y-1' }, React.createElement('label', { className: labelCls }, 'Amount (Rs.)'), React.createElement('input', { type: 'number', value: blk.amount, onChange: (e) => setBlk({ ...blk, amount: e.target.value }), className: fieldBase, placeholder: '8000' })),
           React.createElement('div', { className: 'space-y-1 pt-5' }, React.createElement('label', { className: 'flex items-center gap-2 text-xs' }, React.createElement('input', { type: 'checkbox', checked: blk.taxInclusive, onChange: (e) => setBlk({ ...blk, taxInclusive: e.target.checked }) }), 'Tax-inclusive'))),
         React.createElement('div', { className: 'grid grid-cols-2 gap-3 mt-2' },
-          React.createElement('div', { className: 'space-y-1' }, React.createElement('label', { className: labelCls }, 'Discount'), React.createElement('div', { className: 'flex gap-2' }, React.createElement('select', { value: blk.discountType, onChange: (e) => setBlk({ ...blk, discountType: e.target.value }), className: fieldBase, style: { width: '70px' } }, React.createElement('option', { value: '' }, 'None'), React.createElement('option', { value: '%' }, '%'), React.createElement('option', { value: 'flat' }, 'Rs.')), React.createElement('input', { type: 'number', value: blk.discountVal, onChange: (e) => setBlk({ ...blk, discountVal: e.target.value }), className: fieldBase, disabled: !blk.discountType, placeholder: '0' }))),
+          React.createElement('div', { className: 'space-y-1' }, React.createElement('label', { className: labelCls }, 'Discount'), React.createElement('div', { className: 'flex gap-1.5 items-center' }, React.createElement('select', { value: blk.discountType, onChange: (e) => setBlk({ ...blk, discountType: e.target.value }), className: 'flex-shrink-0 h-[38px] w-[72px] sm:w-[80px] px-2 rounded-lg border border-line bg-white text-[12px] text-ink outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand transition-all' }, React.createElement('option', { value: '' }, 'None'), React.createElement('option', { value: '%' }, '%'), React.createElement('option', { value: 'flat' }, 'Rs.')), React.createElement('input', { type: 'number', value: blk.discountVal, onChange: (e) => setBlk({ ...blk, discountVal: e.target.value }), className: fieldBase + ' flex-1 min-w-0', disabled: !blk.discountType, placeholder: '0' }))),
           React.createElement('div', { className: 'space-y-1' }, React.createElement('label', { className: labelCls }, 'Discount Reason'), React.createElement('input', { value: blk.discountReason || '', onChange: (e) => setBlk({ ...blk, discountReason: e.target.value }), className: fieldBase, disabled: !blk.discountType, placeholder: 'Required if discount applied' }))),
         blk.amount ? React.createElement('div', { className: 'grid grid-cols-4 gap-2 mt-2 text-[10px] bg-white rounded-lg p-2 border border-line/50' },
           React.createElement('div', null, React.createElement('span', { className: 'text-ink-faint' }, 'Base'), React.createElement('p', { className: 'font-semibold text-ink' }, 'Rs.' + fee.baseAmount)),
@@ -322,30 +348,152 @@ export default function AdminStudents() {
   const handleAddStudent = async () => {
     const errors = {};
     if (!addForm.name.trim()) errors.name = 'Name is required';
-    if (addErrors && Object.keys(errors).length > 0) { setAddErrors(errors); return; }
+    if (Object.keys(errors).length > 0) { setAddErrors(errors); return; }
     try {
       const student = await db.upsertStudent({
-        name: addForm.name, guardianName: addForm.guardianName || addForm.name + "'s Guardian",
-        guardianPhone: addForm.guardianPhone, membershipType: addForm.membershipType, status: 'ACTIVE',
+        name: addForm.name.trim(),
+        guardianName: addForm.guardianName || addForm.name + "'s Guardian",
+        guardianPhone: addForm.guardianPhone || '',
+        guardianEmail: addForm.guardianEmail || '',
+        guardianRelationship: addForm.guardianRelationship || 'Father',
+        alternatePhone: addForm.alternatePhone || '',
+        membershipType: addForm.membershipType,
+        status: addForm.membershipType === 'Guest' ? 'TRIAL' : 'ACTIVE',
+        remarks: addForm.remarks || '',
         enrolledFrom: new Date().toISOString().split('T')[0],
       });
-      if (addForm.program && addForm.batchId) {
-        await db.upsertEnrollment({ studentId: student.id, batchId: addForm.batchId, billingProgram: addForm.program, status: 'ACTIVE' });
+
+      const blocks = addForm.membershipType === 'Guest' ? addForm.enrollments.slice(0, 1) : addForm.enrollments;
+
+      for (const blk of blocks) {
+        if (blk.enrollmentType === 'Customised') {
+          if (!blk.customLineItems || blk.customLineItems.length === 0) {
+            throw new Error('Customised package requires at least one line item mapped to a category');
+          }
+          for (const item of blk.customLineItems) {
+            if (!item.category) throw new Error('Each custom line item must map to a valid category');
+          }
+          const totalRate = blk.customLineItems.reduce((sum, item) => sum + (parseFloat(item.rate) || 0), 0);
+          const finalAmt = parseFloat(blk.amount) || totalRate;
+          const fee = calcFee(finalAmt, blk.taxInclusive, blk.discountType, blk.discountVal, GST_RATE);
+          const rec = parseFloat(blk.amountReceived) || 0;
+          await db.upsertEnrollment({
+            studentId: student.id,
+            batchId: null,
+            billingProgram: blk.customLineItems[0]?.category || 'ADV',
+            enrollmentType: 'Customised',
+            customLineItems: blk.customLineItems,
+            status: 'ACTIVE',
+            startDate: blk.joiningDate || new Date().toISOString().split('T')[0],
+          });
+          await db.upsertPackage({
+            studentId: student.id,
+            program: blk.customLineItems[0]?.category || 'ADV',
+            enrollmentType: 'Customised',
+            packageDuration: blk.packageDuration || null,
+            amount: fee.finalAmount,
+            paymentStatus: blk.paymentStatus || 'PAID',
+            paymentMode: blk.paymentMode || '',
+            amountReceived: rec,
+            balanceAmount: fee.finalAmount - rec,
+            paymentDate: blk.paymentDate || new Date().toISOString().split('T')[0],
+            transactionRef: blk.transactionRef || '',
+            gstRate: GST_RATE,
+            taxInclusive: blk.taxInclusive,
+            baseAmount: fee.baseAmount,
+            taxAmount: fee.taxAmount,
+            discount: fee.discount,
+            discountReason: blk.discountReason || null,
+            validTo: blk.endDate || '',
+          });
+        } else if (blk.enrollmentType === 'Private') {
+          const rate = parseFloat(blk.amount) || 0;
+          const fee = calcFee(rate, blk.taxInclusive, blk.discountType, blk.discountVal, GST_RATE);
+          await db.upsertEnrollment({
+            studentId: student.id,
+            batchId: null,
+            coachId: blk.coachId || null,
+            billingProgram: 'PRIVATE',
+            enrollmentType: 'Private',
+            status: 'ACTIVE',
+            startDate: blk.joiningDate || new Date().toISOString().split('T')[0],
+          });
+          await db.upsertPackage({
+            studentId: student.id,
+            program: 'PRIVATE',
+            coachId: blk.coachId || null,
+            enrollmentType: 'Private',
+            packageDuration: blk.packageDuration || 'per-session',
+            amount: fee.finalAmount,
+            paymentStatus: blk.paymentStatus || 'PAID',
+            paymentMode: blk.paymentMode || '',
+            amountReceived: parseFloat(blk.amountReceived) || 0,
+            balanceAmount: fee.finalAmount - (parseFloat(blk.amountReceived) || 0),
+            paymentDate: blk.paymentDate || new Date().toISOString().split('T')[0],
+            transactionRef: blk.transactionRef || '',
+            gstRate: GST_RATE,
+            baseAmount: fee.baseAmount,
+            taxAmount: fee.taxAmount,
+            discount: fee.discount,
+            validTo: blk.endDate || '',
+          });
+        } else {
+          // Group, Add-on, HPP, Guest
+          if (blk.program && blk.batchId) {
+            await db.upsertEnrollment({
+              studentId: student.id,
+              batchId: blk.batchId,
+              billingProgram: blk.program,
+              ballLevel: blk.ballColor || null,
+              enrollmentType: blk.enrollmentType || 'Group',
+              status: 'ACTIVE',
+              startDate: blk.joiningDate || new Date().toISOString().split('T')[0],
+            });
+            if (blk.amount || blk.packageDuration) {
+              const dm = DURATION_OPTIONS.find((d) => d.value === blk.packageDuration)?.months;
+              const ed = blk.packageDuration === 'custom' ? blk.endDate : computeEndDate(blk.joiningDate, dm);
+              const fee = calcFee(blk.amount, blk.taxInclusive, blk.discountType, blk.discountVal, GST_RATE);
+              const rec = parseFloat(blk.amountReceived) || 0;
+              await db.upsertPackage({
+                studentId: student.id,
+                program: blk.program,
+                packageDuration: blk.packageDuration || null,
+                endDate: ed || null,
+                sessionsPurchased: 0,
+                sessionsUsed: 0,
+                amount: fee.finalAmount,
+                paymentStatus: blk.paymentStatus || 'PAID',
+                paymentMode: blk.paymentMode || '',
+                amountReceived: rec,
+                balanceAmount: fee.finalAmount - rec,
+                paymentDate: blk.paymentDate || new Date().toISOString().split('T')[0],
+                transactionRef: blk.transactionRef || '',
+                gstRate: GST_RATE,
+                taxInclusive: blk.taxInclusive,
+                baseAmount: fee.baseAmount,
+                taxAmount: fee.taxAmount,
+                discount: fee.discount,
+                discountReason: blk.discountReason || null,
+                validTo: ed || '',
+              });
+            }
+          }
+        }
       }
-      if (addForm.sessionsPurchased) {
-        await db.upsertPackage({
-          studentId: student.id, program: addForm.program || 'ADV',
-          sessionsPurchased: parseInt(addForm.sessionsPurchased) || 0, sessionsUsed: 0,
-          amount: parseInt(addForm.amount) || 0, paymentStatus: addForm.paymentStatus,
-          validTo: new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString().split('T')[0],
-        });
-      }
-      toast.success(`Student "${addForm.name}" created`);
+
+      toast.success(`Student "${addForm.name}" created with enrollment(s)`);
       setShowAdd(false);
-      setAddForm({ name: '', guardianName: '', guardianPhone: '', membershipType: 'Member', program: '', ballColor: '', batchId: '', sessionsPurchased: '', amount: '', paymentStatus: 'PAID' });
+      setAddForm({
+        name: '', guardianName: '', guardianPhone: '', guardianEmail: '',
+        guardianRelationship: 'Father', alternatePhone: '', remarks: '',
+        membershipType: 'Member', program: '', ballColor: '', batchId: '',
+        sessionsPurchased: '', amount: '', paymentStatus: 'PAID',
+        enrollments: [newEnrollmentBlock()]
+      });
       setAddErrors({}); setDupCheck(null);
     } catch (e) { toast.error(e.message); }
   };
+
 
   const handleEdit = async () => {
     if (!selected) return;
@@ -499,32 +647,112 @@ export default function AdminStudents() {
         </div>
       </Card>
 
-      {/* Student Detail Modal */}
-      <Modal open={!!selected} onClose={() => setSelected(null)} title={selected?.name} size="md">
+      {/* Student Detail Modal — Consolidated Profile (UC-2 / WF-2.3) */}
+      <Modal open={!!selected} onClose={() => setSelected(null)} title={selected?.name} size="lg">
         {selected && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div><p className="text-ink-faint">Name</p><p className="font-semibold">{selected.name}</p></div>
-              <div><p className="text-ink-faint">Guardian</p><p className="font-semibold">{selected.guardianName}</p></div>
-              <div><p className="text-ink-faint">Phone</p><p className="font-semibold">{selected.guardianPhone}</p></div>
-              <div><p className="text-ink-faint">Email</p><p className="font-semibold">{selected.guardianEmail || '\u2014'}</p></div>
-              <div><p className="text-ink-faint">Relationship</p><p className="font-semibold">{selected.guardianRelationship || '\u2014'}</p></div>
-              <div><p className="text-ink-faint">Status</p><StatusPill status={selected.status} /></div>
+          <div className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+            {/* 1. Basic & Contact Information */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs bg-canvas-soft p-3 rounded-xl border border-line/60">
+              <div><p className="text-ink-faint">Name</p><p className="font-semibold text-ink">{selected.name}</p></div>
+              <div><p className="text-ink-faint">Guardian</p><p className="font-semibold text-ink">{selected.guardianName}</p></div>
+              <div><p className="text-ink-faint">Phone</p><p className="font-semibold text-ink">{selected.guardianPhone || '—'}</p></div>
+              <div><p className="text-ink-faint">Email</p><p className="font-semibold text-ink">{selected.guardianEmail || '—'}</p></div>
+              <div><p className="text-ink-faint">Relationship</p><p className="font-semibold text-ink">{selected.guardianRelationship || '—'}</p></div>
+              <div><p className="text-ink-faint">Membership / Status</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="font-semibold text-ink">{selected.membershipType || 'Member'}</span>
+                  <StatusPill status={selected.status} />
+                </div>
+              </div>
             </div>
 
-            {/* Monthly Attendance % (F2) */}
-            <AttendancePctCard studentId={selected.id} db={db} />
+            {/* 2. Enrolled Group Batches (Consolidated) */}
+            <div>
+              <h4 className="text-xs font-semibold text-ink-muted mb-1.5">Group Batches ({selected.enrollments?.length || 0})</h4>
+              {(!selected.enrollments || selected.enrollments.length === 0) ? (
+                <p className="text-xs text-ink-faint py-2 px-3 bg-canvas-soft rounded-lg">No active group batch enrollments.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {selected.enrollments.map((enr) => {
+                    const b = state.batches.find((batch) => batch.id === enr.batchId);
+                    const c = state.courts.find((court) => court.id === b?.courtId);
+                    const coach = state.coaches.find((coach) => coach.id === b?.primaryCoachId);
+                    return (
+                      <div key={enr.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-lg bg-canvas-soft text-xs border border-line/40">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-ink">{enr.billingProgram || b?.program}</span>
+                          {enr.ballLevel && <span className="text-brand-600 font-medium">{enr.ballLevel}</span>}
+                          <span className="text-ink-muted">{b?.dayPattern} · {b ? `${formatTime12h(b.startTime)} - ${formatTime12h(b.endTime)}` : 'No batch'}</span>
+                          {enr.enrollmentType && enr.enrollmentType !== 'Group' && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] bg-brand-50 text-brand-600 font-medium">{enr.enrollmentType}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-ink-faint text-[11px] ml-auto">
+                          <span>{c?.name || 'Court —'}</span>
+                          <span>•</span>
+                          <span>Coach: {coach?.name || 'Unassigned'}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
+            {/* 3. Scheduled Private Sessions (Consolidated) */}
+            {(() => {
+              const privates = (state.privateSessions || []).filter((ps) => ps.studentId === selected.id || ps.clientName === selected.name);
+              if (privates.length === 0) return null;
+              return (
+                <div>
+                  <h4 className="text-xs font-semibold text-ink-muted mb-1.5">Private Coaching Sessions ({privates.length})</h4>
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                    {privates.map((ps) => {
+                      const coach = state.coaches.find((c) => c.id === ps.coachId);
+                      return (
+                        <div key={ps.id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-canvas-soft text-xs border border-line/40">
+                          <span className="text-ink font-medium">{formatDateDDMMYY(ps.date)} · {formatTime12h(ps.startTime || ps.time)}</span>
+                          <span className="text-ink-muted">Coach: {coach?.name || ps.coachName || '—'}</span>
+                          <StatusPill status={ps.status || 'confirmed'} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* 4. Package & Payment Position (Consolidated — Base, Tax, Total, Paid, Pending, Mode, Due Date) */}
             {selected.package && (
               <div>
-                <h4 className="text-xs font-semibold text-ink-muted mb-1">Package</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs bg-canvas-soft rounded-lg p-3">
-                  <div><p className="text-ink-faint">Plan</p><p className="font-semibold">{selected.package.program}</p></div>
-                  <div><p className="text-ink-faint">Sessions</p><p className="font-semibold">{selected.package.sessionsUsed}/{selected.package.sessionsPurchased}</p></div>
-                  <div><p className="text-ink-faint">Status</p><EligibilityStatusPill package={selected.package} /></div>
+                <h4 className="text-xs font-semibold text-ink-muted mb-1.5">Package & Payment Position</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs bg-canvas-soft rounded-xl p-3 border border-line/60">
+                  <div>
+                    <p className="text-[10px] uppercase text-ink-faint font-semibold">Total Amount</p>
+                    <p className="font-bold text-ink text-sm">₹{(selected.package.amount || selected.package.finalAmount || 0).toLocaleString('en-IN')}</p>
+                    <p className="text-[10px] text-ink-faint mt-0.5">Base: ₹{(selected.package.baseAmount || Math.round((selected.package.amount || 0) / 1.18)).toLocaleString('en-IN')} + GST</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase text-ink-faint font-semibold">Amount Paid</p>
+                    <p className="font-bold text-ok text-sm">₹{(selected.package.amountReceived || 0).toLocaleString('en-IN')}</p>
+                    <p className="text-[10px] text-ink-faint mt-0.5">Mode: {selected.package.paymentMode || 'Not recorded'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase text-ink-faint font-semibold">Pending Balance</p>
+                    <p className="font-bold text-err text-sm">₹{Math.max(0, (selected.package.amount || 0) - (selected.package.amountReceived || 0)).toLocaleString('en-IN')}</p>
+                    <p className="text-[10px] text-ink-faint mt-0.5">{selected.package.nextPaymentDue ? `Due: ${formatDateDDMMYY(selected.package.nextPaymentDue)}` : 'No due date'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase text-ink-faint font-semibold">Package Status</p>
+                    <div className="mt-0.5"><EligibilityStatusPill package={selected.package} /></div>
+                    <p className="text-[10px] text-ink-faint mt-0.5">{selected.package.validTo ? `Valid to: ${formatDateDDMMYY(selected.package.validTo)}` : ''}</p>
+                  </div>
                 </div>
               </div>
             )}
+
+            {/* 5. Monthly Attendance % */}
+            <AttendancePctCard studentId={selected.id} db={db} />
 
             {selected.isAmbiguous && (
               <div className="px-3 py-2 rounded-lg bg-brand-50 text-xs text-brand-600">
@@ -532,8 +760,9 @@ export default function AdminStudents() {
               </div>
             )}
 
-            {/* Category History (F5) */}
+            {/* 6. Dated Category History */}
             <CategoryHistoryCard studentId={selected.id} db={db} />
+
 
             <div className="flex flex-wrap gap-2 pt-2 border-t border-line">
               <Button size="sm" variant="secondary" icon={Pencil} onClick={openEdit}>Edit</Button>
@@ -652,7 +881,7 @@ export default function AdminStudents() {
               </div>
               <div className="space-y-1 mt-2">
                 <label className={labelCls}>Trial Batch</label>
-                <Dropdown value={addForm.enrollments[0].batchId} onChange={(v) => setAddForm((f) => ({ ...f, enrollments: [{ ...f.enrollments[0], batchId: typeof v === 'object' ? (v.value || '') : (v || '') }] }))} placeholder="Select batch..." options={batchOptions.map((b) => ({ value: b.id, label: `${b.program}${b.ballLevel ? ' \u00b7 ' + b.ballLevel : ''} (${b.dayPattern} ${b.startTime || ''})` }))} getOptionLabel={(o) => o?.label || ''} getOptionValue={(o) => o?.value || ''} />
+                <Dropdown value={addForm.enrollments[0].batchId} onChange={(v) => setAddForm((f) => ({ ...f, enrollments: [{ ...f.enrollments[0], batchId: typeof v === 'object' ? (v.value || '') : (v || '') }] }))} placeholder="Select batch..." options={batchOptions.map((b) => ({ value: b.id, label: `${b.name || `${b.program}${b.ballLevel ? ' · ' + b.ballLevel : ''} (${b.startTime || ''})`} (${b.dayPattern})` }))} getOptionLabel={(o) => o?.label || ''} getOptionValue={(o) => o?.value || ''} />
               </div>
             </div>
           ) : (
@@ -660,7 +889,7 @@ export default function AdminStudents() {
               <p className="text-[10px] font-semibold text-ink-muted uppercase mb-2">Enrollments</p>
               {addForm.enrollments.map((blk, idx) => (
                 <div key={idx} className="mb-3">
-                  {renderEnrollmentBlock(blk, (newBlk) => { const e = [...addForm.enrollments]; e[idx] = newBlk; setAddForm((f) => ({ ...f, enrollments: e })); }, addForm.enrollments.length > 1, () => { const e = [...addForm.enrollments]; e.splice(idx, 1); setAddForm((f) => ({ ...f, enrollments: e.length > 0 ? e : [newEnrollmentBlock()] })); })}
+                  {renderEnrollmentBlock(blk, (newBlk) => { const e = [...addForm.enrollments]; e[idx] = newBlk; setAddForm((f) => ({ ...f, enrollments: e })); }, addForm.enrollments.length > 1, () => { const e = [...addForm.enrollments]; e.splice(idx, 1); setAddForm((f) => ({ ...f, enrollments: e.length > 0 ? e : [newEnrollmentBlock()] })); }, batchOptions)}
                 </div>
               ))}
               <Button size="sm" variant="ghost" icon={Plus} onClick={() => setAddForm((f) => ({ ...f, enrollments: [...f.enrollments, newEnrollmentBlock()] }))} className="w-full">+ Add Another Enrollment</Button>
@@ -694,7 +923,7 @@ export default function AdminStudents() {
       {/* Add Enrollment Modal (for existing students) */}
       <Modal open={showEnroll} onClose={() => setShowEnroll(false)} title="Add Enrollment" size="lg">
         <div className="space-y-4 max-h-[65vh] overflow-y-auto">
-          {renderEnrollmentBlock(enrollForm, setEnrollForm, false, null)}
+          {renderEnrollmentBlock(enrollForm, setEnrollForm, false, null, batchOptions)}
           <div className="flex justify-end gap-2 pt-2"><Button variant="secondary" onClick={() => setShowEnroll(false)}>Cancel</Button><Button onClick={handleAddEnrollment} disabled={!enrollForm.program}>Add Enrollment</Button></div>
         </div>
       </Modal>
@@ -703,7 +932,7 @@ export default function AdminStudents() {
       <Modal open={showConvert} onClose={() => setShowConvert(false)} title={`Convert "${selected?.name}" to Enrollment`} size="lg">
         <div className="space-y-4 max-h-[65vh] overflow-y-auto">
           <p className="text-xs text-ink-muted">Convert this trial student to a regular enrollment.</p>
-          {renderEnrollmentBlock(convertForm, setConvertForm, false, null)}
+          {renderEnrollmentBlock(convertForm, setConvertForm, false, null, batchOptions)}
           <div className="flex justify-end gap-2 pt-2"><Button variant="secondary" onClick={() => setShowConvert(false)}>Cancel</Button><Button onClick={handleConvert} disabled={!convertForm.program}>Convert to Enrollment</Button></div>
         </div>
       </Modal>

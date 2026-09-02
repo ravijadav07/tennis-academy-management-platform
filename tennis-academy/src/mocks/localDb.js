@@ -9,7 +9,7 @@
 // ---------------------------------------------------------------------------
 import SEED from './seedData';
 
-const KEY = 'ata.db.v1';
+const KEY = 'ata.db.v3';
 const LATENCY = 120;                       // fake network delay, keeps loading states honest
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const clone = (v) => JSON.parse(JSON.stringify(v));
@@ -330,6 +330,22 @@ export const db = {
         !b.isSemiBatch && !batch.isSemiBatch &&
         batch.startTime < b.endTime && b.startTime < batch.endTime);
       if (conflict) throw Object.assign(new Error('COURT_CONFLICT'), { conflictWith: conflict.name || conflict.program });
+
+      if (!batch.allowCoachConflict && batch.primaryCoachId) {
+        const coachConflict = s.batches.find((b) =>
+          b.id !== batch.id && b.status === 'ACTIVE' && batch.status !== 'INACTIVE' &&
+          b.dayPattern === batch.dayPattern &&
+          (b.primaryCoachId === batch.primaryCoachId || b.supportCoachId === batch.primaryCoachId) &&
+          batch.startTime < b.endTime && b.startTime < batch.endTime);
+        if (coachConflict) {
+          const cName = s.coaches?.find((c) => c.id === batch.primaryCoachId)?.name || 'Coach';
+          throw Object.assign(new Error('COACH_CONFLICT'), {
+            coachName: cName,
+            conflictWith: `${coachConflict.program} (${coachConflict.startTime}-${coachConflict.endTime})`
+          });
+        }
+      }
+
       const i = s.batches.findIndex((b) => b.id === batch.id);
       const before = i >= 0 ? s.batches[i] : null;
       const row = { ...batch, id: batch.id || uid('b') };

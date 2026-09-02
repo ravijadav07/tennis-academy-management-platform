@@ -92,12 +92,26 @@ export default function AdminAttendance() {
         const student = state.students.find((s) => s.id === e.studentId);
         const pkg = state.packages.find((p) => p.studentId === e.studentId);
         const att = marked.find((a) => a.studentId === e.studentId);
+        const notes = (state.playerNotes || []).filter((n) => n.studentId === e.studentId).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
         const elig = getEligibility(pkg, selectedDate);
         const key = e.studentId + '|' + selectedBatchId + '|' + selectedDate;
         const optStatus = optimistic[key];
-        return { studentId: e.studentId, name: student && student.name || 'Unknown', program: e.billingProgram, eligibility: elig, package: pkg, attendance: att, blocked: !elig.markable, optStatus };
+        return {
+          studentId: e.studentId,
+          name: student && student.name || 'Unknown',
+          program: e.billingProgram,
+          membershipType: student?.membershipType || 'Member',
+          eligibility: elig,
+          package: pkg,
+          attendance: att,
+          blocked: !elig.markable,
+          optStatus,
+          latestNote: notes[0]?.note || student?.remarks || '',
+        };
       });
+
   }, [state, batch, selectedBatchId, selectedDate, optimistic]);
+
 
   // Students NOT in this batch (for out-of-schedule)
   const otherStudents = state.students.filter((s) => s.status === 'ACTIVE' && !roster.some((r) => r.studentId === s.id));
@@ -240,7 +254,10 @@ export default function AdminAttendance() {
             value={selectedBatchId}
             onChange={(v) => setSelectedBatchId(typeof v === 'object' ? (v.value || v) : v)}
             placeholder="Select batch..."
-            options={state.batches.filter((b) => b.status === 'ACTIVE').map((b) => ({ value: b.id, label: b.program + ' ' + b.dayPattern + ' (' + b.startTime + ')' }))}
+            options={state.batches.filter((b) => b.status === 'ACTIVE').map((b) => ({
+              value: b.id,
+              label: `${b.program} ${b.dayPattern} (${formatTime12h(b.startTime)})`
+            }))}
             getOptionLabel={(o) => (o && o.label) || ''}
             getOptionValue={(o) => (o && o.value) || ''}
           />
@@ -263,19 +280,40 @@ export default function AdminAttendance() {
 
       {batch && (
         <Card>
-          <h3 className="text-sm font-semibold text-ink mb-3">{batch.program} {batch.dayPattern} {'\u2014'} {formatDateDDMMYY(selectedDate)}</h3>
+          <h3 className="text-sm font-semibold text-ink mb-3">{batch.name || `${batch.program} ${batch.dayPattern}`} {'\u2014'} {formatDateDDMMYY(selectedDate)}</h3>
           <div className="space-y-1">
             {roster.map((r) => {
               const displayStatus = r.optStatus || (r.attendance && r.attendance.status);
               const isPending = pending.has(r.studentId);
+              const isReallocated = batch && r.program !== batch.program;
               return (
                 <div key={r.studentId} onClick={() => handleToggleOrRequest(r)}
                   className={'flex flex-wrap items-center gap-2 sm:gap-3 px-3 py-2 rounded-lg text-xs transition-colors ' +
                     (r.blocked ? 'bg-err-bg/20 opacity-50 cursor-not-allowed' : displayStatus === 'PRESENT' ? 'bg-ok-bg/30 cursor-pointer' : displayStatus === 'ABSENT' ? 'bg-err-bg/30 cursor-pointer' : 'bg-canvas-soft hover:bg-canvas-soft/50 cursor-pointer')}>
                   <span className="font-semibold text-ink min-w-[120px]">{r.name}</span>
-                  <StatusPill status={r.program} />
+                  <span className={`px-2 py-0.5 rounded font-bold text-[11px] uppercase tracking-wider ${
+                    r.program === 'JDP'
+                      ? 'bg-purple-100 text-purple-800 border border-purple-300'
+                      : r.program === 'HPP'
+                      ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                      : 'bg-brand-50 text-brand-700 border border-brand/20'
+                  }`}>
+                    {r.program}
+                  </span>
+                  {isReallocated && (
+                    <span className="text-[10px] text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded font-medium border border-purple-200">
+                      Capacity follows student ({r.program} in {batch.program})
+                    </span>
+                  )}
+                  {r.membershipType && r.membershipType !== 'Member' && <StatusPill status={r.membershipType.toLowerCase()} />}
                   {displayStatus ? <StatusPill status={displayStatus} /> : <span className="text-ink-faint">{'\u2014'}</span>}
                   {r.blocked && <EligibilityStatusPill package={r.package} date={selectedDate} />}
+
+                  {r.latestNote && (
+                    <span className="px-2 py-0.5 rounded bg-brand-50 text-brand-700 text-[10px] max-w-[200px] truncate" title={r.latestNote}>
+                      Note: {r.latestNote}
+                    </span>
+                  )}
                   {isPending && <Loader2 className="w-3 h-3 animate-spin text-brand" />}
                   {/* Notify Parent button for absent students */}
                   {displayStatus === 'ABSENT' && selectedDate === today && (
@@ -283,6 +321,7 @@ export default function AdminAttendance() {
                       <NotifyButton r={r} batch={batch} selectedDate={selectedDate} state={state} db={db} notifiedAbsences={notifiedAbsences} setNotifiedAbsences={setNotifiedAbsences} />
                     </div>
                   )}
+
                 </div>
               );
             })}

@@ -7,6 +7,7 @@ import StatusPill from '../../ui/StatusPill';
 import { toast } from 'sonner';
 import { CheckCircle, Plus, Clock, MapPin, User } from 'lucide-react';
 import TimePicker12h from '../../ui/TimePicker12h';
+import { formatDateDDMMYY, formatTime12h } from '../../../utils/formatters';
 
 function getToday() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 
@@ -98,7 +99,7 @@ export default function PrivateLog() {
                     {s.clientName || s.studentName || 'Unnamed'}
                   </p>
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[11px] text-ink-muted">
-                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{s.startTime} - {s.endTime}</span>
+                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{formatTime12h(s.startTime)} - {formatTime12h(s.endTime)}</span>
                     {courtName && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{courtName}</span>}
                     <StatusPill status={s.clientType || 'MEMBER'} />
                   </div>
@@ -129,12 +130,13 @@ export default function PrivateLog() {
             {paged.filter((s) => s.date !== today).map((s) => (
               <div key={s.id} className="flex items-center gap-2 py-2 text-xs">
                 <span className="font-medium text-ink truncate flex-1">{s.clientName || s.studentName || 'Unnamed'}</span>
-                <span className="text-ink-faint flex-shrink-0">{s.date}</span>
-                <span className="text-ink-faint flex-shrink-0">{s.startTime}</span>
+                <span className="text-ink-faint flex-shrink-0">{formatDateDDMMYY(s.date)}</span>
+                <span className="text-ink-faint flex-shrink-0">{formatTime12h(s.startTime)}</span>
                 <StatusPill status={s.status === 'COMPLETED' ? 'completed' : 'pending'} />
               </div>
             ))}
           </div>
+
           {hasMore && (
             <Button variant="ghost" size="sm" onClick={() => setPage((p) => p + 1)} className="w-full mt-3">
               Load More ({total - page * PAGE_SIZE} remaining)
