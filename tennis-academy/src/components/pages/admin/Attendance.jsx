@@ -1,0 +1,521 @@
+import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useDb } from '../../../context/DbContext';
+import { getEligibility } from '../../../mocks/rules';
+import Card from '../../ui/Card';
+import StatusPill from '../../ui/StatusPill';
+import Button from '../../ui/Button';
+import Modal from '../../ui/Modal';
+import EligibilityStatusPill from '../../ui/EligibilityStatusPill';
+import Dropdown from '../../ui/Dropdown';
+import { CheckSquare, Printer, Loader2, UserPlus, FileText, ShieldCheck, Mail } from 'lucide-react';
+import { formatDateDDMMYY, formatTime12h } from '../../../utils/formatters';
+import { prepareAbsenceEmail, getNotificationWindow } from '../../../utils/notificationEngine';
+import { toast } from 'sonner';
+import { useAuth } from '../../../context/AuthContext';
+
+const FIELD = 'w-full h-[38px] px-3 rounded-lg border border-line bg-white text-[13px] text-ink outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand transition-all';
+const LBL = 'block text-[10px] font-semibold text-ink-muted uppercase tracking-[0.04em] mb-1';
+
+function getToday() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+
+export default function AdminAttendance() {
+  const { db, tick } = useDb();
+  const { user } = useAuth();
+  const state = useMemo(() => db.readAll(), [db, tick]);
+  const today = getToday();
+  const isAdmin = user?.role === 'admin' || user?.role === 'ops_head';
+  const [selectedBatchId, setSelectedBatchId] = useState(state.batches[0] && state.batches[0].id || '');
+  const [selectedDate, setSelectedDate] = useState(today);
+  const [showPrint, setShowPrint] = useState(false);
+  const [optimistic, setOptimistic] = useState({});
+  const [pending, setPending] = useState(new Set());
+
+// Add Student modal state
+  const [showAddStudent, setShowAddStudent] = useState(false);
+  const [addMode, setAddMode] = useState('existing');
+  const [addStudentId, setAddStudentId] = useState('');
+  const [trialName, setTrialName] = useState('');
+  const [trialPhone, setTrialPhone] = useState('');
+  const [sessionRemark, setSessionRemark] = useState('');
+  const [sessionRemarkSaved, setSessionRemarkSaved] = useState(false);
+
+  // Load notified absences for this session
+  useEffect(() => {
+    if (selectedBatchId && selectedDate) {
+      const state = db.readAll();
+      const notified = (state.absentNotifications || []).filter(
+        (n) => n.batchId === selectedBatchId && n.date === selectedDate
+      ).map((n) => n.studentId);
+      setNotifiedAbsences(new Set(notified));
+    }
+  }, [selectedBatchId, selectedDate, tick, db]);
+
+  // Notify parent — opens mailto: draft
+  const handleNotifyParent = async (r, e) => {
+    e.stopPropagation();
+    const student = state.students.find((s) => s.id === r.studentId);
+    if (!student || !student.guardianEmail) {
+      toast.error('Guardian email is not available for this student');
+      return;
+    }
+    const mailto = prepareAbsenceEmail({
+      studentName: r.name,
+      guardianEmail: student.guardianEmail,
+      batchName: batch.program + ' ' + batch.dayPattern,
+      batchDate: formatDateDDMMYY(selectedDate),
+      startTime: batch.startTime,
+      endTime: batch.endTime,
+    });
+    await db.logAbsenceNotification({
+      studentId: r.studentId, batchId: selectedBatchId, date: selectedDate,
+      guardianEmail: student.guardianEmail,
+    });
+    setNotifiedAbsences((prev) => new Set(prev).add(r.studentId));
+    toast.success('Opening email draft for ' + r.name);
+    window.open(mailto, '_blank');
+  };
+
+  // Correction requests state
+  const [correctionRequests, setCorrectionRequests] = useState([]);
+  const [showCorrectionReason, setShowCorrectionReason] = useState(false);
+  const [correctionTarget, setCorrectionTarget] = useState(null);
+  const [correctionReason, setCorrectionReason] = useState('');
+  const [notifiedAbsences, setNotifiedAbsences] = useState(new Set());
+
+  const batch = state.batches.find((b) => b.id === selectedBatchId);
+  const roster = useMemo(() => {
+    if (!batch) return [];
+    const marked = state.attendance.filter((a) => a.batchId === selectedBatchId && a.date === selectedDate);
+    return state.enrollments
+      .filter((e) => e.batchId === selectedBatchId && e.status === 'ACTIVE')
+      .map((e) => {
+        const student = state.students.find((s) => s.id === e.studentId);
+        const pkg = state.packages.find((p) => p.studentId === e.studentId);
+        const att = marked.find((a) => a.studentId === e.studentId);
+        const elig = getEligibility(pkg, selectedDate);
+        const key = e.studentId + '|' + selectedBatchId + '|' + selectedDate;
+        const optStatus = optimistic[key];
+        return { studentId: e.studentId, name: student && student.name || 'Unknown', program: e.billingProgram, eligibility: elig, package: pkg, attendance: att, blocked: !elig.markable, optStatus };
+      });
+  }, [state, batch, selectedBatchId, selectedDate, optimistic]);
+
+  // Students NOT in this batch (for out-of-schedule)
+  const otherStudents = state.students.filter((s) => s.status === 'ACTIVE' && !roster.some((r) => r.studentId === s.id));
+
+  const markAll = async (status) => {
+    const entries = roster.filter((r) => !r.blocked).map((r) => ({ studentId: r.studentId, status }));
+    if (entries.length === 0) { toast.error('No markable students'); return; }
+    const opt = { ...optimistic };
+    entries.forEach((e) => { opt[e.studentId + '|' + selectedBatchId + '|' + selectedDate] = status; });
+    setOptimistic(opt);
+    setPending(new Set(entries.map((e) => e.studentId)));
+    try {
+      await db.markAttendance({ batchId: selectedBatchId, date: selectedDate, entries, markedBy: 'admin', markedByRole: 'ADMIN', source: 'ADMIN' });
+      entries.forEach((e) => toast.success('Marked ' + (roster.find((r) => r.studentId === e.studentId) || {}).name + ' as ' + status, { duration: 2000 }));
+      setOptimistic({}); setPending(new Set());
+    } catch (e) { setOptimistic({}); setPending(new Set()); toast.error(e.message || 'Failed'); }
+  };
+
+  const toggleStudent = useCallback(async (entry) => {
+    if (entry.blocked && !entry.attendance) { toast.error('Not markable: ' + entry.eligibility.reason); return; }
+    const nextStatus = entry.attendance && entry.attendance.status === 'PRESENT' ? 'ABSENT' : entry.attendance && entry.attendance.status === 'ABSENT' ? 'PRESENT' : 'PRESENT';
+    const key = entry.studentId + '|' + selectedBatchId + '|' + selectedDate;
+    setOptimistic((prev) => ({ ...prev, [key]: nextStatus }));
+    setPending((prev) => new Set(prev).add(entry.studentId));
+    try {
+      await db.markAttendance({ batchId: selectedBatchId, date: selectedDate, entries: [{ studentId: entry.studentId, status: nextStatus }], markedBy: 'admin', markedByRole: 'ADMIN', source: 'ADMIN' });
+      toast.success(entry.name + ' \u2192 ' + nextStatus, { duration: 2000 });
+      setOptimistic((prev) => { const n = { ...prev }; delete n[key]; return n; });
+      setPending((prev) => { const s = new Set(prev); s.delete(entry.studentId); return s; });
+    } catch (e) {
+      setOptimistic((prev) => { const n = { ...prev }; delete n[key]; return n; });
+      setPending((prev) => { const s = new Set(prev); s.delete(entry.studentId); return s; });
+      toast.error(e.message);
+    }
+  }, [optimistic, selectedBatchId, selectedDate, db]);
+
+  const handleAddExisting = async () => {
+    if (!addStudentId) { toast.error('Select a student'); return; }
+    const stu = otherStudents.find((s) => s.id === addStudentId);
+    try {
+      await db.markExemption({ batchId: selectedBatchId, date: selectedDate, studentId: addStudentId, status: 'PRESENT', markedByRole: 'ADMIN' });
+      toast.success((stu ? stu.name : 'Student') + ' added to attendance (out-of-schedule)');
+      setShowAddStudent(false); setAddStudentId(''); setAddMode('existing');
+    } catch (e) { toast.error(e.message); }
+  };
+
+  const handleAddTrial = async () => {
+    if (!trialName.trim()) { toast.error('Name is required'); return; }
+    try {
+      await db.createTrialStudent({ name: trialName, guardianPhone: trialPhone, batchId: selectedBatchId, date: selectedDate });
+      toast.success('Trial student ' + trialName + ' logged and marked present');
+      setShowAddStudent(false); setTrialName(''); setTrialPhone(''); setAddMode('existing');
+    } catch (e) { toast.error(e.message); }
+  };
+
+  // Load correction requests for admin
+  useEffect(() => {
+    if (isAdmin) { db.getCorrectionRequests().then(setCorrectionRequests); }
+  }, [tick, isAdmin, db]);
+
+  const handleRequestCorrection = async () => {
+    if (!correctionReason.trim()) { toast.error('Reason is required'); return; }
+    const { studentId, attendance } = correctionTarget;
+    try {
+      await db.createCorrectionRequest({
+        attendanceId: attendance?.id || null, studentId, batchId: selectedBatchId, date: selectedDate,
+        oldStatus: attendance?.status || 'ABSENT', newStatus: correctionTarget.nextStatus,
+        reason: correctionReason.trim(), requestedBy: user?.userId || 'user_admin',
+      });
+      toast.success('Correction request submitted for admin approval');
+      setShowCorrectionReason(false); setCorrectionTarget(null); setCorrectionReason('');
+      if (isAdmin) db.getCorrectionRequests().then(setCorrectionRequests);
+    } catch (e) { toast.error(e.message); }
+  };
+
+  const handleApproveRequest = async (reqId) => {
+    try { await db.approveCorrectionRequest({ requestId: reqId, reviewedBy: user?.userId }); toast.success('Correction approved'); db.getCorrectionRequests().then(setCorrectionRequests); }
+    catch (e) { toast.error(e.message); }
+  };
+
+  const handleRejectRequest = async (reqId) => {
+    try { await db.rejectCorrectionRequest({ requestId: reqId, reviewedBy: user?.userId }); toast.success('Correction rejected'); db.getCorrectionRequests().then(setCorrectionRequests); }
+    catch (e) { toast.error(e.message); }
+  };
+
+  // Modified toggleStudent: past-date correction requests go through approval
+  const isPastDate = selectedDate < today;
+  const handleToggleOrRequest = useCallback(async (entry) => {
+    if (entry.blocked && !entry.attendance) { toast.error('Not markable: ' + entry.eligibility.reason); return; }
+    const nextStatus = entry.attendance && entry.attendance.status === 'PRESENT' ? 'ABSENT' : entry.attendance && entry.attendance.status === 'ABSENT' ? 'PRESENT' : 'PRESENT';
+    // For past dates where attendance is already marked, create a correction request instead
+    if (isPastDate && entry.attendance && !isAdmin) {
+      setCorrectionTarget({ studentId: entry.studentId, nextStatus, attendance: entry.attendance });
+      setCorrectionReason('');
+      setShowCorrectionReason(true);
+      return;
+    }
+    // Admin or current date: direct marking
+    const key = entry.studentId + '|' + selectedBatchId + '|' + selectedDate;
+    setOptimistic((prev) => ({ ...prev, [key]: nextStatus }));
+    setPending((prev) => new Set(prev).add(entry.studentId));
+    try {
+      await db.markAttendance({ batchId: selectedBatchId, date: selectedDate, entries: [{ studentId: entry.studentId, status: nextStatus }], markedBy: isAdmin ? 'admin' : 'coach', markedByRole: (user?.role || 'ADMIN').toUpperCase(), source: isAdmin ? 'ADMIN' : 'COACH_APP' });
+      toast.success(entry.name + ' \u2192 ' + nextStatus, { duration: 2000 });
+      setOptimistic((prev) => { const n = { ...prev }; delete n[key]; return n; });
+      setPending((prev) => { const s = new Set(prev); s.delete(entry.studentId); return s; });
+    } catch (e) {
+      setOptimistic((prev) => { const n = { ...prev }; delete n[key]; return n; });
+      setPending((prev) => { const s = new Set(prev); s.delete(entry.studentId); return s; });
+      toast.error(e.message);
+    }
+  }, [optimistic, selectedBatchId, selectedDate, db, isPastDate, isAdmin, user]);
+
+  // Load session remark when batch + date changes
+  useEffect(() => {
+    if (!selectedBatchId || !selectedDate) return;
+    db.getSessionRemark({ batchId: selectedBatchId, date: selectedDate }).then((r) => {
+      setSessionRemark(r ? r.remark : '');
+      setSessionRemarkSaved(!!r);
+    });
+  }, [selectedBatchId, selectedDate, tick]);
+
+  const handleSaveRemark = async () => {
+    try {
+      await db.saveSessionRemark({ batchId: selectedBatchId, date: selectedDate, remark: sessionRemark });
+      setSessionRemarkSaved(true);
+      toast.success('Session remark saved');
+    } catch (e) { toast.error(e.message); }
+  };
+
+  const presentCount = roster.filter((r) => (r.optStatus || (r.attendance && r.attendance.status)) === 'PRESENT').length;
+  const absentCount = roster.filter((r) => (r.optStatus || (r.attendance && r.attendance.status)) === 'ABSENT').length;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap">
+        <div className="w-full sm:w-72">
+          <Dropdown
+            className="w-full"
+            value={selectedBatchId}
+            onChange={(v) => setSelectedBatchId(typeof v === 'object' ? (v.value || v) : v)}
+            placeholder="Select batch..."
+            options={state.batches.filter((b) => b.status === 'ACTIVE').map((b) => ({ value: b.id, label: b.program + ' ' + b.dayPattern + ' (' + b.startTime + ')' }))}
+            getOptionLabel={(o) => (o && o.label) || ''}
+            getOptionValue={(o) => (o && o.value) || ''}
+          />
+        </div>
+        <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className={`${FIELD} w-full sm:w-auto`} />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" icon={CheckSquare} onClick={() => markAll('PRESENT')}>All Present</Button>
+          <Button size="sm" variant="secondary" onClick={() => markAll('ABSENT')}>All Absent</Button>
+          <Button size="sm" variant="ghost" icon={Printer} onClick={() => setShowPrint(true)}>Print</Button>
+          <Button size="sm" variant="secondary" icon={UserPlus} onClick={() => setShowAddStudent(true)}>Add Student</Button>
+        </div>
+        <span className="text-[11px] text-ink-muted sm:ml-auto w-full sm:w-auto text-right">
+          <span className="text-ok font-semibold">{presentCount} present</span>
+          {' \u00b7 '}
+          <span className="text-err font-semibold">{absentCount} absent</span>
+          {' \u00b7 '}
+          {roster.length} total
+        </span>
+      </div>
+
+      {batch && (
+        <Card>
+          <h3 className="text-sm font-semibold text-ink mb-3">{batch.program} {batch.dayPattern} {'\u2014'} {formatDateDDMMYY(selectedDate)}</h3>
+          <div className="space-y-1">
+            {roster.map((r) => {
+              const displayStatus = r.optStatus || (r.attendance && r.attendance.status);
+              const isPending = pending.has(r.studentId);
+              return (
+                <div key={r.studentId} onClick={() => handleToggleOrRequest(r)}
+                  className={'flex flex-wrap items-center gap-2 sm:gap-3 px-3 py-2 rounded-lg text-xs transition-colors ' +
+                    (r.blocked ? 'bg-err-bg/20 opacity-50 cursor-not-allowed' : displayStatus === 'PRESENT' ? 'bg-ok-bg/30 cursor-pointer' : displayStatus === 'ABSENT' ? 'bg-err-bg/30 cursor-pointer' : 'bg-canvas-soft hover:bg-canvas-soft/50 cursor-pointer')}>
+                  <span className="font-semibold text-ink min-w-[120px]">{r.name}</span>
+                  <StatusPill status={r.program} />
+                  {displayStatus ? <StatusPill status={displayStatus} /> : <span className="text-ink-faint">{'\u2014'}</span>}
+                  {r.blocked && <EligibilityStatusPill package={r.package} date={selectedDate} />}
+                  {isPending && <Loader2 className="w-3 h-3 animate-spin text-brand" />}
+                  {/* Notify Parent button for absent students */}
+                  {displayStatus === 'ABSENT' && selectedDate === today && (
+                    <div className="sm:ml-auto" onClick={(e) => e.stopPropagation()}>
+                      <NotifyButton r={r} batch={batch} selectedDate={selectedDate} state={state} db={db} notifiedAbsences={notifiedAbsences} setNotifiedAbsences={setNotifiedAbsences} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
+      {/* Session Remark */}
+      {batch && (
+        <Card>
+          <div className="flex items-center gap-2 mb-2">
+            <FileText className="w-4 h-4 text-ink-faint" />
+            <h3 className="text-sm font-semibold text-ink">Session Remark</h3>
+            {sessionRemarkSaved && <span className="text-[10px] text-ok">Saved</span>}
+          </div>
+          <p className="text-[11px] text-ink-faint mb-2">Record court condition, weather, early finish, or any session-level observation. This is separate from individual player attendance notes.</p>
+          <div className="flex gap-2">
+            <textarea value={sessionRemark} onChange={(e) => setSessionRemark(e.target.value)}
+              className="flex-1 h-16 px-3 py-2 rounded-lg border border-line text-[13px] outline-none focus:ring-2 focus:ring-brand/10 resize-none"
+              placeholder="e.g. Court surface wet, session ended 15 minutes early" />
+            <Button size="sm" onClick={handleSaveRemark}>Save Remark</Button>
+          </div>
+        </Card>
+      )}
+
+      {/* Exemption Attendees — students marked present who aren't in this batch's enrollment */}
+      {batch && (() => {
+        const exemptions = state.attendance.filter(
+          (a) => a.batchId === selectedBatchId && a.date === selectedDate && a.exemption);
+        if (exemptions.length === 0) return null;
+        const totalHeadcount = roster.filter((r) => (r.optStatus || (r.attendance && r.attendance.status)) === 'PRESENT').length + exemptions.filter((a) => a.status === 'PRESENT').length;
+        const over = totalHeadcount > batch.capacity;
+        return (
+          <Card>
+            <div className="flex items-center gap-2 mb-2">
+              <h3 className="text-sm font-semibold text-ink">Exemption Attendees</h3>
+              {over && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-warn-bg text-warn">
+                  Over capacity ({totalHeadcount}/{batch.capacity})
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-ink-faint mb-3">
+              These students are attending this session but are not permanently enrolled in this batch.
+              Marking them present does not alter their permanent batch assignment.
+            </p>
+            <div className="space-y-1">
+              {exemptions.map((a) => {
+                const stu = state.students.find((s) => s.id === a.studentId);
+                return (
+                  <div key={a.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-canvas-soft text-xs">
+                    <span className="font-semibold text-ink">{stu ? stu.name : a.studentId}</span>
+                    <StatusPill status={a.status} />
+                    {stu && stu.membershipType === 'Guest' ? <StatusPill status="guest" /> : null}
+                    <span className="text-ink-faint text-[10px]">Marked by {a.markedByRole} • Exemption</span>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        );
+      })()}
+
+      {showPrint && (
+        <Modal open={showPrint} onClose={() => setShowPrint(false)} title="Printable Roster" size="lg">
+          <div className="print-only">
+            <h3 className="text-lg font-bold mb-2">{batch && batch.program} {'\u2014'} {selectedDate}</h3>
+            <table className="w-full text-sm border-collapse"><thead><tr className="border-b"><th className="text-left py-1">Student</th><th className="text-left py-1">Status</th><th className="text-left py-1">Notes</th></tr></thead>
+              <tbody>{roster.map((r) => (<tr key={r.studentId} className="border-b"><td className="py-1">{r.name}</td><td className="py-1">{r.attendance ? r.attendance.status : '\u2014'}</td><td className="py-1">{r.attendance && r.attendance.notes || ''}</td></tr>))}</tbody></table>
+          </div>
+          <div className="flex justify-end mt-4"><Button onClick={() => window.print()}>Print</Button></div>
+        </Modal>
+      )}
+
+      {/* Add Student Modal */}
+      <Modal open={showAddStudent} onClose={() => { setShowAddStudent(false); setAddMode('existing'); }} title="Add Student to Attendance" size="md">
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            <button onClick={() => setAddMode('existing')} className={'px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ' + (addMode === 'existing' ? 'bg-brand-50 text-brand-600' : 'text-ink-muted hover:bg-canvas-soft')}>
+              Existing Student
+            </button>
+            <button onClick={() => setAddMode('trial')} className={'px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ' + (addMode === 'trial' ? 'bg-brand-50 text-brand-600' : 'text-ink-muted hover:bg-canvas-soft')}>
+              New / Trial
+            </button>
+          </div>
+
+          {addMode === 'existing' ? (
+            <div className="space-y-3">
+              <p className="text-xs text-ink-muted">Pick a student not normally in this batch for out-of-schedule attendance.</p>
+              <div className="space-y-1">
+                <label className={LBL}>Student</label>
+                <Dropdown
+                  value={addStudentId}
+                  onChange={(v) => setAddStudentId(typeof v === 'object' ? (v.value || v) : v)}
+                  placeholder="Select student..."
+                  options={otherStudents.map((s) => ({ value: s.id, label: s.name + (s.isGuest ? ' (Guest)' : '') }))}
+                  getOptionLabel={(o) => (o && o.label) || ''}
+                  getOptionValue={(o) => (o && o.value) || ''}
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="secondary" onClick={() => setShowAddStudent(false)}>Cancel</Button>
+                <Button onClick={handleAddExisting} disabled={!addStudentId}>Add to Session</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs text-ink-muted">Create a lightweight trial student record and mark them present for this session. No full enrollment required.</p>
+              <div className="space-y-1">
+                <label className={LBL}>Name *</label>
+                <input value={trialName} onChange={(e) => setTrialName(e.target.value)} className={FIELD} placeholder="Student name" />
+              </div>
+              <div className="space-y-1">
+                <label className={LBL}>Guardian Phone</label>
+                <input value={trialPhone} onChange={(e) => setTrialPhone(e.target.value)} className={FIELD} placeholder="Phone number" />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="secondary" onClick={() => setShowAddStudent(false)}>Cancel</Button>
+                <Button onClick={handleAddTrial} disabled={!trialName.trim()}>Log Trial Student</Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* Correction Reason Modal */}
+      <Modal open={showCorrectionReason} onClose={() => setShowCorrectionReason(false)} title="Request Attendance Correction" size="sm">
+        <div className="space-y-3">
+          <p className="text-xs text-ink-muted">
+            You are changing a past attendance record. This requires admin approval.
+            Your request will be reviewed before the change is applied.
+          </p>
+          <div className="px-3 py-2 rounded-lg bg-canvas-soft text-xs">
+            <span className="font-semibold">{correctionTarget?.studentName || 'Student'}</span>
+            <span className="text-ink-muted"> {'\u2192'} {correctionTarget?.nextStatus}</span>
+          </div>
+          <div className="space-y-1">
+            <label className={LBL}>Reason *</label>
+            <textarea value={correctionReason} onChange={(e) => setCorrectionReason(e.target.value)}
+              className="w-full h-20 px-3 py-2 rounded-lg border border-line text-[13px] outline-none focus:ring-2 focus:ring-brand/10 resize-none"
+              placeholder="Why does this attendance record need to be corrected?" />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="secondary" onClick={() => setShowCorrectionReason(false)}>Cancel</Button>
+            <Button onClick={handleRequestCorrection} disabled={!correctionReason.trim()}>Submit Request</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Admin Correction Requests Panel */}
+      {isAdmin && correctionRequests.length > 0 && (
+        <Card>
+          <div className="flex items-center gap-2 mb-3">
+            <ShieldCheck className="w-4 h-4 text-brand" />
+            <h3 className="text-sm font-semibold text-ink">Pending Correction Requests ({correctionRequests.filter((r) => r.status === 'pending').length})</h3>
+          </div>
+          <div className="space-y-1">
+            {correctionRequests.filter((r) => r.status === 'pending').map((req) => {
+              const stu = state.students.find((s) => s.id === req.studentId);
+              return (
+                <div key={req.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-canvas-soft text-xs">
+                  <span className="font-semibold text-ink">{stu?.name || req.studentId}</span>
+                  <span className="text-ink-muted">{req.date}</span>
+                  <StatusPill status={req.oldStatus} />
+                  <span className="text-ink-faint">{'\u2192'}</span>
+                  <StatusPill status={req.newStatus} />
+                  <span className="text-ink-muted flex-1 truncate">Reason: {req.reason}</span>
+                  <span className="text-ink-faint">by {(req.requestedBy || '').replace('user_', '')}</span>
+                  <Button size="sm" variant="primary" onClick={() => handleApproveRequest(req.id)} className="!h-7 !px-2 !text-[10px]">Approve</Button>
+                  <Button size="sm" variant="danger" onClick={() => handleRejectRequest(req.id)} className="!h-7 !px-2 !text-[10px]">Reject</Button>
+                </div>
+              );
+            })}
+            {correctionRequests.filter((r) => r.status !== 'pending').map((req) => {
+              const stu = state.students.find((s) => s.id === req.studentId);
+              return (
+                <div key={req.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-canvas-soft/50 text-xs opacity-60">
+                  <span className="font-semibold text-ink">{stu?.name || req.studentId}</span>
+                  <StatusPill status={req.status} />
+                  <span className="text-ink-muted">{req.date}</span>
+                  <span className="text-ink-faint">by {(req.reviewedBy || '').replace('user_', '')}</span>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+// Small inline component for the Notify Parent button with countdown
+function NotifyButton({ r, batch, selectedDate, state, db, notifiedAbsences, setNotifiedAbsences }) {
+  const { open, minutesRemaining } = getNotificationWindow(batch.startTime);
+  const alreadyNotified = notifiedAbsences.has(r.studentId);
+
+  if (alreadyNotified) {
+    return <span className="text-[10px] text-ok ml-auto flex-shrink-0" onClick={(e) => e.stopPropagation()}>Notified</span>;
+  }
+
+  const student = state.students.find((s) => s.id === r.studentId);
+  if (!student || !student.guardianEmail) {
+    return <span className="text-[10px] text-ink-faint ml-auto flex-shrink-0" title="No guardian email available" onClick={(e) => e.stopPropagation()}>No email</span>;
+  }
+
+  if (!open) {
+    return (
+      <span className="text-[10px] text-ink-faint ml-auto flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+        Available in {minutesRemaining}m
+      </span>
+    );
+  }
+
+  return (
+    <button onClick={async (e) => {
+      e.stopPropagation();
+      const mailto = prepareAbsenceEmail({
+        studentName: r.name,
+        guardianEmail: student.guardianEmail,
+        batchName: batch.program + ' ' + batch.dayPattern,
+        batchDate: formatDateDDMMYY(selectedDate),
+        startTime: batch.startTime,
+        endTime: batch.endTime,
+      });
+      await db.logAbsenceNotification({
+        studentId: r.studentId, batchId: batch.id, date: selectedDate,
+        guardianEmail: student.guardianEmail,
+      });
+      setNotifiedAbsences((prev) => new Set(prev).add(r.studentId));
+      toast.success('Opening email for ' + r.name);
+      window.open(mailto, '_blank');
+    }} className="ml-auto flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-brand-50 text-brand-600 hover:bg-brand-100 transition-colors">
+      <Mail className="w-3 h-3" /> Notify
+    </button>
+  );
+}

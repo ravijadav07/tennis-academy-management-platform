@@ -1,0 +1,154 @@
+{
+  "created": 1756800000000,
+  "updated": 1756800000000,
+  "name": "WF-Absence-Notification",
+  "description": "Receives attendance data via webhook. For each student marked Absent today, resolves the guardian email and sends an absence notification via Gmail. Prevents duplicate notifications per student+batch+date.",
+  "tags": [],
+  "pieces": [
+    "@puchoaistudio/tool-webhook",
+    "@puchoaistudio/tool-gmail"
+  ],
+  "template": {
+    "displayName": "WF-Absence Notification",
+    "trigger": {
+      "name": "trigger",
+      "type": "TOOL_TRIGGER",
+      "displayName": "Catch Absence Webhook",
+      "valid": true,
+      "settings": {
+        "pieceName": "@puchoaistudio/tool-webhook",
+        "pieceVersion": "^2.0.4",
+        "triggerName": "catch_webhook",
+        "input": {
+          "authType": "none",
+          "authFields": {}
+        },
+        "propertySettings": {
+          "authType": { "type": "MANUAL" },
+          "authFields": { "type": "MANUAL", "schema": {} },
+          "liveMarkdown": { "type": "MANUAL" },
+          "syncMarkdown": { "type": "MANUAL" },
+          "testMarkdown": { "type": "MANUAL" }
+        },
+        "sampleData": {}
+      },
+      "nextAction": {
+        "name": "step_1",
+        "type": "CODE",
+        "displayName": "Filter Absent Students & Compose Emails",
+        "valid": true,
+        "skip": false,
+        "settings": {
+          "input": {
+            "payload": "{{trigger['body']}}"
+          },
+          "sourceCode": {
+            "code": "export const code = async (inputs) => {\n  const payload = typeof inputs.payload === 'string' ? JSON.parse(inputs.payload) : (inputs.payload || {});\n  const attendance = payload.attendance || [];\n  const students = payload.students || [];\n  const batches = payload.batches || [];\n  const date = payload.date || new Date().toISOString().split('T')[0];\n  const alreadyNotified = payload.alreadyNotified || [];\n\n  const studentMap = {};\n  students.forEach(s => { studentMap[s.id] = s; });\n  const batchMap = {};\n  batches.forEach(b => { batchMap[b.id] = b; });\n\n  const emails = [];\n  const skipped = [];\n\n  attendance.forEach(a => {\n    if (a.status !== 'ABSENT') return;\n    const student = studentMap[a.studentId];\n    if (!student || !student.guardianEmail) {\n      skipped.push({ studentId: a.studentId, reason: 'missing_email' });\n      return;\n    }\n    const notificationKey = a.studentId + '|' + a.batchId + '|' + date;\n    if (alreadyNotified.includes(notificationKey)) {\n      skipped.push({ studentId: a.studentId, reason: 'already_notified' });\n      return;\n    }\n    const batch = batchMap[a.batchId] || {};\n    emails.push({\n      studentId: a.studentId,\n      studentName: student.name || 'Student',\n      guardianEmail: student.guardianEmail,\n      batchName: (batch.program || '') + ' ' + (batch.dayPattern || ''),\n      batchDate: date,\n      batchTime: (batch.startTime || '') + ' - ' + (batch.endTime || ''),\n      subject: `Attendance Notification — ${student.name}`,\n      body: `Dear Parent/Guardian,\n\nThis is to inform you that ${student.name} was marked absent for their scheduled tennis session.\n\nBatch: ${batch.program || ''} ${batch.dayPattern || ''}\nDate: ${date}\nTime: ${batch.startTime || ''} — ${batch.endTime || ''}\n\nRegards,\nTennis Academy Management`\n    });\n  });\n\n  return { emails, skipped, totalAbsent: attendance.filter(a => a.status === 'ABSENT').length, emailsToSend: emails.length, skippedCount: skipped.length };\n};",
+            "packageJson": "{}"
+          },
+          "propertySettings": {
+            "payload": { "type": "MANUAL" }
+          },
+          "sampleData": {},
+          "errorHandlingOptions": {
+            "retryOnFailure": { "value": false },
+            "continueOnFailure": { "value": false }
+          }
+        },
+        "nextAction": {
+          "name": "step_2",
+          "type": "PIECE",
+          "displayName": "Send Absence Notification Emails",
+          "valid": true,
+          "skip": false,
+          "settings": {
+            "input": {
+              "auth": "",
+              "to": "{% set recipients = [] %}{% for e in step_1['emails'] %}{% set _ = recipients.push(e.guardianEmail) %}{% endfor %}{{ recipients | join(',') }}",
+              "subject": "Attendance Notification — {{step_1['emails'][0]['studentName'] || 'Students'}}",
+              "body": "{% if step_1['emails'][0] %}{{step_1['emails'][0]['body']}}{% else %}No absent students to notify.{% endif %}",
+              "body_type": "text",
+              "cc": [],
+              "bcc": [],
+              "reply_to": [],
+              "sender_name": "Tennis Academy Management",
+              "draft": false
+            },
+            "pieceName": "@puchoaistudio/tool-gmail",
+            "actionName": "send_email",
+            "pieceVersion": "^2.0.4",
+            "propertySettings": {
+              "auth": { "type": "MANUAL" },
+              "to": { "type": "MANUAL" },
+              "subject": { "type": "MANUAL" },
+              "body": { "type": "MANUAL" },
+              "body_type": { "type": "MANUAL" },
+              "cc": { "type": "MANUAL" },
+              "bcc": { "type": "MANUAL" },
+              "reply_to": { "type": "MANUAL" },
+              "sender_name": { "type": "MANUAL" },
+              "draft": { "type": "MANUAL" },
+              "attachment": { "type": "MANUAL" },
+              "attachment_name": { "type": "MANUAL" },
+              "from": { "type": "MANUAL" }
+            },
+            "sampleData": {},
+            "errorHandlingOptions": {
+              "retryOnFailure": { "value": false },
+              "continueOnFailure": { "value": true }
+            }
+          },
+          "nextAction": {
+            "name": "step_3",
+            "type": "PIECE",
+            "displayName": "Return Response",
+            "valid": true,
+            "skip": false,
+            "settings": {
+              "input": {
+                "fields": {
+                  "body": {
+                    "success": true,
+                    "emailsSent": "{{step_1['emailsToSend']}}",
+                    "skipped": "{{step_1['skippedCount']}}",
+                    "totalAbsent": "{{step_1['totalAbsent']}}",
+                    "message": "Absence notifications processed"
+                  },
+                  "status": 200,
+                  "headers": {}
+                },
+                "respond": "stop",
+                "responseType": "json"
+              },
+              "pieceName": "@puchoaistudio/tool-webhook",
+              "actionName": "return_response",
+              "pieceVersion": "^2.0.4",
+              "propertySettings": {
+                "fields": {
+                  "type": "MANUAL",
+                  "schema": {
+                    "body": { "type": "JSON", "required": true, "displayName": "JSON Body" },
+                    "status": { "type": "NUMBER", "required": false, "displayName": "Status", "defaultValue": 200 },
+                    "headers": { "type": "OBJECT", "required": false, "displayName": "Headers" }
+                  }
+                },
+                "respond": { "type": "MANUAL" },
+                "responseType": { "type": "MANUAL" }
+              },
+              "sampleData": {},
+              "errorHandlingOptions": {
+                "retryOnFailure": { "value": false },
+                "continueOnFailure": { "value": false }
+              }
+            }
+          }
+        }
+      }
+    },
+    "valid": true,
+    "agentIds": [],
+    "connectionIds": [],
+    "schemaVersion": "7"
+  },
+  "blogUrl": ""
+}

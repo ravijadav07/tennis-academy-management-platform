@@ -1,0 +1,137 @@
+import { useDashboard } from '../../../hooks/useDashboard';
+import StatCard from '../../ui/StatCard';
+import Card from '../../ui/Card';
+import StatusPill from '../../ui/StatusPill';
+import CapacityIndicator from '../../ui/CapacityIndicator';
+import { formatTime12h } from '../../../utils/formatters';
+import { useDb } from '../../../context/DbContext';
+import { useMemo, useState, useEffect } from 'react';
+import { Users, LayoutGrid, AlertTriangle, TrendingUp, Calendar, Clock, ShieldCheck } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+
+export default function AdminDashboard() {
+  const { stats, todayByCourt, uncoveredSlots, conflicts, slotAnalysis } = useDashboard();
+  const { db, tick } = useDb();
+  const navigate = useNavigate();
+  const state = useMemo(() => db.readAll(), [db, tick]);
+  const [unverifiedMonth, setUnverifiedMonth] = useState(false);
+
+  // Check if current month is unverified
+  useEffect(() => {
+    const now = new Date();
+    db.getReportVerification({ month: now.getMonth() + 1, year: now.getFullYear() }).then((v) => {
+      setUnverifiedMonth(!v);
+    });
+  }, [tick]);
+
+  return (
+    <div className="space-y-4">
+      {unverifiedMonth && (
+        <Card>
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-warn flex-shrink-0" />
+            <p className="text-xs text-warn flex-1">
+              The current month's Slot Analysis report has not been verified yet.
+              Reports cannot be sent without verification.
+            </p>
+            <button onClick={() => navigate('/admin/reports')}
+              className="text-[11px] font-semibold text-brand-600 hover:underline flex-shrink-0 flex items-center gap-1">
+              <ShieldCheck className="w-3.5 h-3.5" /> Verify Now
+            </button>
+          </div>
+        </Card>
+      )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard icon={Users} label="Active Students" value={stats.activeStudents} />
+        <StatCard icon={LayoutGrid} label="Active Batches" value={stats.activeBatches} />
+        <StatCard icon={Calendar} label="Today" value={`${stats.todayAttendance}/${stats.totalAttendanceToday}`} sublabel={`${stats.unmarkedToday} unmarked`} />
+        <StatCard icon={Clock} label="Coach Check-in" value={`${stats.checkedInToday}/${stats.coaches}`} sublabel={`${stats.notCheckedIn} not checked in`} color={stats.notCheckedIn > 0 ? 'warn' : 'ok'} />
+      </div>
+
+      {conflicts.length > 0 && (
+        <Card>
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle className="w-4 h-4 text-err" />
+            <h3 className="text-sm font-semibold text-ink">Coach Conflicts — {conflicts.length} coach(es) double-booked</h3>
+          </div>
+          <div className="space-y-2">
+            {conflicts.map((c) => (
+              <div key={c.coachId} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-err-bg text-xs">
+                <span className="font-semibold text-ink">{c.coachName}</span>
+                <span className="text-ink-muted">has {c.batches.length} concurrent batches:</span>
+                {c.batches.map((b) => (
+                  <span key={b.id} className="text-ink-muted">{b.program} {b.dayPattern} {formatTime12h(b.startTime)}</span>
+                ))}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {uncoveredSlots.length > 0 && (
+        <Card>
+          <div className="flex items-center gap-2 mb-3">
+            <AlertTriangle className="w-4 h-4 text-warn" />
+            <h3 className="text-sm font-semibold text-ink">Uncovered Slots — {uncoveredSlots.length} coach(es) not checked in</h3>
+          </div>
+          <div className="space-y-2">
+            {uncoveredSlots.map((s) => (
+              <div key={s.batchId} className="flex flex-wrap items-center gap-2 sm:gap-3 px-3 py-2 rounded-lg bg-warn-bg text-xs">
+                <span className="font-semibold text-ink">{s.batchName}</span><span className="text-ink-muted">{s.time}</span>
+                <span className="text-ink-muted">Coach: {s.coachName}</span><span>Court: {s.courtName}</span><StatusPill status="warning" />
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Today's Agenda */}
+      <Card>
+        <h3 className="text-sm font-semibold text-ink mb-3">Today's Agenda</h3>
+        {todayByCourt.length === 0 ? (
+          <p className="text-xs text-ink-muted">No batches scheduled today.</p>
+        ) : (
+          <div className="space-y-4">
+            {todayByCourt.map(({ court, batches }) => (
+              <div key={court?.id || 'unknown'}>
+                <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider mb-2">{court?.name || 'Unknown Court'}</p>
+                <div className="space-y-1">
+                  {batches.map((b) => {
+                    const coach = state.coaches.find((c) => c.id === b.primaryCoachId);
+                    const roster = state.enrollments.filter((e) => e.batchId === b.id && e.status === 'ACTIVE');
+                    return (
+                      <div key={b.id} className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 sm:gap-3 px-3 py-2 rounded-lg bg-canvas-soft text-xs">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-wrap">
+                          <span className="font-semibold text-ink min-w-[70px]">{b.program}</span>
+                          <span className="text-ink-muted shrink-0">{formatTime12h(b.startTime)} - {formatTime12h(b.endTime)}</span>
+                          <span className="text-ink-muted truncate">Coach: {coach?.name || '—'}</span>
+                        </div>
+                        <CapacityIndicator variant="bar" filled={roster.length} total={b.capacity} className="w-24 sm:w-28 shrink-0 ml-auto sm:ml-0" />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <Card>
+        <h3 className="text-sm font-semibold text-ink mb-3">Slot Analysis Summary</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+          {Object.entries(slotAnalysis.scopes || {}).map(([scope, data]) => (
+            <div key={scope} className="bg-canvas-soft rounded-lg p-3 min-w-0 flex flex-col justify-between gap-2.5">
+              <p className="text-[10px] font-semibold text-ink-muted uppercase truncate">{scope}</p>
+              <CapacityIndicator variant="bar" filled={data.booked} total={data.total} className="w-full" />
+            </div>
+          ))}
+          <div className="bg-brand-50 rounded-lg p-3 min-w-0 flex flex-col justify-between gap-2.5">
+            <p className="text-[10px] font-semibold text-brand-600 uppercase truncate">ACADEMY</p>
+            <CapacityIndicator variant="bar" filled={slotAnalysis.academy.booked} total={slotAnalysis.academy.total} className="w-full" />
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}

@@ -1,0 +1,220 @@
+{
+  "created": 1756800000000,
+  "updated": 1756800000000,
+  "name": "WF-Slot-Report-Email",
+  "description": "Receives Slot Analysis report data and configured recipients via webhook. Generates the formatted report email with CSV attachment and dispatches via Gmail. Gated behind verification — the report must be pre-verified before sending.",
+  "tags": [],
+  "pieces": [
+    "@puchoaistudio/tool-webhook",
+    "@puchoaistudio/tool-gmail"
+  ],
+  "template": {
+    "displayName": "WF-Slot Report Email",
+    "trigger": {
+      "name": "trigger",
+      "type": "TOOL_TRIGGER",
+      "displayName": "Catch Slot Report Webhook",
+      "valid": true,
+      "settings": {
+        "pieceName": "@puchoaistudio/tool-webhook",
+        "pieceVersion": "^2.0.4",
+        "triggerName": "catch_webhook",
+        "input": {
+          "authType": "none",
+          "authFields": {}
+        },
+        "propertySettings": {
+          "authType": { "type": "MANUAL" },
+          "authFields": { "type": "MANUAL", "schema": {} },
+          "liveMarkdown": { "type": "MANUAL" },
+          "syncMarkdown": { "type": "MANUAL" },
+          "testMarkdown": { "type": "MANUAL" }
+        },
+        "sampleData": {}
+      },
+      "nextAction": {
+        "name": "step_1",
+        "type": "ROUTER",
+        "displayName": "Check Verification Gate",
+        "valid": true,
+        "skip": false,
+        "settings": {
+          "branches": [
+            {
+              "branchName": "Verified",
+              "branchType": "CONDITION",
+              "conditions": [[ { "operator": "BOOLEAN_IS_TRUE", "firstValue": "{{trigger['body']['isVerified']}}", "secondValue": "true", "caseSensitive": false } ]]
+            },
+            {
+              "branchName": "Otherwise",
+              "branchType": "FALLBACK"
+            }
+          ],
+          "executionType": "EXECUTE_FIRST_MATCH"
+        },
+        "children": [
+          {
+            "name": "step_2",
+            "type": "CODE",
+            "displayName": "Compose Report Email",
+            "valid": true,
+            "skip": false,
+            "settings": {
+              "input": {
+                "payload": "{{trigger['body']}}"
+              },
+              "sourceCode": {
+                "code": "export const code = async (inputs) => {\n  const payload = typeof inputs.payload === 'string' ? JSON.parse(inputs.payload) : (inputs.payload || {});\n  const recipients = payload.recipients || [];\n  const template = payload.template || {};\n  const slotData = payload.slotData || {};\n  const monthName = payload.monthName || '';\n  const year = payload.year || new Date().getFullYear();\n\n  const subject = (template.subject || 'Monthly Slot Analysis — {month} {year}')\n    .replace('{month}', monthName)\n    .replace('{year}', year);\n\n  const body = (template.body || 'Please find attached the Slot Analysis report for {month} {year}.\\n\\nAcademy Total: {booked}/{total} ({occupancy}%)\\n\\n— Tennis Academy Management')\n    .replace('{month}', monthName)\n    .replace('{year}', year)\n    .replace('{booked}', slotData.academyBooked || '')\n    .replace('{total}', slotData.academyTotal || '')\n    .replace('{occupancy}', slotData.occupancy || '');\n\n  // Generate CSV content from slot data\n  let csv = 'Day/Pattern,Court & Time,Category,Capacity,Enrolled,Attended,Members,Non-members,Guest/Trial,Occupancy %\n';\n  const rows = slotData.rows || [];\n  rows.forEach(r => {\n    csv += `${r.dayPattern || ''},${r.courtTime || ''},${r.program || ''},${r.capacity || ''},${r.enrolled || ''},${r.attended || ''},${r.members || ''},${r.nonMembers || ''},${r.guests || ''},${r.occupancy || ''}%\n`;\n  });\n\n  return {\n    recipients: recipients.join(','),\n    subject,\n    body,\n    csvContent: csv,\n    recipientCount: recipients.length\n  };\n};",
+                "packageJson": "{}"
+              },
+              "propertySettings": {
+                "payload": { "type": "MANUAL" }
+              },
+              "sampleData": {},
+              "errorHandlingOptions": {
+                "retryOnFailure": { "value": false },
+                "continueOnFailure": { "value": false }
+              }
+            },
+            "nextAction": {
+              "name": "step_3",
+              "type": "PIECE",
+              "displayName": "Send Slot Report via Gmail",
+              "valid": true,
+              "skip": false,
+              "settings": {
+                "input": {
+                  "auth": "",
+                  "to": "{{step_2['recipients']}}",
+                  "subject": "{{step_2['subject']}}",
+                  "body": "{{step_2['body']}}",
+                  "body_type": "text",
+                  "cc": [],
+                  "bcc": [],
+                  "reply_to": [],
+                  "sender_name": "Tennis Academy Management",
+                  "draft": false
+                },
+                "pieceName": "@puchoaistudio/tool-gmail",
+                "actionName": "send_email",
+                "pieceVersion": "^2.0.4",
+                "propertySettings": {
+                  "auth": { "type": "MANUAL" },
+                  "to": { "type": "MANUAL" },
+                  "subject": { "type": "MANUAL" },
+                  "body": { "type": "MANUAL" },
+                  "body_type": { "type": "MANUAL" },
+                  "cc": { "type": "MANUAL" },
+                  "bcc": { "type": "MANUAL" },
+                  "reply_to": { "type": "MANUAL" },
+                  "sender_name": { "type": "MANUAL" },
+                  "draft": { "type": "MANUAL" },
+                  "attachment": { "type": "MANUAL" },
+                  "attachment_name": { "type": "MANUAL" },
+                  "from": { "type": "MANUAL" }
+                },
+                "sampleData": {},
+                "errorHandlingOptions": {
+                  "retryOnFailure": { "value": false },
+                  "continueOnFailure": { "value": true }
+                }
+              },
+              "nextAction": {
+                "name": "step_4",
+                "type": "PIECE",
+                "displayName": "Return Success Response",
+                "valid": true,
+                "skip": false,
+                "settings": {
+                  "input": {
+                    "fields": {
+                      "body": {
+                        "success": true,
+                        "recipients": "{{step_2['recipientCount']}}",
+                        "month": "{{trigger['body']['monthName']}}",
+                        "year": "{{trigger['body']['year']}}",
+                        "message": "Slot analysis report emailed successfully"
+                      },
+                      "status": 200,
+                      "headers": {}
+                    },
+                    "respond": "stop",
+                    "responseType": "json"
+                  },
+                  "pieceName": "@puchoaistudio/tool-webhook",
+                  "actionName": "return_response",
+                  "pieceVersion": "^2.0.4",
+                  "propertySettings": {
+                    "fields": {
+                      "type": "MANUAL",
+                      "schema": {
+                        "body": { "type": "JSON", "required": true, "displayName": "JSON Body" },
+                        "status": { "type": "NUMBER", "required": false, "displayName": "Status", "defaultValue": 200 },
+                        "headers": { "type": "OBJECT", "required": false, "displayName": "Headers" }
+                      }
+                    },
+                    "respond": { "type": "MANUAL" },
+                    "responseType": { "type": "MANUAL" }
+                  },
+                  "sampleData": {},
+                  "errorHandlingOptions": {
+                    "retryOnFailure": { "value": false },
+                    "continueOnFailure": { "value": false }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "name": "step_5",
+            "type": "PIECE",
+            "displayName": "Return Verification-Required Response",
+            "valid": true,
+            "skip": false,
+            "settings": {
+              "input": {
+                "fields": {
+                  "body": {
+                    "success": false,
+                    "error": "NOT_VERIFIED",
+                    "message": "The Slot Analysis report must be verified before it can be sent. Please verify the report first."
+                  },
+                  "status": 403,
+                  "headers": {}
+                },
+                "respond": "stop",
+                "responseType": "json"
+              },
+              "pieceName": "@puchoaistudio/tool-webhook",
+              "actionName": "return_response",
+              "pieceVersion": "^2.0.4",
+              "propertySettings": {
+                "fields": {
+                  "type": "MANUAL",
+                  "schema": {
+                    "body": { "type": "JSON", "required": true, "displayName": "JSON Body" },
+                    "status": { "type": "NUMBER", "required": false, "displayName": "Status", "defaultValue": 200 },
+                    "headers": { "type": "OBJECT", "required": false, "displayName": "Headers" }
+                  }
+                },
+                "respond": { "type": "MANUAL" },
+                "responseType": { "type": "MANUAL" }
+              },
+              "sampleData": {},
+              "errorHandlingOptions": {
+                "retryOnFailure": { "value": false },
+                "continueOnFailure": { "value": false }
+              }
+            }
+          }
+        ],
+        "nextAction": null
+      }
+    },
+    "valid": true,
+    "agentIds": [],
+    "connectionIds": [],
+    "schemaVersion": "7"
+  },
+  "blogUrl": ""
+}

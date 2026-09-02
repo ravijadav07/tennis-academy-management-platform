@@ -75,86 +75,6 @@ export const db = {
   async exportJson() { return JSON.stringify(readAll(), null, 2); },
   async importJson(json) { writeAll(JSON.parse(json)); notify(); },
 
-  // Direct state read (no async delay — hooks read sync from hydrated memory)
-  readAll,
-
-  readSessionSync() {
-    try {
-      const raw = localStorage.getItem(KEY);
-      if (raw) {
-        const state = JSON.parse(raw);
-        if (state.session && state.session.userId) return state.session;
-      }
-    } catch {}
-    return null;
-  },
-
-  setSessionSync(user) {
-    try {
-      const raw = localStorage.getItem(KEY);
-      if (raw) {
-        const state = JSON.parse(raw);
-        state.session = user ? {
-          userId: user.userId,
-          name: user.name,
-          role: user.role,
-          linkedCoachId: user.linkedCoachId || null,
-          isParent: user.isParent || false,
-          guardianPhone: user.guardianPhone || null,
-          childrenIds: user.childrenIds || []
-        } : null;
-        localStorage.setItem(KEY, JSON.stringify(state));
-      }
-    } catch {}
-  },
-
-  clearSessionSync() {
-    try {
-      const raw = localStorage.getItem(KEY);
-      if (raw) {
-        const state = JSON.parse(raw);
-        state.session = null;
-        localStorage.setItem(KEY, JSON.stringify(state));
-      }
-    } catch {}
-  },
-
-  getAuditLog() {
-    try {
-      const state = readAll();
-      return (state.auditLog || []).slice(0, 500);
-    } catch {
-      return [];
-    }
-  },
-
-  getStorageUsage() {
-    try {
-      const raw = localStorage.getItem(KEY) || '';
-      const usedKB = Math.round(new Blob([raw]).size / 1024);
-      const pctUsed = Math.round((usedKB / 5120) * 100);
-      return { usedKB, pctUsed };
-    } catch {
-      return { usedKB: 0, pctUsed: 0 };
-    }
-  },
-
-  async recordPayment({ packageId, studentId, amount, paymentStatus = 'PAID', mode = 'DIRECT', reference = '' }) {
-    await sleep(LATENCY);
-    return mutate((s) => {
-      const pkg = s.packages.find((p) => (packageId ? p.id === packageId : p.studentId === studentId));
-      if (!pkg) throw new Error('PACKAGE_NOT_FOUND');
-      const before = clone(pkg);
-      pkg.paymentStatus = paymentStatus;
-      if (amount) pkg.amount = amount;
-      pkg.paidAt = new Date().toISOString();
-      pkg.paymentMode = mode;
-      pkg.paymentRef = reference;
-      audit(s, 'RECORD_PAYMENT', 'package', pkg.id, before, pkg);
-      return pkg;
-    });
-  },
-
   // --- reference data, one call, everything the shell needs to boot
   async getBootstrap() {
     await sleep(LATENCY);
@@ -189,15 +109,6 @@ export const db = {
     };
   },
 
-  // Duplicate check by name+phone before creating
-  async checkDuplicateStudent({ name, guardianPhone }) {
-    await sleep(LATENCY / 2);
-    const s = readAll();
-    return s.students.find((x) =>
-      x.name.toLowerCase() === (name || '').toLowerCase() &&
-      x.guardianPhone === guardianPhone) || null;
-  },
-
   async upsertStudent(student) {
     await sleep(LATENCY);
     return mutate((s) => {
@@ -207,48 +118,6 @@ export const db = {
       if (i >= 0) s.students[i] = row; else s.students.push(row);
       audit(s, before ? 'UPDATE' : 'CREATE', 'student', row.id, before, row);
       return row;
-    });
-  },
-
-  // Archive (never hard-delete) — sets status: 'INACTIVE', requires reason
-  async archiveStudent({ studentId, reason, userId }) {
-    await sleep(LATENCY);
-    if (!reason?.trim()) throw new Error('REASON_REQUIRED');
-    return mutate((s) => {
-      const student = s.students.find((x) => x.id === studentId);
-      if (!student) throw new Error('STUDENT_NOT_FOUND');
-      const before = clone(student);
-      student.status = 'INACTIVE';
-      student.archivedReason = reason;
-      student.archivedBy = userId || 'user_admin';
-      student.archivedAt = new Date().toISOString();
-      audit(s, 'ARCHIVE', 'student', studentId, before, student);
-      return student;
-    });
-  },
-
-  // Quick trial-student entry — minimal fields only, no full enrollment
-  async createTrialStudent({ name, guardianPhone, batchId, date, createdBy }) {
-    await sleep(LATENCY);
-    return mutate((s) => {
-      const student = {
-        id: uid('st'), name, guardianPhone, guardianName: name + "'s Guardian",
-        status: 'TRIAL', isGuest: true, enrolledFrom: date, enrolledTo: null,
-        createdBy: createdBy || 'user_admin', createdAt: new Date().toISOString(),
-      };
-      s.students.push(student);
-      audit(s, 'CREATE_TRIAL', 'student', student.id, null, student);
-      // Auto-mark attendance for the trial session if batchId provided
-      if (batchId && date) {
-        const attRow = {
-          id: uid('at'), date, batchId, studentId: student.id,
-          status: 'PRESENT', markedBy: createdBy || 'user_admin',
-          markedByRole: 'ADMIN', markedAt: new Date().toISOString(), source: 'ADMIN',
-          isMakeup: false, overrideReason: null,
-        };
-        s.attendance.push(attRow);
-      }
-      return { student, attendance: batchId ? { batchId, date, status: 'PRESENT' } : null };
     });
   },
 
@@ -283,32 +152,15 @@ export const db = {
     return mutate((s) => {
       const conflict = s.batches.find((b) =>
         b.id !== batch.id && b.courtId === batch.courtId && b.dayPattern === batch.dayPattern &&
-        b.status === 'ACTIVE' && batch.status !== 'INACTIVE' &&
         !b.isSemiBatch && !batch.isSemiBatch &&
         batch.startTime < b.endTime && b.startTime < batch.endTime);
-      if (conflict) throw Object.assign(new Error('COURT_CONFLICT'), { conflictWith: conflict.name || conflict.program });
+      if (conflict) throw Object.assign(new Error('COURT_CONFLICT'), { conflictWith: conflict.name });
       const i = s.batches.findIndex((b) => b.id === batch.id);
       const before = i >= 0 ? s.batches[i] : null;
       const row = { ...batch, id: batch.id || uid('b') };
       if (i >= 0) s.batches[i] = row; else s.batches.push(row);
       audit(s, before ? 'UPDATE' : 'CREATE', 'batch', row.id, before, row);
       return row;
-    });
-  },
-
-  async archiveBatch({ batchId, reason, userId }) {
-    await sleep(LATENCY);
-    if (!reason?.trim()) throw new Error('REASON_REQUIRED');
-    return mutate((s) => {
-      const batch = s.batches.find((b) => b.id === batchId);
-      if (!batch) throw new Error('BATCH_NOT_FOUND');
-      const before = clone(batch);
-      batch.status = 'INACTIVE';
-      batch.archivedReason = reason;
-      batch.archivedBy = userId || 'user_admin';
-      batch.archivedAt = new Date().toISOString();
-      audit(s, 'ARCHIVE', 'batch', batchId, before, batch);
-      return batch;
     });
   },
 
@@ -383,17 +235,9 @@ export const db = {
   },
 
   // Idempotent on (date, batchId, studentId) — calling twice never duplicates.
-  // Attendance lock: Coach can amend up to 2 days back, Admin up to 30 days.
-  // Past the lock window, a mandatory overrideReason is required.
   async markAttendance({ batchId, date, entries, markedBy, markedByRole, source = 'ADMIN' }) {
     await sleep(LATENCY);
     const { getEligibility } = await import('./rules');
-    const today = new Date();
-    const targetDate = new Date(date + 'T00:00:00+05:30'); // Asia/Kolkata
-    const diffDays = Math.floor((today - targetDate) / (1000 * 60 * 60 * 24));
-    const isCoach = (markedByRole || '').toLowerCase() === 'coach';
-    const lockDays = isCoach ? 2 : 30;
-
     return mutate((s) => {
       const written = [];
       for (const entry of entries) {
@@ -402,13 +246,6 @@ export const db = {
         const elig = getEligibility(pkg, date);
         if (!elig.markable && !entry.overrideReason) {
           throw Object.assign(new Error('NOT_MARKABLE'), { studentId: entry.studentId, reason: elig.reason });
-        }
-        // Attendance lock: past-date entries beyond lock window require overrideReason
-        if (diffDays > lockDays && !entry.overrideReason) {
-          throw Object.assign(new Error('PAST_DATE_LOCKED'), {
-            studentId: entry.studentId, diffDays, lockDays,
-            reason: `Attendance locked for ${isCoach ? 'coach' : 'admin'} past ${lockDays} days. Provide overrideReason to back-date.`,
-          });
         }
         const i = s.attendance.findIndex(
           (a) => a.batchId === batchId && a.date === date && a.studentId === entry.studentId);
@@ -562,23 +399,6 @@ export const db = {
         done.push(p);
       }
       audit(s, 'VERIFY_PRIVATE', 'privateSession', null, null, { count: done.length });
-      return done;
-    });
-  },
-
-  async unverifyPrivateSessions({ sessionIds }) {
-    await sleep(LATENCY);
-    return mutate((s) => {
-      const done = [];
-      for (const id of sessionIds) {
-        const p = s.privateSessions.find((x) => x.id === id);
-        if (!p) continue;
-        p.status = 'PENDING_VERIFICATION';
-        p.verifiedBy = null;
-        p.verifiedAt = null;
-        done.push(p);
-      }
-      audit(s, 'UNVERIFY_PRIVATE', 'privateSession', null, null, { count: done.length });
       return done;
     });
   },

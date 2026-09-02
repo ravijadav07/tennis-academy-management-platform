@@ -1,0 +1,339 @@
+{
+  "created": "1754800000002",
+  "updated": "1754800000002",
+  "name": "WF-J Club Excel Reconciliation",
+  "description": "PENDING CLIENT DECISION (MoM Aug 2026): Club payments are processed directly by the club, not the academy. Current Excel-reconciliation logic is a WORKING ASSUMPTION only. Do not finalize WF-J until client answers: 'How will the system handle payment tracking and billing for The Club?'. This workflow receives pre-parsed excel rows via webhook, matches against system students, creates reconciliation entries, and returns summary.",
+  "tags": [],
+  "pieces": [
+    "@puchoaistudio/tool-webhook",
+    "@puchoaistudio/tool-supabase"
+  ],
+  "template": {
+    "displayName": "WF-J Club Excel Reconciliation",
+    "trigger": {
+      "name": "trigger",
+      "type": "TOOL_TRIGGER",
+      "displayName": "Catch Reconciliation Webhook",
+      "valid": true,
+      "settings": {
+        "pieceName": "@puchoaistudio/tool-webhook",
+        "pieceVersion": "^2.0.4",
+        "triggerName": "catch_webhook",
+        "input": {
+          "authType": "none",
+          "authFields": {}
+        },
+        "propertySettings": {
+          "authType": {
+            "type": "MANUAL"
+          },
+          "authFields": {
+            "type": "MANUAL",
+            "schema": {}
+          },
+          "liveMarkdown": {
+            "type": "MANUAL"
+          },
+          "syncMarkdown": {
+            "type": "MANUAL"
+          },
+          "testMarkdown": {
+            "type": "MANUAL"
+          }
+        },
+        "sampleData": {}
+      },
+      "nextAction": {
+        "name": "step_1",
+        "type": "CODE",
+        "valid": true,
+        "skip": false,
+        "settings": {
+          "input": {
+            "payload": "{{trigger['body']}}"
+          },
+          "sourceCode": {
+            "code": "export const code = async (inputs) => {\n  const p = typeof inputs.payload === 'string' ? JSON.parse(inputs.payload) : inputs.payload;\n  const rows = Array.isArray(p.rows) ? p.rows : (Array.isArray(p) ? p : []);\n  const entity = (p.entity || 'the-club').trim();\n  const normalized = rows.map(r => ({\n    student_name: (r.student_name || r.name || '').trim(),\n    excel_amount: parseFloat(r.amount || r.excel_amount || '0'),\n    gateway: (r.gateway || 'excel_reported').trim(),\n    date: (r.date || r.payment_date || '').trim(),\n    note: (r.note || r.remarks || '').trim()\n  }));\n  return { rows: normalized, entity: entity, row_count: normalized.length };\n};",
+            "packageJson": "{}"
+          },
+          "propertySettings": {
+            "payload": {
+              "type": "MANUAL"
+            }
+          },
+          "sampleData": {},
+          "errorHandlingOptions": {
+            "retryOnFailure": {
+              "value": false
+            },
+            "continueOnFailure": {
+              "value": false
+            }
+          }
+        },
+        "nextAction": {
+          "name": "step_2",
+          "type": "PIECE",
+          "valid": true,
+          "skip": false,
+          "settings": {
+            "input": {
+              "auth": "",
+              "table_name": "students",
+              "page": 1,
+              "pageSize": 20,
+              "filters": []
+            },
+            "pieceName": "@puchoaistudio/tool-supabase",
+            "actionName": "search_rows",
+            "pieceVersion": "^2.0.1",
+            "propertySettings": {
+              "auth": {
+                "type": "MANUAL"
+              },
+              "page": {
+                "type": "MANUAL"
+              },
+              "columns": {
+                "type": "MANUAL"
+              },
+              "filters": {
+                "type": "MANUAL"
+              },
+              "pageSize": {
+                "type": "MANUAL"
+              },
+              "table_name": {
+                "type": "MANUAL"
+              },
+              "countOption": {
+                "type": "MANUAL"
+              }
+            },
+            "sampleData": {},
+            "errorHandlingOptions": {
+              "retryOnFailure": {
+                "value": true
+              },
+              "continueOnFailure": {
+                "value": false
+              }
+            }
+          },
+          "nextAction": {
+            "name": "step_3",
+            "type": "CODE",
+            "valid": true,
+            "skip": false,
+            "settings": {
+              "input": {
+                "excel_rows": "{{step_1['rows']}}",
+                "students": "{{step_2['data']}}",
+                "entity": "{{step_1['entity']}}"
+              },
+              "sourceCode": {
+                "code": "export const code = async (inputs) => {\n  const excelRows = typeof inputs.excel_rows === 'string' ? JSON.parse(inputs.excel_rows) : (inputs.excel_rows || []);\n  const students = typeof inputs.students === 'string' ? JSON.parse(inputs.students) : (inputs.students || []);\n  const entity = inputs.entity || 'the-club';\n  const studentMap = {};\n  students.forEach(s => { studentMap[s.name.toLowerCase()] = s; });\n  let matchedCount = 0, mismatchCount = 0, newCount = 0;\n  const entries = excelRows.map(r => {\n    const student = studentMap[r.student_name.toLowerCase()];\n    let status = 'new';\n    if (student) { status = 'matched'; matchedCount++; }\n    else { newCount++; }\n    return {\n      student_id: student ? student.id : '',\n      student_name: r.student_name,\n      entity: entity,\n      excel_amount: r.excel_amount,\n      system_amount: 0,\n      gateway: r.gateway,\n      status: status,\n      date: r.date,\n      note: r.note\n    };\n  });\n  return { entries: entries, matched_count: matchedCount, mismatch_count: mismatchCount, new_count: newCount, total_rows: excelRows.length };\n};",
+                "packageJson": "{}"
+              },
+              "propertySettings": {
+                "excel_rows": {
+                  "type": "MANUAL"
+                },
+                "students": {
+                  "type": "MANUAL"
+                },
+                "entity": {
+                  "type": "MANUAL"
+                }
+              },
+              "sampleData": {},
+              "errorHandlingOptions": {
+                "retryOnFailure": {
+                  "value": false
+                },
+                "continueOnFailure": {
+                  "value": false
+                }
+              }
+            },
+            "nextAction": {
+              "name": "step_4",
+              "type": "PIECE",
+              "valid": true,
+              "skip": false,
+              "settings": {
+                "input": {
+                  "auth": "",
+                  "table_name": "reconciliation",
+                  "row_data": {
+                    "student_id": "{{step_3['entries'][0]['student_id']}}",
+                    "entity": "{{step_3['entries'][0]['entity']}}",
+                    "excel_amount": "{{step_3['entries'][0]['excel_amount']}}",
+                    "system_amount": "{{step_3['entries'][0]['system_amount']}}",
+                    "gateway": "{{step_3['entries'][0]['gateway']}}",
+                    "status": "{{step_3['entries'][0]['status']}}",
+                    "date": "{{step_3['entries'][0]['date']}}",
+                    "note": "{{step_3['entries'][0]['note']}}"
+                  },
+                  "return_row": true
+                },
+                "pieceName": "@puchoaistudio/tool-supabase",
+                "actionName": "create_row",
+                "pieceVersion": "^2.0.1",
+                "propertySettings": {
+                  "auth": {
+                    "type": "MANUAL"
+                  },
+                  "row_data": {
+                    "type": "MANUAL",
+                    "schema": {
+                      "student_id": {
+                        "type": "SHORT_TEXT",
+                        "required": false,
+                        "displayName": "student_id",
+                        "defaultValue": ""
+                      },
+                      "entity": {
+                        "type": "SHORT_TEXT",
+                        "required": false,
+                        "displayName": "entity",
+                        "defaultValue": ""
+                      },
+                      "excel_amount": {
+                        "type": "SHORT_TEXT",
+                        "required": false,
+                        "displayName": "excel_amount",
+                        "defaultValue": ""
+                      },
+                      "system_amount": {
+                        "type": "SHORT_TEXT",
+                        "required": false,
+                        "displayName": "system_amount",
+                        "defaultValue": ""
+                      },
+                      "gateway": {
+                        "type": "SHORT_TEXT",
+                        "required": false,
+                        "displayName": "gateway",
+                        "defaultValue": ""
+                      },
+                      "status": {
+                        "type": "SHORT_TEXT",
+                        "required": false,
+                        "displayName": "status",
+                        "defaultValue": ""
+                      },
+                      "date": {
+                        "type": "SHORT_TEXT",
+                        "required": false,
+                        "displayName": "date",
+                        "defaultValue": ""
+                      },
+                      "note": {
+                        "type": "SHORT_TEXT",
+                        "required": false,
+                        "displayName": "note",
+                        "defaultValue": ""
+                      }
+                    }
+                  },
+                  "return_row": {
+                    "type": "MANUAL"
+                  },
+                  "table_name": {
+                    "type": "MANUAL"
+                  }
+                },
+                "sampleData": {},
+                "errorHandlingOptions": {
+                  "retryOnFailure": {
+                    "value": true
+                  },
+                  "continueOnFailure": {
+                    "value": false
+                  }
+                }
+              },
+              "nextAction": {
+                "name": "step_5",
+                "type": "PIECE",
+                "valid": true,
+                "skip": false,
+                "settings": {
+                  "input": {
+                    "fields": {
+                      "body": {
+                        "success": true,
+                        "entity": "{{step_1['entity']}}",
+                        "total_rows": "{{step_3['total_rows']}}",
+                        "matched_count": "{{step_3['matched_count']}}",
+                        "mismatch_count": "{{step_3['mismatch_count']}}",
+                        "new_count": "{{step_3['new_count']}}",
+                        "message": "Reconciliation entries created successfully"
+                      },
+                      "status": 200,
+                      "headers": {}
+                    },
+                    "respond": "stop",
+                    "responseType": "json"
+                  },
+                  "pieceName": "@puchoaistudio/tool-webhook",
+                  "actionName": "return_response",
+                  "pieceVersion": "^2.0.4",
+                  "propertySettings": {
+                    "fields": {
+                      "type": "MANUAL",
+                      "schema": {
+                        "body": {
+                          "type": "JSON",
+                          "required": true,
+                          "displayName": "JSON Body"
+                        },
+                        "status": {
+                          "type": "NUMBER",
+                          "required": false,
+                          "displayName": "Status",
+                          "defaultValue": 200
+                        },
+                        "headers": {
+                          "type": "OBJECT",
+                          "required": false,
+                          "displayName": "Headers"
+                        }
+                      }
+                    },
+                    "respond": {
+                      "type": "MANUAL"
+                    },
+                    "responseType": {
+                      "type": "MANUAL"
+                    }
+                  },
+                  "sampleData": {},
+                  "errorHandlingOptions": {
+                    "retryOnFailure": {
+                      "value": false
+                    },
+                    "continueOnFailure": {
+                      "value": false
+                    }
+                  }
+                },
+                "displayName": "Return Reconciliation Summary"
+              },
+              "displayName": "Create Reconciliation Entry"
+            },
+            "displayName": "Match & Compute Reconciliation"
+          },
+          "displayName": "Find All Students by Entity"
+        },
+        "displayName": "Parse Excel Rows"
+      }
+    },
+    "valid": true,
+    "agentIds": [],
+    "connectionIds": [],
+    "schemaVersion": "7"
+  },
+  "blogUrl": ""
+}

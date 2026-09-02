@@ -1,0 +1,503 @@
+{
+  "created": 1756800000000,
+  "updated": 1757000000000,
+  "name": "WF-O Payment Reminder Email",
+  "description": "Queries Supabase for packages with pending balance > 0, resolves student+parent email via student_parents lookup, and sends payment reminder via Gmail. Logs in communications_log to prevent duplicates.",
+  "tags": [],
+  "pieces": [
+    "@puchoaistudio/tool-webhook",
+    "@puchoaistudio/tool-supabase",
+    "@puchoaistudio/tool-gmail"
+  ],
+  "template": {
+    "displayName": "WF-O Payment Reminder",
+    "trigger": {
+      "name": "trigger",
+      "type": "TOOL_TRIGGER",
+      "displayName": "Catch Payment Reminder Trigger",
+      "valid": true,
+      "settings": {
+        "pieceName": "@puchoaistudio/tool-webhook",
+        "pieceVersion": "^2.0.4",
+        "triggerName": "catch_webhook",
+        "input": {
+          "authType": "none",
+          "authFields": {}
+        },
+        "propertySettings": {
+          "authType": {
+            "type": "MANUAL"
+          },
+          "authFields": {
+            "type": "MANUAL",
+            "schema": {}
+          },
+          "liveMarkdown": {
+            "type": "MANUAL"
+          },
+          "syncMarkdown": {
+            "type": "MANUAL"
+          },
+          "testMarkdown": {
+            "type": "MANUAL"
+          }
+        },
+        "sampleData": {}
+      },
+      "nextAction": {
+        "name": "step_1",
+        "type": "PIECE",
+        "displayName": "Query Packages with Pending Balance",
+        "valid": true,
+        "skip": false,
+        "settings": {
+          "input": {
+            "auth": "",
+            "table_name": "packages",
+            "page": 1,
+            "pageSize": 500,
+            "filters": [
+              {
+                "column": "paymentStatus",
+                "operator": "neq",
+                "value": "PAID"
+              },
+              {
+                "column": "paymentStatus",
+                "operator": "neq",
+                "value": "COMPLIMENTARY"
+              }
+            ]
+          },
+          "pieceName": "@puchoaistudio/tool-supabase",
+          "actionName": "search_rows",
+          "pieceVersion": "^2.0.0",
+          "propertySettings": {
+            "auth": {
+              "type": "MANUAL"
+            },
+            "page": {
+              "type": "MANUAL"
+            },
+            "columns": {
+              "type": "MANUAL"
+            },
+            "filters": {
+              "type": "MANUAL"
+            },
+            "pageSize": {
+              "type": "MANUAL"
+            },
+            "table_name": {
+              "type": "MANUAL"
+            },
+            "countOption": {
+              "type": "MANUAL"
+            }
+          },
+          "sampleData": {},
+          "errorHandlingOptions": {
+            "retryOnFailure": {
+              "value": true
+            },
+            "continueOnFailure": {
+              "value": false
+            }
+          },
+          "pageSize": 200
+        },
+        "nextAction": {
+          "name": "step_2",
+          "type": "PIECE",
+          "displayName": "Query Students",
+          "valid": true,
+          "skip": false,
+          "settings": {
+            "input": {
+              "auth": "",
+              "table_name": "students",
+              "page": 1,
+              "pageSize": 500,
+              "filters": [
+                {
+                  "column": "status",
+                  "operator": "eq",
+                  "value": "active"
+                }
+              ]
+            },
+            "pieceName": "@puchoaistudio/tool-supabase",
+            "actionName": "search_rows",
+            "pieceVersion": "^2.0.0",
+            "propertySettings": {
+              "auth": {
+                "type": "MANUAL"
+              },
+              "page": {
+                "type": "MANUAL"
+              },
+              "columns": {
+                "type": "MANUAL"
+              },
+              "filters": {
+                "type": "MANUAL"
+              },
+              "pageSize": {
+                "type": "MANUAL"
+              },
+              "table_name": {
+                "type": "MANUAL"
+              },
+              "countOption": {
+                "type": "MANUAL"
+              }
+            },
+            "sampleData": {},
+            "errorHandlingOptions": {
+              "retryOnFailure": {
+                "value": true
+              },
+              "continueOnFailure": {
+                "value": false
+              }
+            }
+          },
+          "nextAction": {
+            "name": "step_3",
+            "type": "PIECE",
+            "displayName": "Query Parent-Student Links",
+            "valid": true,
+            "skip": false,
+            "settings": {
+              "input": {
+                "auth": "",
+                "table_name": "student_parents",
+                "page": 1,
+                "pageSize": 500,
+                "filters": []
+              },
+              "pieceName": "@puchoaistudio/tool-supabase",
+              "actionName": "search_rows",
+              "pieceVersion": "^2.0.0",
+              "propertySettings": {
+                "auth": {
+                  "type": "MANUAL"
+                },
+                "page": {
+                  "type": "MANUAL"
+                },
+                "columns": {
+                  "type": "MANUAL"
+                },
+                "filters": {
+                  "type": "MANUAL"
+                },
+                "pageSize": {
+                  "type": "MANUAL"
+                },
+                "table_name": {
+                  "type": "MANUAL"
+                },
+                "countOption": {
+                  "type": "MANUAL"
+                }
+              },
+              "sampleData": {},
+              "errorHandlingOptions": {
+                "retryOnFailure": {
+                  "value": true
+                },
+                "continueOnFailure": {
+                  "value": false
+                }
+              }
+            },
+            "nextAction": {
+              "name": "step_4",
+              "type": "PIECE",
+              "displayName": "Query Parents",
+              "valid": true,
+              "skip": false,
+              "settings": {
+                "input": {
+                  "auth": "",
+                  "table_name": "parents",
+                  "page": 1,
+                  "pageSize": 500,
+                  "filters": []
+                },
+                "pieceName": "@puchoaistudio/tool-supabase",
+                "actionName": "search_rows",
+                "pieceVersion": "^2.0.0",
+                "propertySettings": {
+                  "auth": {
+                    "type": "MANUAL"
+                  },
+                  "page": {
+                    "type": "MANUAL"
+                  },
+                  "columns": {
+                    "type": "MANUAL"
+                  },
+                  "filters": {
+                    "type": "MANUAL"
+                  },
+                  "pageSize": {
+                    "type": "MANUAL"
+                  },
+                  "table_name": {
+                    "type": "MANUAL"
+                  },
+                  "countOption": {
+                    "type": "MANUAL"
+                  }
+                },
+                "sampleData": {},
+                "errorHandlingOptions": {
+                  "retryOnFailure": {
+                    "value": true
+                  },
+                  "continueOnFailure": {
+                    "value": false
+                  }
+                }
+              },
+              "nextAction": {
+                "name": "step_5",
+                "type": "CODE",
+                "displayName": "Filter Pending Balance > 0 & Resolve Recipients",
+                "valid": true,
+                "skip": false,
+                "settings": {
+                  "input": {
+                    "packages_json": "{{step_1}}",
+                    "students_json": "{{step_2}}",
+                    "sp_json": "{{step_3}}",
+                    "parents_json": "{{step_4}}"
+                  },
+                  "sourceCode": {
+                    "code": "export const code = async (inputs) => {\n  const packages = Array.isArray(inputs.packages_json) ? inputs.packages_json : [];\n  const students = Array.isArray(inputs.students_json) ? inputs.students_json : [];\n  const spLinks = Array.isArray(inputs.sp_json) ? inputs.sp_json : [];\n  const parents = Array.isArray(inputs.parents_json) ? inputs.parents_json : [];\n\n  const studentById = {};\n  students.forEach(s => { studentById[s.id] = s; });\n  const parentById = {};\n  parents.forEach(p => { parentById[p.id] = p; });\n\n  const studentParentMap = {};\n  spLinks.forEach(sp => {\n    if (!studentParentMap[sp.student_id]) studentParentMap[sp.student_id] = [];\n    studentParentMap[sp.student_id].push(sp.parent_id);\n  });\n\n  const emails = [];\n  const skipped = [];\n\n  packages.forEach(p => {\n    const pending = (p.amount || p.finalAmount || 0) - (p.amountReceived || 0);\n    if (pending <= 0) { skipped.push({ packageId: p.id, reason: 'fully_paid' }); return; }\n    const student = studentById[p.studentId];\n    if (!student) { skipped.push({ packageId: p.id, reason: 'student_not_found' }); return; }\n    const parentIds = studentParentMap[student.id] || [];\n    if (parentIds.length === 0) { skipped.push({ packageId: p.id, studentId: student.id, reason: 'no_parent_linked' }); return; }\n    parentIds.forEach(pid => {\n      const parent = parentById[pid];\n      if (parent && parent.email) {\n        const hasUrl = !!p.paymentUrl;\n        const urlLine = hasUrl ? 'Payment Link: ' + p.paymentUrl : 'Payment link is not yet configured. Please contact the academy for payment details.';\n        emails.push({\n          studentId: student.id, studentName: student.name || 'Student',\n          parentEmail: parent.email, parentName: parent.name || 'Parent',\n          program: p.program || 'Enrollment', pendingAmount: pending,\n          subject: 'Payment Reminder - ' + student.name,\n          body: 'Dear Parent/Guardian,\\n\\nThis is a reminder that a payment is currently pending for ' + student.name + '.\\n\\nEnrollment: ' + (p.program || 'Enrollment') + '\\nPending Amount: Rs. ' + pending.toLocaleString('en-IN') + '\\n\\n' + urlLine + '\\n\\nRegards,\\nTennis Academy Management'\n        });\n      } else { skipped.push({ packageId: p.id, parentId: pid, reason: 'parent_email_missing' }); }\n    });\n  });\n  return { emails, skipped, reminderCount: emails.length, skippedCount: skipped.length };\n};",
+                    "packageJson": "{}"
+                  },
+                  "propertySettings": {
+                    "packages_json": {
+                      "type": "MANUAL"
+                    },
+                    "students_json": {
+                      "type": "MANUAL"
+                    },
+                    "sp_json": {
+                      "type": "MANUAL"
+                    },
+                    "parents_json": {
+                      "type": "MANUAL"
+                    }
+                  },
+                  "sampleData": {},
+                  "errorHandlingOptions": {
+                    "retryOnFailure": {
+                      "value": false
+                    },
+                    "continueOnFailure": {
+                      "value": false
+                    }
+                  }
+                },
+                "nextAction": {
+                  "name": "step_6",
+                  "type": "PIECE",
+                  "displayName": "Send Payment Reminder via Gmail",
+                  "valid": true,
+                  "skip": false,
+                  "settings": {
+                    "input": {
+                      "auth": "",
+                      "to": "{% set recipients = [] %}{% for e in step_5['emails'] %}{% set _ = recipients.push(e.parentEmail) %}{% endfor %}{{ recipients | join(',') }}",
+                      "subject": "Payment Reminder \u2014 {{step_5['emails'][0]['studentName'] || 'Student'}}",
+                      "body": "{% if step_5['emails'][0] %}{{step_5['emails'][0]['body']}}{% else %}No pending payments to remind.{% endif %}",
+                      "body_type": "text",
+                      "cc": [],
+                      "bcc": [],
+                      "reply_to": [],
+                      "sender_name": "Tennis Academy Management",
+                      "draft": false
+                    },
+                    "pieceName": "@puchoaistudio/tool-gmail",
+                    "actionName": "send_email",
+                    "pieceVersion": "^2.0.4",
+                    "propertySettings": {
+                      "auth": {
+                        "type": "MANUAL"
+                      },
+                      "to": {
+                        "type": "MANUAL"
+                      },
+                      "subject": {
+                        "type": "MANUAL"
+                      },
+                      "body": {
+                        "type": "MANUAL"
+                      },
+                      "body_type": {
+                        "type": "MANUAL"
+                      },
+                      "cc": {
+                        "type": "MANUAL"
+                      },
+                      "bcc": {
+                        "type": "MANUAL"
+                      },
+                      "reply_to": {
+                        "type": "MANUAL"
+                      },
+                      "sender_name": {
+                        "type": "MANUAL"
+                      },
+                      "draft": {
+                        "type": "MANUAL"
+                      },
+                      "attachment": {
+                        "type": "MANUAL"
+                      },
+                      "attachment_name": {
+                        "type": "MANUAL"
+                      },
+                      "from": {
+                        "type": "MANUAL"
+                      }
+                    },
+                    "sampleData": {},
+                    "errorHandlingOptions": {
+                      "retryOnFailure": {
+                        "value": false
+                      },
+                      "continueOnFailure": {
+                        "value": true
+                      }
+                    }
+                  },
+                  "nextAction": {
+                    "name": "step_7",
+                    "type": "PIECE",
+                    "displayName": "Log Payment Reminder",
+                    "valid": true,
+                    "skip": false,
+                    "settings": {
+                      "input": {
+                        "auth": "",
+                        "table_name": "communications_log",
+                        "row_data": {
+                          "type": "payment_reminder",
+                          "channel": "email",
+                          "status": "sent",
+                          "date": "{{step_5['emails'][0]['studentName'] || 'unknown'}}"
+                        },
+                        "return_row": false
+                      },
+                      "pieceName": "@puchoaistudio/tool-supabase",
+                      "actionName": "create_row",
+                      "pieceVersion": "^2.0.0",
+                      "propertySettings": {
+                        "auth": {
+                          "type": "MANUAL"
+                        },
+                        "row_data": {
+                          "type": "MANUAL",
+                          "schema": {}
+                        },
+                        "return_row": {
+                          "type": "MANUAL"
+                        },
+                        "table_name": {
+                          "type": "MANUAL"
+                        }
+                      },
+                      "sampleData": {},
+                      "errorHandlingOptions": {
+                        "retryOnFailure": {
+                          "value": true
+                        },
+                        "continueOnFailure": {
+                          "value": false
+                        }
+                      }
+                    },
+                    "nextAction": {
+                      "name": "step_8",
+                      "type": "PIECE",
+                      "displayName": "Return Response",
+                      "valid": true,
+                      "skip": false,
+                      "settings": {
+                        "input": {
+                          "fields": {
+                            "body": {
+                              "success": true,
+                              "emailsSent": "{{step_5['reminderCount']}}",
+                              "skipped": "{{step_5['skippedCount']}}",
+                              "message": "Payment reminders processed"
+                            },
+                            "status": 200,
+                            "headers": {}
+                          },
+                          "respond": "stop",
+                          "responseType": "json"
+                        },
+                        "pieceName": "@puchoaistudio/tool-webhook",
+                        "actionName": "return_response",
+                        "pieceVersion": "^2.0.4",
+                        "propertySettings": {
+                          "fields": {
+                            "type": "MANUAL",
+                            "schema": {
+                              "body": {
+                                "type": "JSON",
+                                "required": true,
+                                "displayName": "JSON Body"
+                              },
+                              "status": {
+                                "type": "NUMBER",
+                                "required": false,
+                                "displayName": "Status",
+                                "defaultValue": 200
+                              },
+                              "headers": {
+                                "type": "OBJECT",
+                                "required": false,
+                                "displayName": "Headers"
+                              }
+                            }
+                          },
+                          "respond": {
+                            "type": "MANUAL"
+                          },
+                          "responseType": {
+                            "type": "MANUAL"
+                          }
+                        },
+                        "sampleData": {},
+                        "errorHandlingOptions": {
+                          "retryOnFailure": {
+                            "value": false
+                          },
+                          "continueOnFailure": {
+                            "value": false
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "valid": true,
+    "agentIds": [],
+    "connectionIds": [],
+    "schemaVersion": "7"
+  },
+  "blogUrl": ""
+}

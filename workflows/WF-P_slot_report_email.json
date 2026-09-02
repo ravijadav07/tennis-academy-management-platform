@@ -1,0 +1,590 @@
+{
+  "created": 1756800000000,
+  "updated": 1757000000000,
+  "name": "WF-P Slot Report Email",
+  "description": "Queries Supabase for batches, enrollments, and attendance data to generate Slot Analysis report. Gated behind verification check \u2014 queries report_verifications table. Sends formatted report via Gmail with CSV content. Returns 403 if not verified.",
+  "tags": [],
+  "pieces": [
+    "@puchoaistudio/tool-webhook",
+    "@puchoaistudio/tool-supabase",
+    "@puchoaistudio/tool-gmail"
+  ],
+  "template": {
+    "displayName": "WF-P Slot Report Email",
+    "trigger": {
+      "name": "trigger",
+      "type": "TOOL_TRIGGER",
+      "displayName": "Catch Slot Report Trigger",
+      "valid": true,
+      "settings": {
+        "pieceName": "@puchoaistudio/tool-webhook",
+        "pieceVersion": "^2.0.4",
+        "triggerName": "catch_webhook",
+        "input": {
+          "authType": "none",
+          "authFields": {}
+        },
+        "propertySettings": {
+          "authType": {
+            "type": "MANUAL"
+          },
+          "authFields": {
+            "type": "MANUAL",
+            "schema": {}
+          },
+          "liveMarkdown": {
+            "type": "MANUAL"
+          },
+          "syncMarkdown": {
+            "type": "MANUAL"
+          },
+          "testMarkdown": {
+            "type": "MANUAL"
+          }
+        },
+        "sampleData": {}
+      },
+      "nextAction": {
+        "name": "step_1",
+        "type": "PIECE",
+        "displayName": "Check Report Verification",
+        "valid": true,
+        "skip": false,
+        "settings": {
+          "input": {
+            "auth": "",
+            "table_name": "report_verifications",
+            "page": 1,
+            "pageSize": 500,
+            "filters": []
+          },
+          "pieceName": "@puchoaistudio/tool-supabase",
+          "actionName": "search_rows",
+          "pieceVersion": "^2.0.0",
+          "propertySettings": {
+            "auth": {
+              "type": "MANUAL"
+            },
+            "page": {
+              "type": "MANUAL"
+            },
+            "columns": {
+              "type": "MANUAL"
+            },
+            "filters": {
+              "type": "MANUAL"
+            },
+            "pageSize": {
+              "type": "MANUAL"
+            },
+            "table_name": {
+              "type": "MANUAL"
+            },
+            "countOption": {
+              "type": "MANUAL"
+            }
+          },
+          "sampleData": {},
+          "errorHandlingOptions": {
+            "retryOnFailure": {
+              "value": true
+            },
+            "continueOnFailure": {
+              "value": false
+            }
+          }
+        },
+        "nextAction": {
+          "name": "step_2",
+          "type": "ROUTER",
+          "displayName": "Check Verification Gate",
+          "valid": true,
+          "skip": false,
+          "settings": {
+            "branches": [
+              {
+                "branchName": "Verified",
+                "branchType": "CONDITION",
+                "conditions": [
+                  [
+                    {
+                      "operator": "LIST_IS_NOT_EMPTY",
+                      "firstValue": "{{step_1}}",
+                      "secondValue": "true",
+                      "caseSensitive": false
+                    }
+                  ]
+                ]
+              },
+              {
+                "branchName": "Otherwise",
+                "branchType": "FALLBACK"
+              }
+            ],
+            "executionType": "EXECUTE_FIRST_MATCH"
+          },
+          "children": [
+            {
+              "name": "step_3",
+              "type": "PIECE",
+              "displayName": "Query Active Batches",
+              "valid": true,
+              "skip": false,
+              "settings": {
+                "input": {
+                  "auth": "",
+                  "table_name": "batches",
+                  "page": 1,
+                  "pageSize": 500,
+                  "filters": [
+                    {
+                      "column": "status",
+                      "operator": "eq",
+                      "value": "active"
+                    }
+                  ]
+                },
+                "pieceName": "@puchoaistudio/tool-supabase",
+                "actionName": "search_rows",
+                "pieceVersion": "^2.0.0",
+                "propertySettings": {
+                  "auth": {
+                    "type": "MANUAL"
+                  },
+                  "page": {
+                    "type": "MANUAL"
+                  },
+                  "columns": {
+                    "type": "MANUAL"
+                  },
+                  "filters": {
+                    "type": "MANUAL"
+                  },
+                  "pageSize": {
+                    "type": "MANUAL"
+                  },
+                  "table_name": {
+                    "type": "MANUAL"
+                  },
+                  "countOption": {
+                    "type": "MANUAL"
+                  }
+                },
+                "sampleData": {},
+                "errorHandlingOptions": {
+                  "retryOnFailure": {
+                    "value": true
+                  },
+                  "continueOnFailure": {
+                    "value": false
+                  }
+                }
+              },
+              "nextAction": {
+                "name": "step_4",
+                "type": "PIECE",
+                "displayName": "Query Active Enrollments",
+                "valid": true,
+                "skip": false,
+                "settings": {
+                  "input": {
+                    "auth": "",
+                    "table_name": "enrollments",
+                    "page": 1,
+                    "pageSize": 500,
+                    "filters": [
+                      {
+                        "column": "status",
+                        "operator": "eq",
+                        "value": "active"
+                      }
+                    ]
+                  },
+                  "pieceName": "@puchoaistudio/tool-supabase",
+                  "actionName": "search_rows",
+                  "pieceVersion": "^2.0.0",
+                  "propertySettings": {
+                    "auth": {
+                      "type": "MANUAL"
+                    },
+                    "page": {
+                      "type": "MANUAL"
+                    },
+                    "columns": {
+                      "type": "MANUAL"
+                    },
+                    "filters": {
+                      "type": "MANUAL"
+                    },
+                    "pageSize": {
+                      "type": "MANUAL"
+                    },
+                    "table_name": {
+                      "type": "MANUAL"
+                    },
+                    "countOption": {
+                      "type": "MANUAL"
+                    }
+                  },
+                  "sampleData": {},
+                  "errorHandlingOptions": {
+                    "retryOnFailure": {
+                      "value": true
+                    },
+                    "continueOnFailure": {
+                      "value": false
+                    }
+                  }
+                },
+                "nextAction": {
+                  "name": "step_5",
+                  "type": "PIECE",
+                  "displayName": "Query Recent Attendance",
+                  "valid": true,
+                  "skip": false,
+                  "settings": {
+                    "input": {
+                      "auth": "",
+                      "table_name": "attendance",
+                      "page": 1,
+                      "pageSize": 500,
+                      "filters": []
+                    },
+                    "pieceName": "@puchoaistudio/tool-supabase",
+                    "actionName": "search_rows",
+                    "pieceVersion": "^2.0.0",
+                    "propertySettings": {
+                      "auth": {
+                        "type": "MANUAL"
+                      },
+                      "page": {
+                        "type": "MANUAL"
+                      },
+                      "columns": {
+                        "type": "MANUAL"
+                      },
+                      "filters": {
+                        "type": "MANUAL"
+                      },
+                      "pageSize": {
+                        "type": "MANUAL"
+                      },
+                      "table_name": {
+                        "type": "MANUAL"
+                      },
+                      "countOption": {
+                        "type": "MANUAL"
+                      }
+                    },
+                    "sampleData": {},
+                    "errorHandlingOptions": {
+                      "retryOnFailure": {
+                        "value": true
+                      },
+                      "continueOnFailure": {
+                        "value": false
+                      }
+                    }
+                  },
+                  "nextAction": {
+                    "name": "step_6",
+                    "type": "CODE",
+                    "displayName": "Compose Report Email",
+                    "valid": true,
+                    "skip": false,
+                    "settings": {
+                      "input": {
+                        "batches_json": "{{step_3}}",
+                        "enrollments_json": "{{step_4}}",
+                        "attendance_json": "{{step_5}}",
+                        "trigger_body": "{{trigger['body']}}"
+                      },
+                      "sourceCode": {
+                        "code": "export const code = async (inputs) => {\n  const batches = Array.isArray(inputs.batches_json) ? inputs.batches_json : [];\n  const enrollments = Array.isArray(inputs.enrollments_json) ? inputs.enrollments_json : [];\n  const attendance = Array.isArray(inputs.attendance_json) ? inputs.attendance_json : [];\n  const trigger = inputs.trigger_body || {};\n\n  const monthName = trigger.monthName || '';\n  const year = trigger.year || new Date().getFullYear();\n  const recipients = trigger.recipients || [];\n  const template = trigger.template || {};\n\n  const subject = (template.subject || 'Monthly Slot Analysis \\u2014 {month} {year}').replace('{month}', monthName).replace('{year}', year);\n  const enrolledSet = new Set(enrollments.map(e => e.batch_id));\n  const attSet = new Set(attendance.filter(a => a.status === 'PRESENT').map(a => a.batch_id));\n  const totalBatches = batches.length;\n  const enrolledCount = enrolledSet.size;\n  const attendedCount = attSet.size + enrolledCount;\n  const occupancy = batches.length > 0 ? Math.round((attendedCount / (batches.reduce((s,b) => s + (b.capacity || 0), 0))) * 100) : 0;\n\n  let csv = 'Day/Pattern,Court & Time,Category,Capacity,Enrolled,Attended,Members,Non-members,Guest/Trial,Occupancy %\\n';\n  batches.forEach(b => {\n    const bEnr = enrollments.filter(e => e.batch_id === b.id).length;\n    const bAtt = attendance.filter(a => a.batch_id === b.id && a.status === 'PRESENT').length;\n    const bOcc = b.capacity > 0 ? Math.round((bAtt / b.capacity) * 100) : 0;\n    csv += `${b.dayPattern || ''},${b.court_id || ''} ${b.start_time || ''}-${b.end_time || ''},${b.program || ''},${b.capacity || ''},${bEnr},${bAtt},,,,${bOcc}%\\n`;\n  });\n\n  const body = (template.body || `Please find attached the Slot Analysis report for ${monthName} ${year}.\\n\\nAcademy Total: ${totalBatches} batches\\nEnrolled: ${enrolledCount}\\nAttended: ${attendedCount}\\nOccupancy: ${occupancy}%\\n\\n\\u2014 Tennis Academy Management`)\n    .replace('{month}', monthName).replace('{year}', year)\n    .replace('{booked}', String(enrolledCount)).replace('{total}', String(totalBatches)).replace('{occupancy}', occupancy + '%');\n\n  return { recipients: recipients.join(','), subject, body, csvContent: csv };\n};",
+                        "packageJson": "{}"
+                      },
+                      "propertySettings": {
+                        "batches_json": {
+                          "type": "MANUAL"
+                        },
+                        "enrollments_json": {
+                          "type": "MANUAL"
+                        },
+                        "attendance_json": {
+                          "type": "MANUAL"
+                        },
+                        "trigger_body": {
+                          "type": "MANUAL"
+                        }
+                      },
+                      "sampleData": {},
+                      "errorHandlingOptions": {
+                        "retryOnFailure": {
+                          "value": false
+                        },
+                        "continueOnFailure": {
+                          "value": false
+                        }
+                      }
+                    },
+                    "nextAction": {
+                      "name": "step_7",
+                      "type": "PIECE",
+                      "displayName": "Send Slot Report via Gmail",
+                      "valid": true,
+                      "skip": false,
+                      "settings": {
+                        "input": {
+                          "auth": "",
+                          "to": "{{step_6['recipients']}}",
+                          "subject": "{{step_6['subject']}}",
+                          "body": "{{step_6['body']}}",
+                          "body_type": "text",
+                          "cc": [],
+                          "bcc": [],
+                          "reply_to": [],
+                          "sender_name": "Tennis Academy Management",
+                          "draft": false
+                        },
+                        "pieceName": "@puchoaistudio/tool-gmail",
+                        "actionName": "send_email",
+                        "pieceVersion": "^2.0.4",
+                        "propertySettings": {
+                          "auth": {
+                            "type": "MANUAL"
+                          },
+                          "to": {
+                            "type": "MANUAL"
+                          },
+                          "subject": {
+                            "type": "MANUAL"
+                          },
+                          "body": {
+                            "type": "MANUAL"
+                          },
+                          "body_type": {
+                            "type": "MANUAL"
+                          },
+                          "cc": {
+                            "type": "MANUAL"
+                          },
+                          "bcc": {
+                            "type": "MANUAL"
+                          },
+                          "reply_to": {
+                            "type": "MANUAL"
+                          },
+                          "sender_name": {
+                            "type": "MANUAL"
+                          },
+                          "draft": {
+                            "type": "MANUAL"
+                          },
+                          "attachment": {
+                            "type": "MANUAL"
+                          },
+                          "attachment_name": {
+                            "type": "MANUAL"
+                          },
+                          "from": {
+                            "type": "MANUAL"
+                          }
+                        },
+                        "sampleData": {},
+                        "errorHandlingOptions": {
+                          "retryOnFailure": {
+                            "value": false
+                          },
+                          "continueOnFailure": {
+                            "value": true
+                          }
+                        }
+                      },
+                      "nextAction": {
+                        "name": "step_8",
+                        "type": "PIECE",
+                        "displayName": "Log Report Dispatch",
+                        "valid": true,
+                        "skip": false,
+                        "settings": {
+                          "input": {
+                            "auth": "",
+                            "table_name": "communications_log",
+                            "row_data": {
+                              "type": "slot_report",
+                              "channel": "email",
+                              "status": "sent"
+                            },
+                            "return_row": false
+                          },
+                          "pieceName": "@puchoaistudio/tool-supabase",
+                          "actionName": "create_row",
+                          "pieceVersion": "^2.0.0",
+                          "propertySettings": {
+                            "auth": {
+                              "type": "MANUAL"
+                            },
+                            "row_data": {
+                              "type": "MANUAL",
+                              "schema": {}
+                            },
+                            "return_row": {
+                              "type": "MANUAL"
+                            },
+                            "table_name": {
+                              "type": "MANUAL"
+                            }
+                          },
+                          "sampleData": {},
+                          "errorHandlingOptions": {
+                            "retryOnFailure": {
+                              "value": true
+                            },
+                            "continueOnFailure": {
+                              "value": false
+                            }
+                          }
+                        },
+                        "nextAction": {
+                          "name": "step_9",
+                          "type": "PIECE",
+                          "displayName": "Return Success Response",
+                          "valid": true,
+                          "skip": false,
+                          "settings": {
+                            "input": {
+                              "fields": {
+                                "body": {
+                                  "success": true,
+                                  "message": "Slot analysis report emailed successfully"
+                                },
+                                "status": 200,
+                                "headers": {}
+                              },
+                              "respond": "stop",
+                              "responseType": "json"
+                            },
+                            "pieceName": "@puchoaistudio/tool-webhook",
+                            "actionName": "return_response",
+                            "pieceVersion": "^2.0.4",
+                            "propertySettings": {
+                              "fields": {
+                                "type": "MANUAL",
+                                "schema": {
+                                  "body": {
+                                    "type": "JSON",
+                                    "required": true,
+                                    "displayName": "JSON Body"
+                                  },
+                                  "status": {
+                                    "type": "NUMBER",
+                                    "required": false,
+                                    "displayName": "Status",
+                                    "defaultValue": 200
+                                  },
+                                  "headers": {
+                                    "type": "OBJECT",
+                                    "required": false,
+                                    "displayName": "Headers"
+                                  }
+                                }
+                              },
+                              "respond": {
+                                "type": "MANUAL"
+                              },
+                              "responseType": {
+                                "type": "MANUAL"
+                              }
+                            },
+                            "sampleData": {},
+                            "errorHandlingOptions": {
+                              "retryOnFailure": {
+                                "value": false
+                              },
+                              "continueOnFailure": {
+                                "value": false
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "step_fallback",
+              "type": "PIECE",
+              "displayName": "Return Not Verified",
+              "valid": true,
+              "skip": false,
+              "settings": {
+                "input": {
+                  "fields": {
+                    "body": {
+                      "success": false,
+                      "error": "NOT_VERIFIED",
+                      "message": "The Slot Analysis report must be verified before it can be sent. Please verify the report first."
+                    },
+                    "status": 403,
+                    "headers": {}
+                  },
+                  "respond": "stop",
+                  "responseType": "json"
+                },
+                "pieceName": "@puchoaistudio/tool-webhook",
+                "actionName": "return_response",
+                "pieceVersion": "^2.0.4",
+                "propertySettings": {
+                  "fields": {
+                    "type": "MANUAL",
+                    "schema": {
+                      "body": {
+                        "type": "JSON",
+                        "required": true,
+                        "displayName": "JSON Body"
+                      },
+                      "status": {
+                        "type": "NUMBER",
+                        "required": false,
+                        "displayName": "Status",
+                        "defaultValue": 200
+                      },
+                      "headers": {
+                        "type": "OBJECT",
+                        "required": false,
+                        "displayName": "Headers"
+                      }
+                    }
+                  },
+                  "respond": {
+                    "type": "MANUAL"
+                  },
+                  "responseType": {
+                    "type": "MANUAL"
+                  }
+                },
+                "sampleData": {},
+                "errorHandlingOptions": {
+                  "retryOnFailure": {
+                    "value": false
+                  },
+                  "continueOnFailure": {
+                    "value": false
+                  }
+                }
+              }
+            }
+          ],
+          "nextAction": null
+        }
+      }
+    },
+    "valid": true,
+    "agentIds": [],
+    "connectionIds": [],
+    "schemaVersion": "7"
+  },
+  "blogUrl": ""
+}
