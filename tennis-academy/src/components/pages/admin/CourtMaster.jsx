@@ -112,9 +112,6 @@ export default function CourtMaster() {
         </Card>
       )}
 
-      {/* Standard Time Slots */}
-      <TimeSlotCard db={db} state={state} />
-
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Add Court" size="sm">
         <div className="space-y-3">
           <div className="space-y-1"><label className={LBL}>Court Name</label><input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className={FIELD} placeholder="e.g. Court 2" /></div>
@@ -138,43 +135,5 @@ export default function CourtMaster() {
         </div>
       </Modal>
     </div>
-  );
-}
-
-// F1: Academy-wide standard time slots — convenience defaults, not hard constraints on batch creation.
-function TimeSlotCard({ db, state }) {
-  const [slots, setSlots] = useState(() => (state.standardTimeSlots || []));
-  const [newSlot, setNewSlot] = useState('');
-  const timeSlots = state.standardTimeSlots || [];
-  const addSlot = async () => {
-    if (!newSlot.trim()) return;
-    const updated = [...timeSlots, newSlot];
-    try { await db.upsertCourt({ id: '__time_slots__', name: '__time_slots__', standardTimeSlots: updated }); setSlots(updated); setNewSlot(''); toast.success('Time slot added'); } catch (e) { toast.error(e.message); }
-  };
-  const removeSlot = async (idx) => {
-    const updated = timeSlots.filter((_, i) => i !== idx);
-    try { await db.upsertCourt({ id: '__time_slots__', name: '__time_slots__', standardTimeSlots: updated }); setSlots(updated); } catch (e) { toast.error(e.message); }
-  };
-  return (
-    <Card>
-      <h3 className="text-sm font-semibold text-ink mb-3">Standard Time Slots</h3>
-      <p className="text-xs text-ink-muted mb-3">Academy-wide convenience defaults for batch creation. Individual batches can use custom times.</p>
-      <div className="flex flex-col sm:flex-row gap-2 mb-3">
-        <input type="time" value={newSlot} onChange={(e) => setNewSlot(e.target.value)} className={FIELD} placeholder="e.g. 15:30" />
-        <Button size="sm" className="whitespace-nowrap flex-shrink-0" onClick={addSlot}>Add</Button>
-      </div>
-      {timeSlots.length === 0 ? (
-        <p className="text-xs text-ink-faint py-2">No standard time slots configured. Add common start times like 15:30, 17:00, etc.</p>
-      ) : (
-        <div className="flex flex-wrap gap-2">
-          {timeSlots.map((s, i) => (
-            <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-canvas-soft text-xs">
-              <span>{s}</span>
-              <button onClick={() => removeSlot(i)} className="text-err hover:underline text-[10px]">Remove</button>
-            </span>
-          ))}
-        </div>
-      )}
-    </Card>
   );
 }
