@@ -193,6 +193,7 @@ input[type="time"] {
 
 /* Print / PDF Stylesheet */
 @media print {
+  /* Reset root — force auto height, visible overflow, remove background */
   body, html, #root {
     background: #ffffff !important;
     color: #000000 !important;
@@ -200,32 +201,90 @@ input[type="time"] {
     overflow: visible !important;
   }
 
-  aside, header, nav, .no-print, button, [data-sonner-toaster], .fixed {
+  /* Hide sidebar, header, nav, toasts, and the Pucho badge */
+  aside,
+  header,
+  nav,
+  .no-print,
+  [data-sonner-toaster],
+  .fixed.bottom-0,
+  .fixed.bottom-14 {
     display: none !important;
   }
 
+  /* Override the layout shell — h-screen + overflow-hidden clips print */
+  .h-screen,
+  [class*="h-screen"] {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Override flex-1 + overflow-hidden containers (the main content wrapper) */
+  .flex-1.min-w-0[class*="w-0"],
+  .flex.flex-col.overflow-hidden {
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  /* Keep only the scrollable main area — allow it to expand fully */
   main {
     padding: 0 !important;
     margin: 0 !important;
     max-width: 100% !important;
     width: 100% !important;
     overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+    flex: none !important;
   }
 
+  /* Remove shadows/borders from cards for clean print */
   .card, [class*="rounded-"], [class*="shadow-"] {
     box-shadow: none !important;
     border: 1px solid #e2e8f0 !important;
     break-inside: avoid;
   }
 
+  /* Tables — full width, no horizontal clip, page-break control */
+  .overflow-x-auto {
+    overflow-x: visible !important;
+  }
+
   table {
     width: 100% !important;
     border-collapse: collapse !important;
+    page-break-inside: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
   }
 
   th, td {
-    padding: 6px 8px !important;
+    padding: 4px 6px !important;
     border-bottom: 1px solid #cbd5e1 !important;
-    font-size: 11px !important;
+    font-size: 10px !important;
+    word-break: break-word;
+  }
+
+  th {
+    background: #f1f5f9 !important;
+    font-weight: 600 !important;
+  }
+
+  /* Hide all buttons and interactive elements */
+  button {
+    display: none !important;
+  }
+
+  /* Page setup */
+  @page {
+    margin: 1cm;
+    size: A4;
   }
 }

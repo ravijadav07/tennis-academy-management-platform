@@ -10,6 +10,7 @@ import Dropdown from '../../ui/Dropdown';
 import { CheckSquare, Printer, Loader2, UserPlus, FileText, ShieldCheck, Mail } from 'lucide-react';
 import { formatDateDDMMYY, formatTime12h } from '../../../utils/formatters';
 import { prepareAbsenceEmail, getNotificationWindow } from '../../../utils/notificationEngine';
+import { triggerWorkflow } from '../../../utils/api';
 import { toast } from 'sonner';
 import { useAuth } from '../../../context/AuthContext';
 
@@ -538,21 +539,30 @@ function NotifyButton({ r, batch, selectedDate, state, db, notifiedAbsences, set
   return (
     <button onClick={async (e) => {
       e.stopPropagation();
-      const mailto = prepareAbsenceEmail({
-        studentName: r.name,
-        guardianEmail: student.guardianEmail,
-        batchName: batch.program + ' ' + batch.dayPattern,
-        batchDate: formatDateDDMMYY(selectedDate),
-        startTime: batch.startTime,
-        endTime: batch.endTime,
-      });
+      try {
+        await triggerWorkflow('absence.alert', {
+          attendance: [{ studentId: r.studentId, batchId: batch.id, status: 'ABSENT' }],
+          students: state.students.filter(s => s.id === r.studentId),
+          batches: [batch],
+          date: selectedDate
+        });
+        toast.success('Absence notification sent via workflow for ' + r.name);
+      } catch (wfErr) {
+        console.warn('Workflow failed, falling back to mailto:', wfErr);
+        const mailto = prepareAbsenceEmail({
+          studentName: r.name, guardianEmail: student.guardianEmail,
+          batchName: batch.program + ' ' + batch.dayPattern,
+          batchDate: formatDateDDMMYY(selectedDate),
+          startTime: batch.startTime, endTime: batch.endTime,
+        });
+        toast.success('Opening email draft for ' + r.name);
+        window.open(mailto, '_blank');
+      }
       await db.logAbsenceNotification({
         studentId: r.studentId, batchId: batch.id, date: selectedDate,
         guardianEmail: student.guardianEmail,
       });
       setNotifiedAbsences((prev) => new Set(prev).add(r.studentId));
-      toast.success('Opening email for ' + r.name);
-      window.open(mailto, '_blank');
     }} className="ml-auto flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-brand-50 text-brand-600 hover:bg-brand-100 transition-colors">
       <Mail className="w-3 h-3" /> Notify
     </button>

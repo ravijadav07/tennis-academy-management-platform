@@ -1,13 +1,15 @@
 {
   "created": 1756800000000,
-  "updated": 1757000000000,
+  "updated": 1757100000000,
   "name": "WF-O Payment Reminder Email",
-  "description": "Queries Supabase for packages with pending balance > 0, resolves student+parent email via student_parents lookup, and sends payment reminder via Gmail. Logs in communications_log to prevent duplicates.",
+  "description": "Queries Supabase for packages with pending balance > 0, resolves the most overdue parent email, composes a professional personalized email body via LLM-AI, and sends via Gmail. Logs in communications_log. Runs one parent per invocation \u2014 the scheduler calls it repeatedly until all pending parents are notified.",
   "tags": [],
   "pieces": [
     "@puchoaistudio/tool-webhook",
     "@puchoaistudio/tool-supabase",
-    "@puchoaistudio/tool-gmail"
+    "@puchoaistudio/tool-gmail",
+    "@puchoaistudio/tool-llm-ai",
+    "@puchoaistudio/tool-date-helper"
   ],
   "template": {
     "displayName": "WF-O Payment Reminder",
@@ -55,17 +57,17 @@
             "auth": "",
             "table_name": "packages",
             "page": 1,
-            "pageSize": 500,
+            "pageSize": 200,
             "filters": [
               {
-                "column": "paymentStatus",
+                "column": "payment_status",
                 "operator": "neq",
-                "value": "PAID"
+                "value": "paid"
               },
               {
-                "column": "paymentStatus",
+                "column": "payment_status",
                 "operator": "neq",
-                "value": "COMPLIMENTARY"
+                "value": "complimentary"
               }
             ]
           },
@@ -103,8 +105,7 @@
             "continueOnFailure": {
               "value": false
             }
-          },
-          "pageSize": 200
+          }
         },
         "nextAction": {
           "name": "step_2",
@@ -265,7 +266,7 @@
               "nextAction": {
                 "name": "step_5",
                 "type": "CODE",
-                "displayName": "Filter Pending Balance > 0 & Resolve Recipients",
+                "displayName": "Filter Pending & Prepare LLM Prompt",
                 "valid": true,
                 "skip": false,
                 "settings": {
@@ -276,7 +277,7 @@
                     "parents_json": "{{step_4}}"
                   },
                   "sourceCode": {
-                    "code": "export const code = async (inputs) => {\n  const packages = Array.isArray(inputs.packages_json) ? inputs.packages_json : [];\n  const students = Array.isArray(inputs.students_json) ? inputs.students_json : [];\n  const spLinks = Array.isArray(inputs.sp_json) ? inputs.sp_json : [];\n  const parents = Array.isArray(inputs.parents_json) ? inputs.parents_json : [];\n\n  const studentById = {};\n  students.forEach(s => { studentById[s.id] = s; });\n  const parentById = {};\n  parents.forEach(p => { parentById[p.id] = p; });\n\n  const studentParentMap = {};\n  spLinks.forEach(sp => {\n    if (!studentParentMap[sp.student_id]) studentParentMap[sp.student_id] = [];\n    studentParentMap[sp.student_id].push(sp.parent_id);\n  });\n\n  const emails = [];\n  const skipped = [];\n\n  packages.forEach(p => {\n    const pending = (p.amount || p.finalAmount || 0) - (p.amountReceived || 0);\n    if (pending <= 0) { skipped.push({ packageId: p.id, reason: 'fully_paid' }); return; }\n    const student = studentById[p.studentId];\n    if (!student) { skipped.push({ packageId: p.id, reason: 'student_not_found' }); return; }\n    const parentIds = studentParentMap[student.id] || [];\n    if (parentIds.length === 0) { skipped.push({ packageId: p.id, studentId: student.id, reason: 'no_parent_linked' }); return; }\n    parentIds.forEach(pid => {\n      const parent = parentById[pid];\n      if (parent && parent.email) {\n        const hasUrl = !!p.paymentUrl;\n        const urlLine = hasUrl ? 'Payment Link: ' + p.paymentUrl : 'Payment link is not yet configured. Please contact the academy for payment details.';\n        emails.push({\n          studentId: student.id, studentName: student.name || 'Student',\n          parentEmail: parent.email, parentName: parent.name || 'Parent',\n          program: p.program || 'Enrollment', pendingAmount: pending,\n          subject: 'Payment Reminder - ' + student.name,\n          body: 'Dear Parent/Guardian,\\n\\nThis is a reminder that a payment is currently pending for ' + student.name + '.\\n\\nEnrollment: ' + (p.program || 'Enrollment') + '\\nPending Amount: Rs. ' + pending.toLocaleString('en-IN') + '\\n\\n' + urlLine + '\\n\\nRegards,\\nTennis Academy Management'\n        });\n      } else { skipped.push({ packageId: p.id, parentId: pid, reason: 'parent_email_missing' }); }\n    });\n  });\n  return { emails, skipped, reminderCount: emails.length, skippedCount: skipped.length };\n};",
+                    "code": "export const code = async (inputs) => {\n  const packages = Array.isArray(inputs.packages_json) ? inputs.packages_json : [];\n  const students = Array.isArray(inputs.students_json) ? inputs.students_json : [];\n  const spLinks = Array.isArray(inputs.sp_json) ? inputs.sp_json : [];\n  const parents = Array.isArray(inputs.parents_json) ? inputs.parents_json : [];\n\n  const studentById = {};\n  students.forEach(s => { studentById[s.id] = s; });\n  const parentById = {};\n  parents.forEach(p => { parentById[p.id] = p; });\n\n  const studentParentMap = {};\n  spLinks.forEach(sp => {\n    if (!studentParentMap[sp.student_id]) studentParentMap[sp.student_id] = [];\n    studentParentMap[sp.student_id].push(sp.parent_id);\n  });\n\n  const eligible = [];\n  packages.forEach(p => {\n    const pending = (p.amount || 0) - (p.amount_received || 0);\n    if (pending <= 0) return;\n    const student = studentById[p.student_id];\n    if (!student) return;\n    const parentIds = studentParentMap[student.id] || [];\n    if (parentIds.length === 0) return;\n    parentIds.forEach(pid => {\n      const parent = parentById[pid];\n      if (parent && parent.email) {\n        const hasUrl = !!p.payment_url;\n        eligible.push({\n          studentId: student.id,\n          studentName: student.name || 'Student',\n          parentId: parent.id,\n          parentEmail: parent.email,\n          parentName: parent.name || 'Parent',\n          program: p.program || 'Enrollment',\n          pendingAmount: pending,\n          hasPaymentUrl: hasUrl,\n          paymentUrl: p.payment_url || '',\n          packageId: p.id\n        });\n      }\n    });\n  });\n\n  // Sort by pending amount descending \u2014 most overdue first\n  eligible.sort((a, b) => b.pendingAmount - a.pendingAmount);\n\n  const target = eligible[0] || null;\n  if (!target) {\n    return { hasReminders: false, totalPending: 0, message: 'No pending payments to remind' };\n  }\n\n  const urlNote = target.hasPaymentUrl\n    ? 'Payment Link: ' + target.paymentUrl\n    : 'Payment link is not yet configured. Please contact the academy for payment details.';\n\n  const llmPrompt = `You are composing a payment reminder email for a tennis academy parent. Write a professional, warm, and clear email body in plain text. Do NOT include a subject line. Output ONLY the email body text.\n\nStudent Name: ${target.studentName}\nParent Name: ${target.parentName}\nEnrollment Program: ${target.program}\nPending Amount: Rs. ${target.pendingAmount.toLocaleString('en-IN')}\n${urlNote}\n\nThe email should:\n- Address the parent by name\n- State the pending amount clearly with the program name\n- Include the payment link (or the note about it being unavailable)\n- End with a warm closing from Tennis Academy Management\n- Be 3-4 short paragraphs in a professional but friendly tone`;\n\n  return {\n    hasReminders: true,\n    totalPending: eligible.length,\n    target: target,\n    llmPrompt: llmPrompt,\n    subject: 'Payment Reminder \\u2014 ' + target.studentName\n  };\n};",
                     "packageJson": "{}"
                   },
                   "propertySettings": {
@@ -306,63 +307,40 @@
                 "nextAction": {
                   "name": "step_6",
                   "type": "PIECE",
-                  "displayName": "Send Payment Reminder via Gmail",
+                  "displayName": "Compose Professional Email Body via AI",
                   "valid": true,
                   "skip": false,
                   "settings": {
                     "input": {
                       "auth": "",
-                      "to": "{% set recipients = [] %}{% for e in step_5['emails'] %}{% set _ = recipients.push(e.parentEmail) %}{% endfor %}{{ recipients | join(',') }}",
-                      "subject": "Payment Reminder \u2014 {{step_5['emails'][0]['studentName'] || 'Student'}}",
-                      "body": "{% if step_5['emails'][0] %}{{step_5['emails'][0]['body']}}{% else %}No pending payments to remind.{% endif %}",
-                      "body_type": "text",
-                      "cc": [],
-                      "bcc": [],
-                      "reply_to": [],
-                      "sender_name": "Tennis Academy Management",
-                      "draft": false
+                      "model": "gpt-4o-mini",
+                      "query": "{{step_5['llmPrompt']}}",
+                      "temperature": "0.7",
+                      "maxTokens": "1000"
                     },
-                    "pieceName": "@puchoaistudio/tool-gmail",
-                    "actionName": "send_email",
-                    "pieceVersion": "^2.0.4",
+                    "pieceName": "@puchoaistudio/tool-llm-ai",
+                    "actionName": "askLlm",
+                    "pieceVersion": "^2.1.0",
                     "propertySettings": {
                       "auth": {
                         "type": "MANUAL"
                       },
-                      "to": {
+                      "model": {
                         "type": "MANUAL"
                       },
-                      "subject": {
+                      "query": {
                         "type": "MANUAL"
                       },
-                      "body": {
+                      "temperature": {
                         "type": "MANUAL"
                       },
-                      "body_type": {
+                      "maxTokens": {
                         "type": "MANUAL"
                       },
-                      "cc": {
+                      "puchoModelKey": {
                         "type": "MANUAL"
                       },
-                      "bcc": {
-                        "type": "MANUAL"
-                      },
-                      "reply_to": {
-                        "type": "MANUAL"
-                      },
-                      "sender_name": {
-                        "type": "MANUAL"
-                      },
-                      "draft": {
-                        "type": "MANUAL"
-                      },
-                      "attachment": {
-                        "type": "MANUAL"
-                      },
-                      "attachment_name": {
-                        "type": "MANUAL"
-                      },
-                      "from": {
+                      "puchoProviderName": {
                         "type": "MANUAL"
                       }
                     },
@@ -372,50 +350,37 @@
                         "value": false
                       },
                       "continueOnFailure": {
-                        "value": true
+                        "value": false
                       }
                     }
                   },
                   "nextAction": {
                     "name": "step_7",
-                    "type": "PIECE",
-                    "displayName": "Log Payment Reminder",
+                    "type": "CODE",
+                    "displayName": "Parse AI Response & Prepare Email",
                     "valid": true,
                     "skip": false,
                     "settings": {
                       "input": {
-                        "auth": "",
-                        "table_name": "communications_log",
-                        "row_data": {
-                          "type": "payment_reminder",
-                          "channel": "email",
-                          "status": "sent",
-                          "date": "{{step_5['emails'][0]['studentName'] || 'unknown'}}"
-                        },
-                        "return_row": false
+                        "step5": "{{step_5}}",
+                        "llmOutput": "{{step_6['data']['response']}}"
                       },
-                      "pieceName": "@puchoaistudio/tool-supabase",
-                      "actionName": "create_row",
-                      "pieceVersion": "^2.0.0",
+                      "sourceCode": {
+                        "code": "export const code = async (inputs) => {\n  const step5 = inputs.step5 || {};\n  const llmOutput = inputs.llmOutput || '';\n  const target = step5.target || {};\n\n  // Clean LLM output \u2014 remove any markdown fences or preamble\n  let body = llmOutput;\n  const match = body.match(/[\\s\\S]*/);\n  if (match) body = match[0];\n  body = body.replace(/```[\\s\\S]*?```/g, '').trim();\n\n  return {\n    parentEmail: target.parentEmail || '',\n    parentName: target.parentName || 'Parent',\n    studentName: target.studentName || 'Student',\n    subject: step5.subject || 'Payment Reminder',\n    body: body || 'Dear Parent,\\n\\nThis is a payment reminder for your child\\'s tennis academy enrollment.\\n\\nRegards,\\nTennis Academy Management',\n    studentId: target.studentId || '',\n    packageId: target.packageId || '',\n    totalPending: step5.totalPending || 0\n  };\n};",
+                        "packageJson": "{}"
+                      },
                       "propertySettings": {
-                        "auth": {
+                        "step5": {
                           "type": "MANUAL"
                         },
-                        "row_data": {
-                          "type": "MANUAL",
-                          "schema": {}
-                        },
-                        "return_row": {
-                          "type": "MANUAL"
-                        },
-                        "table_name": {
+                        "llmOutput": {
                           "type": "MANUAL"
                         }
                       },
                       "sampleData": {},
                       "errorHandlingOptions": {
                         "retryOnFailure": {
-                          "value": true
+                          "value": false
                         },
                         "continueOnFailure": {
                           "value": false
@@ -425,53 +390,63 @@
                     "nextAction": {
                       "name": "step_8",
                       "type": "PIECE",
-                      "displayName": "Return Response",
+                      "displayName": "Send Personalized Payment Reminder via Gmail",
                       "valid": true,
                       "skip": false,
                       "settings": {
                         "input": {
-                          "fields": {
-                            "body": {
-                              "success": true,
-                              "emailsSent": "{{step_5['reminderCount']}}",
-                              "skipped": "{{step_5['skippedCount']}}",
-                              "message": "Payment reminders processed"
-                            },
-                            "status": 200,
-                            "headers": {}
-                          },
-                          "respond": "stop",
-                          "responseType": "json"
+                          "auth": "",
+                          "to": "{{step_7['parentEmail']}}",
+                          "subject": "{{step_7['subject']}}",
+                          "body": "{{step_7['body']}}",
+                          "body_type": "text",
+                          "cc": [],
+                          "bcc": [],
+                          "reply_to": [],
+                          "sender_name": "Tennis Academy Management",
+                          "draft": false
                         },
-                        "pieceName": "@puchoaistudio/tool-webhook",
-                        "actionName": "return_response",
+                        "pieceName": "@puchoaistudio/tool-gmail",
+                        "actionName": "send_email",
                         "pieceVersion": "^2.0.4",
                         "propertySettings": {
-                          "fields": {
-                            "type": "MANUAL",
-                            "schema": {
-                              "body": {
-                                "type": "JSON",
-                                "required": true,
-                                "displayName": "JSON Body"
-                              },
-                              "status": {
-                                "type": "NUMBER",
-                                "required": false,
-                                "displayName": "Status",
-                                "defaultValue": 200
-                              },
-                              "headers": {
-                                "type": "OBJECT",
-                                "required": false,
-                                "displayName": "Headers"
-                              }
-                            }
-                          },
-                          "respond": {
+                          "auth": {
                             "type": "MANUAL"
                           },
-                          "responseType": {
+                          "to": {
+                            "type": "MANUAL"
+                          },
+                          "subject": {
+                            "type": "MANUAL"
+                          },
+                          "body": {
+                            "type": "MANUAL"
+                          },
+                          "body_type": {
+                            "type": "MANUAL"
+                          },
+                          "cc": {
+                            "type": "MANUAL"
+                          },
+                          "bcc": {
+                            "type": "MANUAL"
+                          },
+                          "reply_to": {
+                            "type": "MANUAL"
+                          },
+                          "sender_name": {
+                            "type": "MANUAL"
+                          },
+                          "draft": {
+                            "type": "MANUAL"
+                          },
+                          "attachment": {
+                            "type": "MANUAL"
+                          },
+                          "attachment_name": {
+                            "type": "MANUAL"
+                          },
+                          "from": {
                             "type": "MANUAL"
                           }
                         },
@@ -481,7 +456,152 @@
                             "value": false
                           },
                           "continueOnFailure": {
-                            "value": false
+                            "value": true
+                          }
+                        }
+                      },
+                      "nextAction": {
+                        "name": "step_date_9",
+                        "skip": false,
+                        "type": "PIECE",
+                        "valid": true,
+                        "displayName": "Get Current Date",
+                        "settings": {
+                          "input": {
+                            "timeZone": "Asia/Kolkata",
+                            "timeFormat": "YYYY-MM-DD HH:mm:ss"
+                          },
+                          "pieceName": "@puchoaistudio/tool-date-helper",
+                          "actionName": "get_current_date",
+                          "sampleData": {},
+                          "pieceVersion": "^2.0.0",
+                          "propertySettings": {
+                            "timeZone": {
+                              "type": "MANUAL"
+                            },
+                            "timeFormat": {
+                              "type": "MANUAL"
+                            }
+                          },
+                          "errorHandlingOptions": {
+                            "retryOnFailure": {
+                              "value": false
+                            },
+                            "continueOnFailure": {
+                              "value": false
+                            }
+                          }
+                        },
+                        "nextAction": {
+                          "name": "step_9",
+                          "type": "PIECE",
+                          "displayName": "Log Payment Reminder",
+                          "valid": true,
+                          "skip": false,
+                          "settings": {
+                            "input": {
+                              "auth": "",
+                              "table_name": "communications_log",
+                              "row_data": {
+                                "type": "payment_reminder",
+                                "channel": "email",
+                                "status": "sent",
+                                "date": "{{step_date_9['result']}}"
+                              },
+                              "return_row": false
+                            },
+                            "pieceName": "@puchoaistudio/tool-supabase",
+                            "actionName": "create_row",
+                            "pieceVersion": "^2.0.0",
+                            "propertySettings": {
+                              "auth": {
+                                "type": "MANUAL"
+                              },
+                              "row_data": {
+                                "type": "MANUAL",
+                                "schema": {}
+                              },
+                              "return_row": {
+                                "type": "MANUAL"
+                              },
+                              "table_name": {
+                                "type": "MANUAL"
+                              }
+                            },
+                            "sampleData": {},
+                            "errorHandlingOptions": {
+                              "retryOnFailure": {
+                                "value": true
+                              },
+                              "continueOnFailure": {
+                                "value": false
+                              }
+                            }
+                          },
+                          "nextAction": {
+                            "name": "step_10",
+                            "type": "PIECE",
+                            "displayName": "Return Response",
+                            "valid": true,
+                            "skip": false,
+                            "settings": {
+                              "input": {
+                                "fields": {
+                                  "body": {
+                                    "success": true,
+                                    "sentTo": "{{step_7['parentEmail']}}",
+                                    "studentName": "{{step_7['studentName']}}",
+                                    "remainingPending": "{{step_7['totalPending']}}",
+                                    "message": "Payment reminder sent to one parent. Call again to process the next pending parent."
+                                  },
+                                  "status": 200,
+                                  "headers": {}
+                                },
+                                "respond": "stop",
+                                "responseType": "json"
+                              },
+                              "pieceName": "@puchoaistudio/tool-webhook",
+                              "actionName": "return_response",
+                              "pieceVersion": "^2.0.4",
+                              "propertySettings": {
+                                "fields": {
+                                  "type": "MANUAL",
+                                  "schema": {
+                                    "body": {
+                                      "type": "JSON",
+                                      "required": true,
+                                      "displayName": "JSON Body"
+                                    },
+                                    "status": {
+                                      "type": "NUMBER",
+                                      "required": false,
+                                      "displayName": "Status",
+                                      "defaultValue": 200
+                                    },
+                                    "headers": {
+                                      "type": "OBJECT",
+                                      "required": false,
+                                      "displayName": "Headers"
+                                    }
+                                  }
+                                },
+                                "respond": {
+                                  "type": "MANUAL"
+                                },
+                                "responseType": {
+                                  "type": "MANUAL"
+                                }
+                              },
+                              "sampleData": {},
+                              "errorHandlingOptions": {
+                                "retryOnFailure": {
+                                  "value": false
+                                },
+                                "continueOnFailure": {
+                                  "value": false
+                                }
+                              }
+                            }
                           }
                         }
                       }

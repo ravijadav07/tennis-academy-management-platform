@@ -56,7 +56,18 @@
             "table_name": "report_verifications",
             "page": 1,
             "pageSize": 500,
-            "filters": []
+            "filters": [
+              {
+                "column": "month",
+                "operator": "eq",
+                "value": "{{trigger['body']['month']}}"
+              },
+              {
+                "column": "year",
+                "operator": "eq",
+                "value": "{{trigger['body']['year']}}"
+              }
+            ]
           },
           "pieceName": "@puchoaistudio/tool-supabase",
           "actionName": "search_rows",
@@ -300,7 +311,7 @@
                         "trigger_body": "{{trigger['body']}}"
                       },
                       "sourceCode": {
-                        "code": "export const code = async (inputs) => {\n  const batches = Array.isArray(inputs.batches_json) ? inputs.batches_json : [];\n  const enrollments = Array.isArray(inputs.enrollments_json) ? inputs.enrollments_json : [];\n  const attendance = Array.isArray(inputs.attendance_json) ? inputs.attendance_json : [];\n  const trigger = inputs.trigger_body || {};\n\n  const monthName = trigger.monthName || '';\n  const year = trigger.year || new Date().getFullYear();\n  const recipients = trigger.recipients || [];\n  const template = trigger.template || {};\n\n  const subject = (template.subject || 'Monthly Slot Analysis \\u2014 {month} {year}').replace('{month}', monthName).replace('{year}', year);\n  const enrolledSet = new Set(enrollments.map(e => e.batch_id));\n  const attSet = new Set(attendance.filter(a => a.status === 'PRESENT').map(a => a.batch_id));\n  const totalBatches = batches.length;\n  const enrolledCount = enrolledSet.size;\n  const attendedCount = attSet.size + enrolledCount;\n  const occupancy = batches.length > 0 ? Math.round((attendedCount / (batches.reduce((s,b) => s + (b.capacity || 0), 0))) * 100) : 0;\n\n  let csv = 'Day/Pattern,Court & Time,Category,Capacity,Enrolled,Attended,Members,Non-members,Guest/Trial,Occupancy %\\n';\n  batches.forEach(b => {\n    const bEnr = enrollments.filter(e => e.batch_id === b.id).length;\n    const bAtt = attendance.filter(a => a.batch_id === b.id && a.status === 'PRESENT').length;\n    const bOcc = b.capacity > 0 ? Math.round((bAtt / b.capacity) * 100) : 0;\n    csv += `${b.dayPattern || ''},${b.court_id || ''} ${b.start_time || ''}-${b.end_time || ''},${b.program || ''},${b.capacity || ''},${bEnr},${bAtt},,,,${bOcc}%\\n`;\n  });\n\n  const body = (template.body || `Please find attached the Slot Analysis report for ${monthName} ${year}.\\n\\nAcademy Total: ${totalBatches} batches\\nEnrolled: ${enrolledCount}\\nAttended: ${attendedCount}\\nOccupancy: ${occupancy}%\\n\\n\\u2014 Tennis Academy Management`)\n    .replace('{month}', monthName).replace('{year}', year)\n    .replace('{booked}', String(enrolledCount)).replace('{total}', String(totalBatches)).replace('{occupancy}', occupancy + '%');\n\n  return { recipients: recipients.join(','), subject, body, csvContent: csv };\n};",
+                        "code": "export const code = async (inputs) => {\n  const batches = Array.isArray(inputs.batches_json) ? inputs.batches_json : [];\n  const enrollments = Array.isArray(inputs.enrollments_json) ? inputs.enrollments_json : [];\n  const attendance = Array.isArray(inputs.attendance_json) ? inputs.attendance_json : [];\n  const trigger = inputs.trigger_body || {};\n\n  const monthName = trigger.monthName || '';\n  const year = trigger.year || new Date().getFullYear();\n  const recipients = trigger.recipients || [];\n  const template = trigger.template || {};\n\n  const subject = (template.subject || 'Monthly Slot Analysis \\u2014 {month} {year}').replace('{month}', monthName).replace('{year}', year);\n\n  // Compute totals\n  const totalBatches = batches.length;\n  const enrolledCount = enrollments.length;\n  const attendedCount = attendance.filter(a => a.status === 'present').length;\n  const totalCapacity = batches.reduce((s, b) => s + (b.capacity || 0), 0);\n  const occupancy = totalCapacity > 0 ? Math.round((attendedCount / totalCapacity) * 100) : 0;\n\n  let csv = 'Day/Pattern,Court & Time,Category,Capacity,Enrolled,Attended,Members,Non-members,Guest/Trial,Occupancy %\\n';\n  batches.forEach(b => {\n    const bEnr = enrollments.filter(e => e.batch_id === b.id).length;\n    const bAtt = attendance.filter(a => a.batch_id === b.id && a.status === 'present').length;\n    const bOcc = b.capacity > 0 ? Math.round((bAtt / b.capacity) * 100) : 0;\n    const bMembers = bEnr; // All enrolled count as members by default\n    const bNonMembers = 0;\n    const bGuests = 0;\n    csv += `${b.day_pattern || ''},${b.court_id || ''} ${b.start_time || ''}-${b.end_time || ''},${b.program || ''},${b.capacity || ''},${bEnr},${bAtt},${bMembers},${bNonMembers},${bGuests},${bOcc}%\\n`;\n  });\n\n  const body = (template.body || `Please find attached the Slot Analysis report for ${monthName} ${year}.\\n\\nAcademy Total: ${totalBatches} batches\\nEnrolled: ${enrolledCount}\\nAttended: ${attendedCount}\\nOccupancy: ${occupancy}%\\n\\n\\u2014 Tennis Academy Management`)\n    .replace('{month}', monthName).replace('{year}', year)\n    .replace('{booked}', String(enrolledCount)).replace('{total}', String(totalBatches)).replace('{occupancy}', occupancy + '%');\n\n  return { recipients: recipients.join(','), subject, body, csvContent: csv, recipientCount: recipients.length };\n};",
                         "packageJson": "{}"
                       },
                       "propertySettings": {
@@ -344,7 +355,9 @@
                           "bcc": [],
                           "reply_to": [],
                           "sender_name": "Tennis Academy Management",
-                          "draft": false
+                          "draft": false,
+                          "attachment": "{{step_6['csvContent']}}",
+                          "attachment_name": "{{trigger['body']['monthName']}}-{{trigger['body']['year']}}.csv"
                         },
                         "pieceName": "@puchoaistudio/tool-gmail",
                         "actionName": "send_email",
@@ -413,7 +426,8 @@
                             "row_data": {
                               "type": "slot_report",
                               "channel": "email",
-                              "status": "sent"
+                              "status": "sent",
+                              "date": "{{trigger['body']['monthName']}} {{trigger['body']['year']}}"
                             },
                             "return_row": false
                           },

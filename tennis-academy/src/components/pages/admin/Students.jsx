@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { Search, Plus, Pencil, Archive, UserPlus, FileText, RefreshCw, Mail } from 'lucide-react';
 import { GST_RATE } from '../../../utils/settings';
 import { preparePaymentReminder } from '../../../utils/notificationEngine';
+import { triggerWorkflow } from '../../../utils/api';
 import { formatDateDDMMYY, formatTime12h } from '../../../utils/formatters';
 
 const fieldBase = 'w-full h-[38px] px-3 rounded-lg border border-line bg-white text-[13px] text-ink outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand transition-all';
@@ -776,22 +777,27 @@ export default function AdminStudents() {
                   e.stopPropagation();
                   const pendingAmount = (selected.package.amount || 0) - (parseInt(selected.package.amountReceived) || 0);
                   if (!selected.guardianEmail) { toast.error('Guardian email is not available'); return; }
-                  const mailto = preparePaymentReminder({
-                    studentName: selected.name,
-                    guardianEmail: selected.guardianEmail,
-                    program: selected.package.program,
-                    pendingAmount,
-                    hasPaymentUrl: false,
-                    paymentUrl: '',
-                  });
+                  try {
+                    await triggerWorkflow('payment.reminder', {
+                      packages: [selected.package],
+                      students: [selected],
+                      alreadyReminded: []
+                    });
+                    toast.success('Payment reminder sent via workflow');
+                  } catch (wfErr) {
+                    console.warn('Workflow failed, falling back to mailto:', wfErr);
+                    const mailto = preparePaymentReminder({
+                      studentName: selected.name, guardianEmail: selected.guardianEmail,
+                      program: selected.package.program, pendingAmount,
+                      hasPaymentUrl: false, paymentUrl: '',
+                    });
+                    toast.success('Opening payment reminder email');
+                    window.open(mailto, '_blank');
+                  }
                   await db.logPaymentReminder({
-                    studentId: selected.id,
-                    packageId: selected.package.id,
-                    guardianEmail: selected.guardianEmail,
-                    pendingAmount,
+                    studentId: selected.id, packageId: selected.package.id,
+                    guardianEmail: selected.guardianEmail, pendingAmount,
                   });
-                  toast.success('Opening payment reminder email');
-                  window.open(mailto, '_blank');
                 }}>Send Payment Reminder</Button>
               )}
             </div>

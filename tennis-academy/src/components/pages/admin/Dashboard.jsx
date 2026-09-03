@@ -166,12 +166,28 @@ export default function AdminDashboard() {
           {Object.entries(slotAnalysis.scopes || {}).map(([scope, data]) => (
             <div key={scope} className="bg-canvas-soft rounded-lg p-3 min-w-0 flex flex-col justify-between gap-2.5">
               <p className="text-[10px] font-semibold text-ink-muted uppercase truncate">{scope}</p>
-              <CapacityIndicator variant="bar" filled={data.booked} total={data.total} className="w-full" />
+              <div className="inline-flex flex-col items-start gap-1.5 min-w-0 max-w-full w-full">
+                <div className="w-full min-w-[60px] h-2 bg-line rounded-full overflow-hidden">
+                  <div className="h-full bg-brand rounded-full transition-all duration-300" style={{ width: data.total > 0 ? Math.round((data.booked / data.total) * 100) + '%' : '0%' }} />
+                </div>
+                <div className="flex items-center justify-between gap-2 w-full text-[10px] text-ink-faint font-mono leading-none">
+                  <span>{data.booked}/{data.total}</span>
+                  <span className="text-[10px] font-medium text-ink-muted">{data.total > 0 ? Math.round((data.booked / data.total) * 100) : 0}%</span>
+                </div>
+              </div>
             </div>
           ))}
           <div className="bg-brand-50 rounded-lg p-3 min-w-0 flex flex-col justify-between gap-2.5">
             <p className="text-[10px] font-semibold text-brand-600 uppercase truncate">ACADEMY</p>
-            <CapacityIndicator variant="bar" filled={slotAnalysis.academy.booked} total={slotAnalysis.academy.total} className="w-full" />
+            <div className="inline-flex flex-col items-start gap-1.5 min-w-0 max-w-full w-full">
+              <div className="w-full min-w-[60px] h-2 bg-line rounded-full overflow-hidden">
+                <div className="h-full bg-brand rounded-full transition-all duration-300" style={{ width: slotAnalysis.academy.total > 0 ? Math.round((slotAnalysis.academy.booked / slotAnalysis.academy.total) * 100) + '%' : '0%' }} />
+              </div>
+              <div className="flex items-center justify-between gap-2 w-full text-[10px] text-ink-faint font-mono leading-none">
+                <span>{slotAnalysis.academy.booked}/{slotAnalysis.academy.total}</span>
+                <span className="text-[10px] font-medium text-ink-muted">{slotAnalysis.academy.total > 0 ? Math.round((slotAnalysis.academy.booked / slotAnalysis.academy.total) * 100) : 0}%</span>
+              </div>
+            </div>
           </div>
         </div>
       </Card>
