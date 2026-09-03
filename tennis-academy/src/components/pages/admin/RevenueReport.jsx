@@ -7,7 +7,7 @@ import StatusPill from '../../ui/StatusPill';
 import { toast } from 'sonner';
 import { Download, IndianRupee, Printer, Mail, AlertCircle } from 'lucide-react';
 import { preparePaymentReminder } from '../../../utils/notificationEngine';
-import { formatDateDDMMYY } from '../../../utils/formatters';
+import { formatDateDDMMYY, getBatchDisplayName } from '../../../utils/formatters';
 
 export default function RevenueReport() {
   const { db, tick } = useDb();
@@ -125,7 +125,7 @@ export default function RevenueReport() {
           guardianPhone: stu?.guardianPhone || '',
           guardianEmail: stu?.guardianEmail || '',
           category: p.program || 'Unknown',
-          batchName: batch ? `${batch.program} (${batch.dayPattern})` : '—',
+          batchName: batch ? `${getBatchDisplayName(batch, state.courts)} (${batch.dayPattern})` : '—',
           totalAmount: amt,
           amountPaid: paid,
           pendingAmount: pending,

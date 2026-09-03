@@ -1,135 +1,95 @@
-import { useState, useMemo, useEffect } from 'react';
-import { Layers, Users, GraduationCap, Pencil } from 'lucide-react';
-import { toast } from 'sonner';
-import { supabase } from '../../../utils/supabase';
+import { useState, useMemo } from 'react';
+import { Layers, Users, GraduationCap, Pencil, Plus, Calendar } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useDb } from '../../../context/DbContext';
 import AdaptiveTable from '../../data/AdaptiveTable';
 import RowActionsMenu from '../../data/RowActionsMenu';
 import StatCard from '../../ui/StatCard';
 import StatusPill from '../../ui/StatusPill';
-import Modal from '../../ui/Modal';
-import Input from '../../ui/Input';
 import Button from '../../ui/Button';
-import Skeleton from '../../ui/Skeleton';
+import CapacityIndicator from '../../ui/CapacityIndicator';
+import { formatTime12h, getTodayPattern, getBatchDisplayName } from '../../../utils/formatters';
 
-const INITIAL_FORM = { name: '', coach: '', level: 'beginner', schedule: '', capacity: '', status: 'active' };
+const PATTERNS = ['TODAY', 'MWF', 'TTS', 'SAT_SUN', 'ALL'];
 
 export default function Batches() {
-  const [editItem, setEditItem] = useState(null);
-  const [form, setForm] = useState(INITIAL_FORM);
-  const [batches, setBatches] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const { db, tick } = useDb();
+  const state = useMemo(() => db.readAll(), [db, tick]);
+  const { batches = [], courts = [], coaches = [], enrollments = [] } = state;
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('batches')
-        .select('*, coaches(name), students(id)');
-      if (cancelled) return;
-      if (error) {
-        console.error('[Batches] Supabase error:', error);
-        toast.error('Failed to load batches');
-        setLoading(false);
-        return;
-      }
-      setBatches((data || []).map(b => ({
-        id: b.id,
-        name: b.name,
-        coach: b.coaches?.name ?? 'Unassigned',
-        business_entity: b.entity,
-        level: b.level,
-        schedule: b.schedule_text ?? '',
-        capacity: b.capacity,
-        enrolled: Array.isArray(b.students) ? b.students.length : 0,
-        status: b.status,
-        ageGroup: b.age_group ?? '',
-        location: b.location ?? '',
-      })));
-      setLoading(false);
+  const todayPattern = getTodayPattern();
+  const [selectedPattern, setSelectedPattern] = useState('TODAY');
+
+  const processedBatches = useMemo(() => {
+    return batches
+      .filter((b) => b.status === 'ACTIVE')
+      .map((b) => {
+        const roster = enrollments.filter((e) => e.batchId === b.id && e.status === 'ACTIVE');
+        const court = courts.find((c) => c.id === b.courtId);
+        const coach = coaches.find((c) => c.id === b.primaryCoachId);
+        const displayName = getBatchDisplayName(b, courts);
+        return {
+          ...b,
+          displayName,
+          courtName: court?.name || 'Court',
+          coachName: coach?.name || 'Unassigned',
+          enrolled: roster.length,
+          scheduleText: `${b.dayPattern} · ${formatTime12h(b.startTime)} - ${formatTime12h(b.endTime)}`,
+        };
+      });
+  }, [batches, enrollments, courts, coaches]);
+
+  const filteredBatches = useMemo(() => {
+    if (selectedPattern === 'TODAY') {
+      return processedBatches.filter((b) => b.dayPattern === todayPattern);
     }
-    load();
-    return () => { cancelled = true; };
-  }, []);
-
-  const filteredBatches = batches;
+    if (selectedPattern === 'ALL') {
+      return processedBatches;
+    }
+    return processedBatches.filter((b) => b.dayPattern === selectedPattern);
+  }, [processedBatches, selectedPattern, todayPattern]);
 
   const stats = useMemo(() => ({
     total: filteredBatches.length,
-    capacity: filteredBatches.reduce((s, b) => s + b.capacity, 0),
-    enrolled: filteredBatches.reduce((s, b) => s + b.enrolled, 0),
+    capacity: filteredBatches.reduce((s, b) => s + (b.capacity || 0), 0),
+    enrolled: filteredBatches.reduce((s, b) => s + (b.enrolled || 0), 0),
   }), [filteredBatches]);
-
-  const openEdit = (batch) => {
-    setEditItem(batch);
-    setForm({
-      name: batch.name,
-      coach: batch.coach,
-      level: batch.level,
-      schedule: batch.schedule,
-      capacity: String(batch.capacity),
-      status: batch.status,
-    });
-  };
-
-  const handleSave = async () => {
-    try {
-      const { error } = await supabase
-        .from('batches')
-        .update({
-          name: form.name,
-          level: form.level,
-          schedule_text: form.schedule,
-          capacity: parseInt(form.capacity, 10) || 0,
-          status: form.status,
-        })
-        .eq('id', editItem.id);
-      if (error) throw error;
-      toast.success(`Batch "${form.name}" updated successfully`);
-      setEditItem(null);
-      setBatches(prev => prev.map(b => b.id === editItem.id ? { ...b, name: form.name, level: form.level, schedule: form.schedule, capacity: parseInt(form.capacity, 10) || 0, status: form.status } : b));
-    } catch (err) {
-      console.error('[Batches] Save error:', err);
-      toast.error('Failed to update batch');
-    }
-  };
 
   const columns = useMemo(() => [
     {
-      accessorKey: 'name',
-      header: 'Name',
-      cell: ({ getValue }) => (
-        <span className="font-medium text-ink">{getValue()}</span>
+      accessorKey: 'displayName',
+      header: 'Batch Name',
+      cell: ({ row }) => (
+        <div
+          onClick={() => navigate(`/admin/batches/${row.original.id}`)}
+          className="font-semibold text-ink hover:text-brand cursor-pointer transition-colors"
+        >
+          {row.original.displayName}
+        </div>
       ),
     },
     {
-      accessorKey: 'coach',
+      accessorKey: 'coachName',
       header: 'Coach',
       cell: ({ getValue }) => (
-        <span className="text-ink-muted text-xs">{getValue()}</span>
+        <span className="text-ink-muted text-xs font-medium">{getValue()}</span>
       ),
     },
     {
-      accessorKey: 'business_entity',
+      accessorKey: 'entity',
       header: 'Business Entity',
       cell: ({ getValue }) => (
         <span className="px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-brand-50 text-brand-600 capitalize">
-          {getValue() === 'the-club' ? 'The Club' : "TOTS Tennis"}
+          {getValue() === 'The Club' || getValue() === 'the-club' ? 'The Club' : 'TOTS Tennis'}
         </span>
       ),
     },
     {
-      accessorKey: 'level',
-      header: 'Level',
+      accessorKey: 'dayPattern',
+      header: 'Days',
       cell: ({ getValue }) => (
-        <StatusPill status={getValue()} />
-      ),
-    },
-    {
-      accessorKey: 'schedule',
-      header: 'Schedule',
-      cell: ({ getValue }) => (
-        <span className="text-ink-muted text-xs">{getValue()}</span>
+        <span className="font-mono text-xs font-semibold text-ink-muted">{getValue()}</span>
       ),
     },
     {
@@ -141,146 +101,111 @@ export default function Batches() {
     },
     {
       id: 'enrolled',
-      header: 'Enrolled',
+      header: 'Enrolled / Occupancy',
       cell: ({ row }) => {
         const { enrolled, capacity } = row.original;
-        const pct = capacity > 0 ? Math.round((enrolled / capacity) * 100) : 0;
-        return (
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-ink text-xs w-10">{enrolled}/{capacity}</span>
-            <div className="w-20 h-2 bg-canvas-soft rounded-full overflow-hidden">
-              <div
-                className="h-full bg-brand rounded-full transition-all"
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-            <span className="text-ink-faint text-xs">{pct}%</span>
-          </div>
-        );
+        return <CapacityIndicator filled={enrolled} total={capacity} />;
       },
     },
     {
       accessorKey: 'status',
       header: 'Status',
-      cell: ({ getValue }) => (
-        <StatusPill status={getValue()} />
-      ),
+      cell: ({ getValue }) => <StatusPill status={getValue()} />,
     },
     {
       id: 'actions',
       header: '',
       cell: ({ row }) => (
         <RowActionsMenu
-          actions={[{ label: 'Edit', icon: Pencil, onClick: () => openEdit(row.original) }]}
-          itemLabel={row.original.name}
+          actions={[
+            { label: 'View Details', icon: Pencil, onClick: () => navigate(`/admin/batches/${row.original.id}`) },
+          ]}
+          itemLabel={row.original.displayName}
         />
       ),
       enableSorting: false,
       size: 48,
     },
-  ], []);
+  ], [navigate]);
 
   const renderCard = (batch) => {
-    const pct = batch.capacity > 0 ? Math.round((batch.enrolled / batch.capacity) * 100) : 0;
     return (
-      <div className="space-y-3">
-        <div className="flex items-start justify-between">
+      <div
+        onClick={() => navigate(`/admin/batches/${batch.id}`)}
+        className="space-y-3 cursor-pointer group"
+      >
+        <div className="flex items-start justify-between gap-2">
           <div>
-            <h4 className="font-semibold text-ink">{batch.name}</h4>
-            <p className="text-xs text-ink-muted">{batch.coach}</p>
+            <h4 className="font-semibold text-ink group-hover:text-brand transition-colors text-sm">{batch.displayName}</h4>
+            <p className="text-xs text-ink-muted font-medium">Coach: {batch.coachName}</p>
           </div>
           <StatusPill status={batch.status} />
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-ink-muted">{batch.schedule}</span>
+        <div className="flex items-center gap-2 text-xs text-ink-muted">
+          <span>{batch.scheduleText}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-full h-2.5 bg-canvas-soft rounded-full overflow-hidden">
-            <div
-              className="h-full bg-brand rounded-full transition-all"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-          <span className="text-xs font-mono text-ink whitespace-nowrap">{batch.enrolled}/{batch.capacity} ({pct}%)</span>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <StatusPill status={batch.level} />
-          <span className="px-2 py-0.5 rounded-lg text-[10px] font-medium bg-brand-50 text-brand-600 capitalize">
-            {batch.business_entity === 'the-club' ? 'The Club' : "TOTS Tennis"}
+        <CapacityIndicator filled={batch.enrolled} total={batch.capacity} />
+        <div className="flex items-center gap-2 flex-wrap pt-1">
+          <span className="px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-brand-50 text-brand-600 capitalize">
+            {batch.entity === 'The Club' || batch.entity === 'the-club' ? 'The Club' : 'TOTS Tennis'}
+          </span>
+          <span className="font-mono text-[11px] font-medium text-ink-muted px-2 py-0.5 rounded bg-canvas-soft">
+            {batch.dayPattern}
           </span>
         </div>
       </div>
     );
   };
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <Skeleton.SkeletonCard /><Skeleton.SkeletonCard /><Skeleton.SkeletonCard />
-        </div>
-        <Skeleton.SkeletonTable />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2 items-center">
+          {PATTERNS.map((p) => {
+            const isToday = p === 'TODAY';
+            let label = p;
+            if (p === 'TODAY') label = `Today's Batches (${todayPattern})`;
+            else if (p === 'SAT_SUN') label = 'Sat & Sun';
+            else if (p === 'ALL') label = 'All Batches';
+
+            return (
+              <button
+                key={p}
+                onClick={() => setSelectedPattern(p)}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                  selectedPattern === p
+                    ? 'bg-brand-50 text-brand-600 border border-brand/20 shadow-sm'
+                    : 'text-ink-muted hover:bg-canvas-soft border border-transparent'
+                }`}
+              >
+                <span>{label}</span>
+                {isToday && (
+                  <span className="px-1.5 py-0.5 text-[9px] font-bold bg-brand text-white rounded-full uppercase tracking-wider">
+                    Today
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <Button size="sm" icon={Plus} onClick={() => navigate('/admin/batches/new')}>
+          Add Batch
+        </Button>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatCard icon={Layers} label="Total Batches" value={stats.total} />
+        <StatCard icon={Layers} label="Batches Shown" value={stats.total} />
         <StatCard icon={Users} label="Total Capacity" value={stats.capacity} />
-        <StatCard icon={GraduationCap} label="Enrolled" value={stats.enrolled} color="ok" />
+        <StatCard icon={GraduationCap} label="Enrolled Students" value={stats.enrolled} color="ok" />
       </div>
 
       <AdaptiveTable
         data={filteredBatches}
         columns={columns}
         renderCard={renderCard}
-        searchPlaceholder="Search batches..."
-        emptyMessage="No batches found"
+        searchPlaceholder="Search batches by name, court, coach..."
+        emptyMessage="No batches found for this selection"
       />
-
-      <Modal open={!!editItem} onClose={() => setEditItem(null)} title="Edit Batch" size="md">
-        <div className="space-y-4">
-          <Input label="Batch Name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Coach" value={form.coach} onChange={e => setForm(f => ({ ...f, coach: e.target.value }))} />
-            <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-ink-muted">Level</label>
-              <select
-                value={form.level}
-                onChange={e => setForm(f => ({ ...f, level: e.target.value }))}
-                className="w-full h-[38px] px-3 rounded-lg border border-line bg-white text-[13px] text-ink outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand"
-              >
-                <option value="beginner">Beginner</option>
-                <option value="intermediate">Intermediate</option>
-                <option value="advanced">Advanced</option>
-                <option value="all">All Levels</option>
-              </select>
-            </div>
-          </div>
-          <Input label="Schedule" value={form.schedule} onChange={e => setForm(f => ({ ...f, schedule: e.target.value }))} />
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Capacity" value={form.capacity} onChange={e => setForm(f => ({ ...f, capacity: e.target.value }))} />
-            <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-ink-muted">Status</label>
-              <select
-                value={form.status}
-                onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
-                className="w-full h-[38px] px-3 rounded-lg border border-line bg-white text-[13px] text-ink outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand"
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </div>
-          </div>
-          <div className="flex items-center justify-end gap-2 pt-2">
-            <Button variant="secondary" size="sm" onClick={() => setEditItem(null)}>Cancel</Button>
-            <Button variant="primary" size="sm" onClick={handleSave}>Save Changes</Button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }

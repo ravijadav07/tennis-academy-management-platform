@@ -3,7 +3,7 @@ import StatCard from '../../ui/StatCard';
 import Card from '../../ui/Card';
 import StatusPill from '../../ui/StatusPill';
 import CapacityIndicator from '../../ui/CapacityIndicator';
-import { formatTime12h } from '../../../utils/formatters';
+import { formatTime12h, getBatchDisplayName } from '../../../utils/formatters';
 import { useDb } from '../../../context/DbContext';
 import { useMemo, useState, useEffect } from 'react';
 import { Users, LayoutGrid, AlertTriangle, TrendingUp, Calendar, Clock, ShieldCheck } from 'lucide-react';
@@ -134,6 +134,22 @@ export default function AdminDashboard() {
                 <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider mb-2">{court?.name || 'Unknown Court'}</p>
                 <div className="space-y-1">
                   {batches.map((b) => {
+                    if (b._type === 'private') {
+                      return (
+                        <div
+                          key={b.id}
+                          className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 sm:gap-3 px-3 py-2 rounded-lg bg-[#F5F3FF] border border-brand/10 text-xs"
+                        >
+                          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-wrap">
+                            <span className="font-semibold text-brand-600 min-w-[70px]">Private Coaching</span>
+                            <span className="text-ink-muted shrink-0">{formatTime12h(b.startTime)} - {formatTime12h(b.endTime)}</span>
+                            <span className="text-ink-muted truncate">Client: {b.clientName}</span>
+                            <span className="text-ink-muted truncate">Coach: {b.coachName}</span>
+                          </div>
+                          <StatusPill status="confirmed" />
+                        </div>
+                      );
+                    }
                     const coach = state.coaches.find((c) => c.id === b.primaryCoachId);
                     const roster = state.enrollments.filter((e) => e.batchId === b.id && e.status === 'ACTIVE');
                     return (
@@ -143,7 +159,7 @@ export default function AdminDashboard() {
                         className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 sm:gap-3 px-3 py-2 rounded-lg bg-canvas-soft hover:bg-canvas-soft/80 cursor-pointer border border-transparent hover:border-brand/20 transition-all text-xs group"
                       >
                         <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-wrap">
-                          <span className="font-semibold text-ink min-w-[70px] group-hover:text-brand transition-colors">{b.name || `${b.program} ${b.dayPattern}`}</span>
+                          <span className="font-semibold text-ink min-w-[70px] group-hover:text-brand transition-colors">{getBatchDisplayName(b, state.courts)}</span>
                           <span className="text-ink-muted shrink-0">{formatTime12h(b.startTime)} - {formatTime12h(b.endTime)}</span>
                           <span className="text-ink-muted truncate">Coach: {coach?.name || '—'}</span>
                           {b.isSemiBatch && <StatusPill status="semi-batch" />}
@@ -166,28 +182,12 @@ export default function AdminDashboard() {
           {Object.entries(slotAnalysis.scopes || {}).map(([scope, data]) => (
             <div key={scope} className="bg-canvas-soft rounded-lg p-3 min-w-0 flex flex-col justify-between gap-2.5">
               <p className="text-[10px] font-semibold text-ink-muted uppercase truncate">{scope}</p>
-              <div className="inline-flex flex-col items-start gap-1.5 min-w-0 max-w-full w-full">
-                <div className="w-full min-w-[60px] h-2 bg-line rounded-full overflow-hidden">
-                  <div className="h-full bg-brand rounded-full transition-all duration-300" style={{ width: data.total > 0 ? Math.round((data.booked / data.total) * 100) + '%' : '0%' }} />
-                </div>
-                <div className="flex items-center justify-between gap-2 w-full text-[10px] text-ink-faint font-mono leading-none">
-                  <span>{data.booked}/{data.total}</span>
-                  <span className="text-[10px] font-medium text-ink-muted">{data.total > 0 ? Math.round((data.booked / data.total) * 100) : 0}%</span>
-                </div>
-              </div>
+              <CapacityIndicator filled={data.booked} total={data.total} variant="segments" maxBlocks={10} className="w-full" />
             </div>
           ))}
           <div className="bg-brand-50 rounded-lg p-3 min-w-0 flex flex-col justify-between gap-2.5">
             <p className="text-[10px] font-semibold text-brand-600 uppercase truncate">ACADEMY</p>
-            <div className="inline-flex flex-col items-start gap-1.5 min-w-0 max-w-full w-full">
-              <div className="w-full min-w-[60px] h-2 bg-line rounded-full overflow-hidden">
-                <div className="h-full bg-brand rounded-full transition-all duration-300" style={{ width: slotAnalysis.academy.total > 0 ? Math.round((slotAnalysis.academy.booked / slotAnalysis.academy.total) * 100) + '%' : '0%' }} />
-              </div>
-              <div className="flex items-center justify-between gap-2 w-full text-[10px] text-ink-faint font-mono leading-none">
-                <span>{slotAnalysis.academy.booked}/{slotAnalysis.academy.total}</span>
-                <span className="text-[10px] font-medium text-ink-muted">{slotAnalysis.academy.total > 0 ? Math.round((slotAnalysis.academy.booked / slotAnalysis.academy.total) * 100) : 0}%</span>
-              </div>
-            </div>
+            <CapacityIndicator filled={slotAnalysis.academy.booked} total={slotAnalysis.academy.total} variant="segments" maxBlocks={10} className="w-full" />
           </div>
         </div>
       </Card>

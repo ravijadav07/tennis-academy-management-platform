@@ -21,16 +21,37 @@ export function useDashboard() {
     return false;
   });
 
+  const todayPattern = (todayDay === 0 || todayDay === 6) ? 'SAT_SUN' : [1, 3, 5].includes(todayDay) ? 'MWF' : 'TTS';
+  const todayPrivates = (state.privateSessions || []).filter((s) => s.dayPattern === todayPattern);
+
   const todayByCourt = useMemo(() => {
     const map = {};
     todayBatches.forEach((b) => {
       const cid = b.courtId || 'unknown';
       if (!map[cid]) map[cid] = { court: courts.find((c) => c.id === cid), batches: [] };
-      map[cid].batches.push(b);
+      map[cid].batches.push({ ...b, _type: 'group' });
     });
+
+    todayPrivates.forEach((s) => {
+      const cid = s.courtId || 'unknown';
+      const coach = (coaches || []).find((c) => c.id === s.coachId);
+      if (!map[cid]) map[cid] = { court: courts.find((c) => c.id === cid), batches: [] };
+      map[cid].batches.push({
+        id: s.id,
+        _type: 'private',
+        name: `Private Coaching - ${s.clientName || 'Client'}`,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        primaryCoachId: s.coachId,
+        coachName: coach?.name || 'Coach',
+        clientName: s.clientName,
+        capacity: 1,
+      });
+    });
+
     Object.values(map).forEach((g) => g.batches.sort((a, b) => (a.startTime || '').localeCompare(b.startTime || '')));
     return Object.values(map);
-  }, [todayBatches, courts]);
+  }, [todayBatches, todayPrivates, courts, coaches]);
 
   // Attendance stats
   const todayAttendance = attendance.filter((a) => a.date === today);

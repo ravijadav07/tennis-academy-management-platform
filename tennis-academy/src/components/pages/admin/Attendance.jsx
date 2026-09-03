@@ -8,7 +8,7 @@ import Modal from '../../ui/Modal';
 import EligibilityStatusPill from '../../ui/EligibilityStatusPill';
 import Dropdown from '../../ui/Dropdown';
 import { CheckSquare, Printer, Loader2, UserPlus, FileText, ShieldCheck, Mail } from 'lucide-react';
-import { formatDateDDMMYY, formatTime12h } from '../../../utils/formatters';
+import { formatDateDDMMYY, formatTime12h, getBatchDisplayName } from '../../../utils/formatters';
 import { prepareAbsenceEmail, getNotificationWindow } from '../../../utils/notificationEngine';
 import { triggerWorkflow } from '../../../utils/api';
 import { toast } from 'sonner';
@@ -257,7 +257,7 @@ export default function AdminAttendance() {
             placeholder="Select batch..."
             options={state.batches.filter((b) => b.status === 'ACTIVE').map((b) => ({
               value: b.id,
-              label: `${b.program} ${b.dayPattern} (${formatTime12h(b.startTime)})`
+              label: `${getBatchDisplayName(b, state.courts)} (${b.dayPattern})`
             }))}
             getOptionLabel={(o) => (o && o.label) || ''}
             getOptionValue={(o) => (o && o.value) || ''}
@@ -281,7 +281,7 @@ export default function AdminAttendance() {
 
       {batch && (
         <Card>
-          <h3 className="text-sm font-semibold text-ink mb-3">{batch.name || `${batch.program} ${batch.dayPattern}`} {'\u2014'} {formatDateDDMMYY(selectedDate)}</h3>
+          <h3 className="text-sm font-semibold text-ink mb-3">{getBatchDisplayName(batch, state.courts)} ({batch.dayPattern}) {'\u2014'} {formatDateDDMMYY(selectedDate)}</h3>
           <div className="space-y-1">
             {roster.map((r) => {
               const displayStatus = r.optStatus || (r.attendance && r.attendance.status);

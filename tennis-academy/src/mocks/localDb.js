@@ -9,7 +9,7 @@
 // ---------------------------------------------------------------------------
 import SEED from './seedData';
 
-const KEY = 'ata.db.v3';
+const KEY = 'ata.db.v5';
 const LATENCY = 120;                       // fake network delay, keeps loading states honest
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const clone = (v) => JSON.parse(JSON.stringify(v));

@@ -66,3 +66,44 @@ export function relativeTime(dateStr) {
   if (days <= 7) return `${days}d left`;
   return formatDate(dateStr);
 }
+
+export function getTodayPattern() {
+  const day = new Date().getDay();
+  if (day === 0) return 'SAT_SUN';
+  if ([1, 3, 5].includes(day)) return 'MWF';
+  if ([2, 4, 6].includes(day)) return 'TTS';
+  return 'MWF';
+}
+
+export function getTodayPatternLabel() {
+  const p = getTodayPattern();
+  if (p === 'SAT_SUN') return 'Today (Sat & Sun)';
+  return `Today (${p})`;
+}
+
+export function getBatchDisplayName(batch, courts = []) {
+  if (!batch) return '';
+  if (batch.name) return batch.name;
+
+  const courtObj = (courts || []).find((c) => c.id === batch.courtId);
+  const courtName = courtObj ? courtObj.name : (batch.courtId ? batch.courtId.replace('court_', 'Court ') : 'Court');
+
+  const progMap = {
+    ADV: 'Advance',
+    INT: 'Intermediate',
+    BEG: 'Beginner',
+    ADULT: 'Adults',
+    JDP: 'JDP',
+    HPP: 'HPP',
+    WEEKEND: 'Weekend',
+    FITNESS: 'Fitness',
+  };
+  const progLabel = progMap[batch.program] || batch.program || '';
+  const ballText = batch.ballLevel ? `${batch.ballLevel} Ball` : '';
+  const timeText = batch.startTime && batch.endTime
+    ? `${formatTime12h(batch.startTime)} to ${formatTime12h(batch.endTime)}`
+    : batch.startTime ? formatTime12h(batch.startTime) : '';
+
+  const mid = [progLabel, ballText].filter(Boolean).join(' ');
+  return [courtName, mid, timeText].filter(Boolean).join(' - ');
+}

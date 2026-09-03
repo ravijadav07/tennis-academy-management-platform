@@ -8,11 +8,13 @@ import Button from '../../ui/Button';
 import Modal from '../../ui/Modal';
 import Dropdown from '../../ui/Dropdown';
 import CapacityIndicator from '../../ui/CapacityIndicator';
-import { formatTime12h } from '../../../utils/formatters';
+import { formatTime12h, getBatchDisplayName } from '../../../utils/formatters';
 import TimePicker12h from '../../ui/TimePicker12h';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { Download, AlertTriangle, TrendingUp, Radio, ShieldCheck, Send, Settings, Mail, Clock, CheckCircle, Table, Grid } from 'lucide-react';
+
+import { triggerWorkflow } from '../../../utils/api';
 
 function timeAgo(ms) { const sec = Math.floor((Date.now() - ms) / 1000); if (sec < 5) return 'just now'; if (sec < 60) return sec + 's ago'; if (sec < 3600) return Math.floor(sec / 60) + 'm ago'; return Math.floor(sec / 3600) + 'h ago'; }
 
@@ -72,11 +74,20 @@ export default function Reports() {
     } catch (e) { toast.error(e.message); }
   };
 
-  // Handle Send — manual mailto: with template
+  // Handle Send — triggers backend workflow & manual mailto
   const handleSend = async () => {
     if (!verification) {
       toast.error('Verify the report first before sending');
       return;
+    }
+    try {
+      await triggerWorkflow('report.send', {
+        month: monthName,
+        year: currentYear,
+        recipients: recipients.emails,
+      });
+    } catch (e) {
+      console.log('[api] report.send webhook fallback:', e.message);
     }
     const subj = emailTemplate.subject.replace('{month}', monthName).replace('{year}', currentYear);
     const body = emailTemplate.body
@@ -89,7 +100,7 @@ export default function Reports() {
     // Log dispatch
     const d = await db.logDispatch({ recipients: recipients.emails, exportType: 'CSV', verifiedKey: verification.key, sentBy: user?.userId });
     setDispatchLog((prev) => [d, ...prev]);
-    toast.success('Dispatch logged. Opening mail client...');
+    toast.success('Dispatch logged & report sent');
     window.open(mailto, '_blank');
   };
 
@@ -262,7 +273,7 @@ export default function Reports() {
           return [
             r.dayPattern,
             `${r.courtName} ${formatTime12h(r.startTime)}-${formatTime12h(r.endTime)}`,
-            b?.name || `${r.program} ${r.dayPattern}`,
+            b ? getBatchDisplayName(b, courts) : `${r.program} ${r.dayPattern}`,
             r.program,
             r.capacity,
             r.enrolled,

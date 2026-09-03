@@ -8,7 +8,7 @@ import StatusPill from '../../ui/StatusPill';
 import Modal from '../../ui/Modal';
 import { toast } from 'sonner';
 import { LogIn, LogOut, Clock, Coffee, MapPin, ChevronRight, CheckSquare } from 'lucide-react';
-import { formatDateDDMMYY, formatTime12h } from '../../../utils/formatters';
+import { formatDateDDMMYY, formatTime12h, getBatchDisplayName, getTodayPattern } from '../../../utils/formatters';
 
 function getToday() {
   const d = new Date();
@@ -21,6 +21,7 @@ export default function CoachToday() {
   const navigate = useNavigate();
   const state = useMemo(() => db.readAll(), [db, tick]);
   const today = getToday();
+  const todayPattern = getTodayPattern();
   const coachId = user?.linkedCoachId;
   const [showLeave, setShowLeave] = useState(false);
   const [showOT, setShowOT] = useState(false);
@@ -28,7 +29,11 @@ export default function CoachToday() {
 
   const coachAtt = (state.coachAttendance || []).find((a) => a.coachId === coachId && a.date === today);
   const checkedIn = !!coachAtt?.checkIn;
-  const batches = (state.batches || []).filter((b) => (b.primaryCoachId === coachId || b.supportCoachId === coachId) && b.status === 'ACTIVE');
+  const batches = (state.batches || []).filter(
+    (b) => (b.primaryCoachId === coachId || b.supportCoachId === coachId) &&
+           b.status === 'ACTIVE' &&
+           b.dayPattern === todayPattern
+  );
   const privSessions = (state.privateSessions || []).filter((s) => s.coachId === coachId && s.date === today);
 
   const handleCheckIn = async () => {
@@ -92,7 +97,7 @@ export default function CoachToday() {
       {/* Today's Schedule (Tap through to session roster) */}
       <Card>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-ink">My Batches ({batches.length})</h3>
+          <h3 className="text-sm font-semibold text-ink">My Today's Batches ({todayPattern}) ({batches.length})</h3>
           <span className="text-[11px] text-ink-faint">Tap to mark attendance</span>
         </div>
 
@@ -113,9 +118,8 @@ export default function CoachToday() {
                   <div className="min-w-0 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-sm text-ink group-hover:text-brand transition-colors">
-                        {b.program} {b.dayPattern}
+                        {getBatchDisplayName(b, state.courts)}
                       </span>
-                      {b.ballLevel && <span className="text-brand-600 text-xs font-medium">{b.ballLevel}</span>}
                       {isSupport && <span className="px-1.5 py-0.5 rounded text-[10px] bg-brand-50 text-brand-600 font-medium">Support Coach</span>}
                     </div>
                     <div className="flex items-center gap-3 text-xs text-ink-muted flex-wrap">

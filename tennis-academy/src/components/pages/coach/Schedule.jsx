@@ -1,66 +1,59 @@
-import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../../../utils/supabase';
+import { useMemo } from 'react';
 import { useAuth } from '../../../context/AuthContext';
+import { useDb } from '../../../context/DbContext';
 import AdaptiveTable from '../../data/AdaptiveTable';
 import StatusPill from '../../ui/StatusPill';
-import Skeleton from '../../ui/Skeleton';
-
-const DAY_ORDER = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+import { formatTime12h, getBatchDisplayName } from '../../../utils/formatters';
 
 export default function Schedule() {
   const { user } = useAuth();
-  const [schedule, setSchedule] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { db, tick } = useDb();
+  const state = useMemo(() => db.readAll(), [db, tick]);
+  const coachId = user?.linkedCoachId;
 
-  const fetchSchedule = useCallback(async () => {
-    setLoading(true);
-    try {
-      const coachName = user?.name;
-      if (!coachName) { setLoading(false); return; }
+  const schedule = useMemo(() => {
+    if (!coachId) return [];
 
-      const { data: coachRows } = await supabase
-        .from('coaches')
-        .select('id')
-        .eq('name', coachName)
-        .limit(1);
+    const coachBatches = (state.batches || [])
+      .filter((b) => (b.primaryCoachId === coachId || b.supportCoachId === coachId) && b.status === 'ACTIVE')
+      .map((b) => {
+        const court = (state.courts || []).find((c) => c.id === b.courtId);
+        const roster = (state.enrollments || []).filter((e) => e.batchId === b.id && e.status === 'ACTIVE');
+        return {
+          id: b.id,
+          type: 'group',
+          batchName: getBatchDisplayName(b, state.courts),
+          dayPattern: b.dayPattern,
+          time: `${formatTime12h(b.startTime)} - ${formatTime12h(b.endTime)}`,
+          studentsCount: roster.length,
+          location: court?.name || 'Court',
+          status: 'active',
+        };
+      });
 
-      if (!coachRows || coachRows.length === 0) { setLoading(false); return; }
-      const coachId = coachRows[0].id;
+    const privates = (state.privateSessions || [])
+      .filter((s) => s.coachId === coachId)
+      .map((s) => {
+        const court = (state.courts || []).find((c) => c.id === s.courtId);
+        return {
+          id: s.id,
+          type: 'one_on_one',
+          batchName: `Private - ${s.clientName || s.studentName || 'Client'}`,
+          dayPattern: s.date || 'Today',
+          time: `${formatTime12h(s.startTime || s.time)} - ${formatTime12h(s.endTime)}`,
+          studentsCount: 1,
+          location: court?.name || 'Court',
+          status: s.status || 'confirmed',
+        };
+      });
 
-      const { data: schedRows, error } = await supabase
-        .from('schedule')
-        .select('id, type, day, start_time, end_time, location, status, confirmation, batches(name), students(name)')
-        .eq('coach_id', coachId);
-
-      if (error) throw error;
-
-      const mapped = (schedRows || []).map(s => ({
-        id: s.id,
-        type: s.type,
-        batch: s.batches?.name || null,
-        student: s.students?.name || null,
-        day: s.day,
-        time: `${s.start_time?.substring(0, 5) || '--'} - ${s.end_time?.substring(0, 5) || '--'}`,
-        students: null,
-        location: s.location,
-        status: s.status,
-        confirmation: s.confirmation,
-      })).sort((a, b) => (DAY_ORDER[a.day] ?? 7) - (DAY_ORDER[b.day] ?? 7));
-
-      setSchedule(mapped);
-    } catch (err) {
-      console.error('Failed to fetch schedule:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
-  useEffect(() => { fetchSchedule(); }, [fetchSchedule]);
+    return [...coachBatches, ...privates];
+  }, [state.batches, state.courts, state.enrollments, state.privateSessions, coachId]);
 
   const columns = [
     {
-      accessorKey: 'day',
-      header: 'Day',
+      accessorKey: 'dayPattern',
+      header: 'Days / Date',
       cell: ({ getValue }) => (
         <span className="font-medium text-ink text-sm">{getValue()}</span>
       ),
@@ -80,39 +73,30 @@ export default function Schedule() {
       ),
     },
     {
-      accessorKey: 'batch',
-      header: 'Batch / Student',
-      cell: ({ row }) => (
-        <span className="text-sm text-ink">
-          {row.original.batch || row.original.student}
-        </span>
+      accessorKey: 'batchName',
+      header: 'Batch / Session',
+      cell: ({ getValue }) => (
+        <span className="text-sm font-semibold text-ink">{getValue()}</span>
       ),
     },
     {
-      accessorKey: 'students',
+      accessorKey: 'studentsCount',
       header: 'Students',
-      cell: ({ row }) => (
-        <span className="text-sm text-ink-muted">
-          {row.original.students != null ? row.original.students : '--'}
-        </span>
+      cell: ({ getValue }) => (
+        <span className="text-sm text-ink-muted">{getValue()} enrolled</span>
       ),
     },
     {
       accessorKey: 'location',
       header: 'Location',
       cell: ({ getValue }) => (
-        <span className="text-sm text-ink-muted">{getValue() || '--'}</span>
+        <span className="text-sm text-ink-muted">{getValue()}</span>
       ),
     },
     {
       accessorKey: 'status',
       header: 'Status',
-      cell: ({ row }) => {
-        if (row.original.type === 'one_on_one') {
-          return <StatusPill status={row.original.confirmation || 'not_sent'} />;
-        }
-        return <StatusPill status="confirmed" />;
-      },
+      cell: ({ getValue }) => <StatusPill status={getValue()} />,
     },
   ];
 
@@ -120,37 +104,28 @@ export default function Schedule() {
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold text-ink">{item.day}</span>
+          <span className="text-sm font-semibold text-ink">{item.dayPattern}</span>
           <span className="text-xs text-ink-muted font-mono">{item.time}</span>
         </div>
-        <StatusPill status={item.type === 'one_on_one' ? (item.confirmation || 'not_sent') : 'confirmed'} />
+        <StatusPill status={item.status} />
       </div>
       <div className="flex items-center gap-2 text-xs text-ink-muted">
         <StatusPill status={item.type === 'group' ? 'Group' : '1-on-1'} />
-        <span className="text-ink font-medium">{item.batch || item.student}</span>
-        {item.students != null && <span>{item.students} students</span>}
+        <span className="text-ink font-medium">{item.batchName}</span>
+        <span>({item.studentsCount} students)</span>
       </div>
-      {item.location && <p className="text-xs text-ink-faint">{item.location}</p>}
+      <p className="text-xs text-ink-faint">{item.location}</p>
     </div>
   );
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton.SkeletonTable rows={7} />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
-
       <AdaptiveTable
         data={schedule}
         columns={columns}
         renderCard={renderCard}
         searchPlaceholder="Search schedule..."
-        emptyMessage="No sessions scheduled"
+        emptyMessage="No sessions assigned to you"
       />
     </div>
   );

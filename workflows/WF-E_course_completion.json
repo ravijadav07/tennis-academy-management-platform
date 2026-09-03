@@ -1,4 +1,4 @@
-﻿{
+{
   "created": 1754800000000,
   "updated": 1755200000000,
   "name": "WF-E Course Completion & Certification",
@@ -20,13 +20,27 @@
         "pieceName": "@puchoaistudio/tool-webhook",
         "pieceVersion": "^2.0.4",
         "triggerName": "catch_webhook",
-        "input": { "authType": "none", "authFields": {} },
+        "input": {
+          "authType": "none",
+          "authFields": {}
+        },
         "propertySettings": {
-          "authType": { "type": "MANUAL" },
-          "authFields": { "type": "MANUAL", "schema": {} },
-          "liveMarkdown": { "type": "MANUAL" },
-          "syncMarkdown": { "type": "MANUAL" },
-          "testMarkdown": { "type": "MANUAL" }
+          "authType": {
+            "type": "MANUAL"
+          },
+          "authFields": {
+            "type": "MANUAL",
+            "schema": {}
+          },
+          "liveMarkdown": {
+            "type": "MANUAL"
+          },
+          "syncMarkdown": {
+            "type": "MANUAL"
+          },
+          "testMarkdown": {
+            "type": "MANUAL"
+          }
         },
         "sampleData": {}
       },
@@ -37,18 +51,26 @@
         "valid": true,
         "skip": false,
         "settings": {
-          "input": { "payload": "{{trigger['body']}}" },
+          "input": {
+            "payload": "{{trigger['body']}}"
+          },
           "sourceCode": {
             "code": "export const code = async (inputs) => {\n  const p = typeof inputs.payload === 'string' ? JSON.parse(inputs.payload) : inputs.payload;\n  const student_id = p.student_id || '';\n  const package_id = p.package_id || '';\n  const entity = p.entity || 'tots-tennis';\n  const today = new Date().toISOString().split('T')[0];\n  return {\n    student_id: String(student_id),\n    package_id: String(package_id),\n    entity: entity,\n    completion_date: today,\n    valid: student_id !== '' && package_id !== ''\n  };\n};",
             "packageJson": "{}"
           },
           "propertySettings": {
-            "payload": { "type": "MANUAL" }
+            "payload": {
+              "type": "MANUAL"
+            }
           },
           "sampleData": {},
           "errorHandlingOptions": {
-            "retryOnFailure": { "value": false },
-            "continueOnFailure": { "value": false }
+            "retryOnFailure": {
+              "value": false
+            },
+            "continueOnFailure": {
+              "value": false
+            }
           }
         },
         "nextAction": {
@@ -62,9 +84,16 @@
               {
                 "branchName": "Valid Request",
                 "branchType": "CONDITION",
-                "conditions": [[
-                  { "operator": "TEXT_EXACTLY_MATCHES", "firstValue": "{{step_1['valid']}}", "secondValue": "true", "caseSensitive": false }
-                ]]
+                "conditions": [
+                  [
+                    {
+                      "operator": "TEXT_EXACTLY_MATCHES",
+                      "firstValue": "{{step_1['valid']}}",
+                      "secondValue": "true",
+                      "caseSensitive": false
+                    }
+                  ]
+                ]
               },
               {
                 "branchName": "Invalid",
@@ -86,31 +115,52 @@
                   "table_name": "students",
                   "page": 1,
                   "pageSize": 1,
-"filters": [
-                      {
-                        "column": "id",
-                        "operator": "eq",
-                        "value": "{{step_1['student_id']}}"
-                      }
-                    ]
-                  },
-                  "pieceName": "@puchoaistudio/tool-supabase",
-                  "actionName": "search_rows",
-                  "pieceVersion": "^2.0.1",
-                  "propertySettings": {
-                    "auth": { "type": "MANUAL" },
-                    "page": { "type": "MANUAL" },
-                    "columns": { "type": "MANUAL" },
-                    "filters": { "type": "MANUAL" },
-                    "pageSize": { "type": "MANUAL" },
-                    "table_name": { "type": "MANUAL" },
-                    "countOption": { "type": "MANUAL" }
-                  },
-                  "sampleData": {},
-                  "errorHandlingOptions": { "retryOnFailure": { "value": true }, "continueOnFailure": { "value": false } }
+                  "filters": [
+                    {
+                      "column": "id",
+                      "operator": "eq",
+                      "value": "{{step_1['student_id']}}"
+                    }
+                  ]
                 },
-                "nextAction": {
-                  "name": "step_3",
+                "pieceName": "@puchoaistudio/tool-supabase",
+                "actionName": "search_rows",
+                "pieceVersion": "^2.0.1",
+                "propertySettings": {
+                  "auth": {
+                    "type": "MANUAL"
+                  },
+                  "page": {
+                    "type": "MANUAL"
+                  },
+                  "columns": {
+                    "type": "MANUAL"
+                  },
+                  "filters": {
+                    "type": "MANUAL"
+                  },
+                  "pageSize": {
+                    "type": "MANUAL"
+                  },
+                  "table_name": {
+                    "type": "MANUAL"
+                  },
+                  "countOption": {
+                    "type": "MANUAL"
+                  }
+                },
+                "sampleData": {},
+                "errorHandlingOptions": {
+                  "retryOnFailure": {
+                    "value": true
+                  },
+                  "continueOnFailure": {
+                    "value": false
+                  }
+                }
+              },
+              "nextAction": {
+                "name": "step_3",
                 "type": "PIECE",
                 "displayName": "Mark Student Completed",
                 "valid": true,
@@ -119,7 +169,9 @@
                   "input": {
                     "auth": "",
                     "table_name": "students",
-                    "update_data": { "status": "completed" },
+                    "update_data": {
+                      "status": "completed"
+                    },
                     "filter_column": "id",
                     "filter_value": "{{step_1['student_id']}}",
                     "filter_type": "eq",
@@ -131,23 +183,51 @@
                   "actionName": "update_row",
                   "pieceVersion": "^2.0.1",
                   "propertySettings": {
-                    "auth": { "type": "MANUAL" },
-                    "table_name": { "type": "MANUAL" },
-                    "filter_type": { "type": "MANUAL" },
+                    "auth": {
+                      "type": "MANUAL"
+                    },
+                    "table_name": {
+                      "type": "MANUAL"
+                    },
+                    "filter_type": {
+                      "type": "MANUAL"
+                    },
                     "update_data": {
                       "type": "MANUAL",
                       "schema": {
-                        "status": { "type": "SHORT_TEXT", "required": false, "displayName": "status", "defaultValue": "" }
+                        "status": {
+                          "type": "SHORT_TEXT",
+                          "required": false,
+                          "displayName": "status",
+                          "defaultValue": ""
+                        }
                       }
                     },
-                    "filter_value": { "type": "MANUAL" },
-                    "count_updated": { "type": "MANUAL" },
-                    "filter_column": { "type": "MANUAL" },
-                    "filter_values": { "type": "MANUAL" },
-                    "return_updated": { "type": "MANUAL" }
+                    "filter_value": {
+                      "type": "MANUAL"
+                    },
+                    "count_updated": {
+                      "type": "MANUAL"
+                    },
+                    "filter_column": {
+                      "type": "MANUAL"
+                    },
+                    "filter_values": {
+                      "type": "MANUAL"
+                    },
+                    "return_updated": {
+                      "type": "MANUAL"
+                    }
                   },
                   "sampleData": {},
-                  "errorHandlingOptions": { "retryOnFailure": { "value": true }, "continueOnFailure": { "value": false } }
+                  "errorHandlingOptions": {
+                    "retryOnFailure": {
+                      "value": true
+                    },
+                    "continueOnFailure": {
+                      "value": false
+                    }
+                  }
                 },
                 "nextAction": {
                   "name": "step_4",
@@ -173,16 +253,37 @@
                     "actionName": "search_rows",
                     "pieceVersion": "^2.0.1",
                     "propertySettings": {
-                      "auth": { "type": "MANUAL" },
-                      "page": { "type": "MANUAL" },
-                      "columns": { "type": "MANUAL" },
-                      "filters": { "type": "MANUAL" },
-                      "pageSize": { "type": "MANUAL" },
-                      "table_name": { "type": "MANUAL" },
-                      "countOption": { "type": "MANUAL" }
+                      "auth": {
+                        "type": "MANUAL"
+                      },
+                      "page": {
+                        "type": "MANUAL"
+                      },
+                      "columns": {
+                        "type": "MANUAL"
+                      },
+                      "filters": {
+                        "type": "MANUAL"
+                      },
+                      "pageSize": {
+                        "type": "MANUAL"
+                      },
+                      "table_name": {
+                        "type": "MANUAL"
+                      },
+                      "countOption": {
+                        "type": "MANUAL"
+                      }
                     },
                     "sampleData": {},
-                    "errorHandlingOptions": { "retryOnFailure": { "value": true }, "continueOnFailure": { "value": false } }
+                    "errorHandlingOptions": {
+                      "retryOnFailure": {
+                        "value": true
+                      },
+                      "continueOnFailure": {
+                        "value": false
+                      }
+                    }
                   },
                   "nextAction": {
                     "name": "step_5",
@@ -209,24 +310,57 @@
                       "actionName": "update_row",
                       "pieceVersion": "^2.0.1",
                       "propertySettings": {
-                        "auth": { "type": "MANUAL" },
-                        "table_name": { "type": "MANUAL" },
-                        "filter_type": { "type": "MANUAL" },
+                        "auth": {
+                          "type": "MANUAL"
+                        },
+                        "table_name": {
+                          "type": "MANUAL"
+                        },
+                        "filter_type": {
+                          "type": "MANUAL"
+                        },
                         "update_data": {
                           "type": "MANUAL",
                           "schema": {
-                            "status": { "type": "SHORT_TEXT", "required": false, "displayName": "status", "defaultValue": "" },
-                            "payment_status": { "type": "SHORT_TEXT", "required": false, "displayName": "payment_status", "defaultValue": "" }
+                            "status": {
+                              "type": "SHORT_TEXT",
+                              "required": false,
+                              "displayName": "status",
+                              "defaultValue": ""
+                            },
+                            "payment_status": {
+                              "type": "SHORT_TEXT",
+                              "required": false,
+                              "displayName": "payment_status",
+                              "defaultValue": ""
+                            }
                           }
                         },
-                        "filter_value": { "type": "MANUAL" },
-                        "count_updated": { "type": "MANUAL" },
-                        "filter_column": { "type": "MANUAL" },
-                        "filter_values": { "type": "MANUAL" },
-                        "return_updated": { "type": "MANUAL" }
+                        "filter_value": {
+                          "type": "MANUAL"
+                        },
+                        "count_updated": {
+                          "type": "MANUAL"
+                        },
+                        "filter_column": {
+                          "type": "MANUAL"
+                        },
+                        "filter_values": {
+                          "type": "MANUAL"
+                        },
+                        "return_updated": {
+                          "type": "MANUAL"
+                        }
                       },
                       "sampleData": {},
-                      "errorHandlingOptions": { "retryOnFailure": { "value": true }, "continueOnFailure": { "value": false } }
+                      "errorHandlingOptions": {
+                        "retryOnFailure": {
+                          "value": true
+                        },
+                        "continueOnFailure": {
+                          "value": false
+                        }
+                      }
                     },
                     "nextAction": {
                       "name": "step_5b",
@@ -252,16 +386,37 @@
                         "actionName": "search_rows",
                         "pieceVersion": "^2.0.1",
                         "propertySettings": {
-                          "auth": { "type": "MANUAL" },
-                          "page": { "type": "MANUAL" },
-                          "columns": { "type": "MANUAL" },
-                          "filters": { "type": "MANUAL" },
-                          "pageSize": { "type": "MANUAL" },
-                          "table_name": { "type": "MANUAL" },
-                          "countOption": { "type": "MANUAL" }
+                          "auth": {
+                            "type": "MANUAL"
+                          },
+                          "page": {
+                            "type": "MANUAL"
+                          },
+                          "columns": {
+                            "type": "MANUAL"
+                          },
+                          "filters": {
+                            "type": "MANUAL"
+                          },
+                          "pageSize": {
+                            "type": "MANUAL"
+                          },
+                          "table_name": {
+                            "type": "MANUAL"
+                          },
+                          "countOption": {
+                            "type": "MANUAL"
+                          }
                         },
                         "sampleData": {},
-                        "errorHandlingOptions": { "retryOnFailure": { "value": true }, "continueOnFailure": { "value": false } }
+                        "errorHandlingOptions": {
+                          "retryOnFailure": {
+                            "value": true
+                          },
+                          "continueOnFailure": {
+                            "value": false
+                          }
+                        }
                       },
                       "nextAction": {
                         "name": "step_5c",
@@ -287,16 +442,37 @@
                           "actionName": "search_rows",
                           "pieceVersion": "^2.0.1",
                           "propertySettings": {
-                            "auth": { "type": "MANUAL" },
-                            "page": { "type": "MANUAL" },
-                            "columns": { "type": "MANUAL" },
-                            "filters": { "type": "MANUAL" },
-                            "pageSize": { "type": "MANUAL" },
-                            "table_name": { "type": "MANUAL" },
-                            "countOption": { "type": "MANUAL" }
+                            "auth": {
+                              "type": "MANUAL"
+                            },
+                            "page": {
+                              "type": "MANUAL"
+                            },
+                            "columns": {
+                              "type": "MANUAL"
+                            },
+                            "filters": {
+                              "type": "MANUAL"
+                            },
+                            "pageSize": {
+                              "type": "MANUAL"
+                            },
+                            "table_name": {
+                              "type": "MANUAL"
+                            },
+                            "countOption": {
+                              "type": "MANUAL"
+                            }
                           },
                           "sampleData": {},
-                          "errorHandlingOptions": { "retryOnFailure": { "value": true }, "continueOnFailure": { "value": false } }
+                          "errorHandlingOptions": {
+                            "retryOnFailure": {
+                              "value": true
+                            },
+                            "continueOnFailure": {
+                              "value": false
+                            }
+                          }
                         },
                         "nextAction": {
                           "name": "step_cert_check",
@@ -320,19 +496,39 @@
                               "packageJson": "{}"
                             },
                             "propertySettings": {
-                              "student_id": { "type": "MANUAL" },
-                              "package_id": { "type": "MANUAL" },
-                              "student_name": { "type": "MANUAL" },
-                              "course_name": { "type": "MANUAL" },
-                              "completion_date": { "type": "MANUAL" },
-                              "coach_name": { "type": "MANUAL" },
-                              "entity": { "type": "MANUAL" },
-                              "completion_id": { "type": "MANUAL" }
+                              "student_id": {
+                                "type": "MANUAL"
+                              },
+                              "package_id": {
+                                "type": "MANUAL"
+                              },
+                              "student_name": {
+                                "type": "MANUAL"
+                              },
+                              "course_name": {
+                                "type": "MANUAL"
+                              },
+                              "completion_date": {
+                                "type": "MANUAL"
+                              },
+                              "coach_name": {
+                                "type": "MANUAL"
+                              },
+                              "entity": {
+                                "type": "MANUAL"
+                              },
+                              "completion_id": {
+                                "type": "MANUAL"
+                              }
                             },
                             "sampleData": {},
                             "errorHandlingOptions": {
-                              "retryOnFailure": { "value": true },
-                              "continueOnFailure": { "value": false }
+                              "retryOnFailure": {
+                                "value": true
+                              },
+                              "continueOnFailure": {
+                                "value": false
+                              }
                             }
                           },
                           "nextAction": {
@@ -360,24 +556,72 @@
                               "actionName": "create_row",
                               "pieceVersion": "^2.0.1",
                               "propertySettings": {
-                                "auth": { "type": "MANUAL" },
+                                "auth": {
+                                  "type": "MANUAL"
+                                },
                                 "row_data": {
                                   "type": "MANUAL",
                                   "schema": {
-                                    "student_id": { "type": "SHORT_TEXT", "required": false, "displayName": "student_id", "defaultValue": "" },
-                                    "parent_id": { "type": "SHORT_TEXT", "required": false, "displayName": "parent_id", "defaultValue": "" },
-                                    "type": { "type": "SHORT_TEXT", "required": false, "displayName": "type", "defaultValue": "" },
-                                    "channel": { "type": "SHORT_TEXT", "required": false, "displayName": "channel", "defaultValue": "" },
-                                    "status": { "type": "SHORT_TEXT", "required": false, "displayName": "status", "defaultValue": "" },
-                                    "date": { "type": "SHORT_TEXT", "required": false, "displayName": "date", "defaultValue": "" },
-                                    "file_link": { "type": "SHORT_TEXT", "required": false, "displayName": "file_link", "defaultValue": "" }
+                                    "student_id": {
+                                      "type": "SHORT_TEXT",
+                                      "required": false,
+                                      "displayName": "student_id",
+                                      "defaultValue": ""
+                                    },
+                                    "parent_id": {
+                                      "type": "SHORT_TEXT",
+                                      "required": false,
+                                      "displayName": "parent_id",
+                                      "defaultValue": ""
+                                    },
+                                    "type": {
+                                      "type": "SHORT_TEXT",
+                                      "required": false,
+                                      "displayName": "type",
+                                      "defaultValue": ""
+                                    },
+                                    "channel": {
+                                      "type": "SHORT_TEXT",
+                                      "required": false,
+                                      "displayName": "channel",
+                                      "defaultValue": ""
+                                    },
+                                    "status": {
+                                      "type": "SHORT_TEXT",
+                                      "required": false,
+                                      "displayName": "status",
+                                      "defaultValue": ""
+                                    },
+                                    "date": {
+                                      "type": "SHORT_TEXT",
+                                      "required": false,
+                                      "displayName": "date",
+                                      "defaultValue": ""
+                                    },
+                                    "file_link": {
+                                      "type": "SHORT_TEXT",
+                                      "required": false,
+                                      "displayName": "file_link",
+                                      "defaultValue": ""
+                                    }
                                   }
                                 },
-                                "return_row": { "type": "MANUAL" },
-                                "table_name": { "type": "MANUAL" }
+                                "return_row": {
+                                  "type": "MANUAL"
+                                },
+                                "table_name": {
+                                  "type": "MANUAL"
+                                }
                               },
                               "sampleData": {},
-                              "errorHandlingOptions": { "retryOnFailure": { "value": true }, "continueOnFailure": { "value": false } }
+                              "errorHandlingOptions": {
+                                "retryOnFailure": {
+                                  "value": true
+                                },
+                                "continueOnFailure": {
+                                  "value": false
+                                }
+                              }
                             },
                             "nextAction": {
                               "name": "step_7",
@@ -388,11 +632,15 @@
                               "settings": {
                                 "input": {
                                   "auth": "",
-                                  "receiver": ["{{step_5c[0]['email']}}"],
+                                  "receiver": [
+                                    "{{step_5c[0]['email']}}"
+                                  ],
                                   "subject": "Congratulations! Course Completed - Arnav Jain Tennis Academy",
                                   "body": "Dear {{step_5c[0]['name']}},\n\nYour child {{step_2[0]['name']}} has successfully completed the tennis program at Arnav Jain Tennis Academy!\n\nCompletion Date: {{step_1['completion_date']}}\n\nYour certificate is attached to this email. You can also download it anytime from your parent portal.\n\nWe are proud of this achievement and wish them the very best in their future tennis journey.\n\nBest regards,\nArnav Jain Tennis Academy",
                                   "body_type": "text",
-                                  "cc": [], "bcc": [], "reply_to": [],
+                                  "cc": [],
+                                  "bcc": [],
+                                  "reply_to": [],
                                   "draft": false,
                                   "attachment": "{{step_cert_check['file_path']}}",
                                   "attachment_name": "Certificate_{{step_2[0]['name']}}_{{step_1['completion_date']}}.pdf"
@@ -401,22 +649,55 @@
                                 "actionName": "send_email",
                                 "pieceVersion": "^2.0.4",
                                 "propertySettings": {
-                                  "auth": { "type": "MANUAL" },
-                                  "receiver": { "type": "MANUAL" },
-                                  "subject": { "type": "MANUAL" },
-                                  "body": { "type": "MANUAL" },
-                                  "body_type": { "type": "MANUAL" },
-                                  "cc": { "type": "MANUAL" },
-                                  "bcc": { "type": "MANUAL" },
-                                  "reply_to": { "type": "MANUAL" },
-                                  "draft": { "type": "MANUAL" },
-                                  "from": { "type": "MANUAL" },
-                                  "sender_name": { "type": "MANUAL" },
-                                  "attachment": { "type": "MANUAL" },
-                                  "attachment_name": { "type": "MANUAL" }
+                                  "auth": {
+                                    "type": "MANUAL"
+                                  },
+                                  "receiver": {
+                                    "type": "MANUAL"
+                                  },
+                                  "subject": {
+                                    "type": "MANUAL"
+                                  },
+                                  "body": {
+                                    "type": "MANUAL"
+                                  },
+                                  "body_type": {
+                                    "type": "MANUAL"
+                                  },
+                                  "cc": {
+                                    "type": "MANUAL"
+                                  },
+                                  "bcc": {
+                                    "type": "MANUAL"
+                                  },
+                                  "reply_to": {
+                                    "type": "MANUAL"
+                                  },
+                                  "draft": {
+                                    "type": "MANUAL"
+                                  },
+                                  "from": {
+                                    "type": "MANUAL"
+                                  },
+                                  "sender_name": {
+                                    "type": "MANUAL"
+                                  },
+                                  "attachment": {
+                                    "type": "MANUAL"
+                                  },
+                                  "attachment_name": {
+                                    "type": "MANUAL"
+                                  }
                                 },
                                 "sampleData": {},
-                                "errorHandlingOptions": { "retryOnFailure": { "value": false }, "continueOnFailure": { "value": true } }
+                                "errorHandlingOptions": {
+                                  "retryOnFailure": {
+                                    "value": false
+                                  },
+                                  "continueOnFailure": {
+                                    "value": true
+                                  }
+                                }
                               },
                               "nextAction": {
                                 "name": "step_8",
@@ -448,16 +729,40 @@
                                     "fields": {
                                       "type": "MANUAL",
                                       "schema": {
-                                        "body": { "type": "JSON", "required": true, "displayName": "JSON Body" },
-                                        "status": { "type": "NUMBER", "required": false, "displayName": "Status", "defaultValue": 200 },
-                                        "headers": { "type": "OBJECT", "required": false, "displayName": "Headers" }
+                                        "body": {
+                                          "type": "JSON",
+                                          "required": true,
+                                          "displayName": "JSON Body"
+                                        },
+                                        "status": {
+                                          "type": "NUMBER",
+                                          "required": false,
+                                          "displayName": "Status",
+                                          "defaultValue": 200
+                                        },
+                                        "headers": {
+                                          "type": "OBJECT",
+                                          "required": false,
+                                          "displayName": "Headers"
+                                        }
                                       }
                                     },
-                                    "respond": { "type": "MANUAL" },
-                                    "responseType": { "type": "MANUAL" }
+                                    "respond": {
+                                      "type": "MANUAL"
+                                    },
+                                    "responseType": {
+                                      "type": "MANUAL"
+                                    }
                                   },
                                   "sampleData": {},
-                                  "errorHandlingOptions": { "retryOnFailure": { "value": false }, "continueOnFailure": { "value": false } }
+                                  "errorHandlingOptions": {
+                                    "retryOnFailure": {
+                                      "value": false
+                                    },
+                                    "continueOnFailure": {
+                                      "value": false
+                                    }
+                                  }
                                 }
                               }
                             }
@@ -495,16 +800,40 @@
                   "fields": {
                     "type": "MANUAL",
                     "schema": {
-                      "body": { "type": "JSON", "required": true, "displayName": "JSON Body" },
-                      "status": { "type": "NUMBER", "required": false, "displayName": "Status", "defaultValue": 200 },
-                      "headers": { "type": "OBJECT", "required": false, "displayName": "Headers" }
+                      "body": {
+                        "type": "JSON",
+                        "required": true,
+                        "displayName": "JSON Body"
+                      },
+                      "status": {
+                        "type": "NUMBER",
+                        "required": false,
+                        "displayName": "Status",
+                        "defaultValue": 200
+                      },
+                      "headers": {
+                        "type": "OBJECT",
+                        "required": false,
+                        "displayName": "Headers"
+                      }
                     }
                   },
-                  "respond": { "type": "MANUAL" },
-                  "responseType": { "type": "MANUAL" }
+                  "respond": {
+                    "type": "MANUAL"
+                  },
+                  "responseType": {
+                    "type": "MANUAL"
+                  }
                 },
                 "sampleData": {},
-                "errorHandlingOptions": { "retryOnFailure": { "value": false }, "continueOnFailure": { "value": false } }
+                "errorHandlingOptions": {
+                  "retryOnFailure": {
+                    "value": false
+                  },
+                  "continueOnFailure": {
+                    "value": false
+                  }
+                }
               }
             }
           ],

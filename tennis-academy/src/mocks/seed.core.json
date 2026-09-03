@@ -1521,11 +1521,11 @@
     },
     {
       "id": "b_mwf_fit_a",
-      "name": "Court 6 - Fitness - 5:30 to 6:15pm",
+      "name": "Court 6 - Fitness - 18:15 to 19:00",
       "dayPattern": "MWF",
       "courtId": "court_6",
-      "startTime": "17:30",
-      "endTime": "18:15",
+      "startTime": "18:15",
+      "endTime": "19:00",
       "program": "FITNESS",
       "ballLevel": "",
       "capacity": 6,
@@ -1540,11 +1540,11 @@
     },
     {
       "id": "b_mwf_fit_b",
-      "name": "Court 6 - Fitness - 6:15 to 7:15pm",
+      "name": "Court 6 - Fitness - 19:00 to 19:45",
       "dayPattern": "MWF",
       "courtId": "court_6",
-      "startTime": "18:15",
-      "endTime": "19:15",
+      "startTime": "19:00",
+      "endTime": "19:45",
       "program": "FITNESS",
       "ballLevel": "",
       "capacity": 6,
@@ -1692,11 +1692,11 @@
     },
     {
       "id": "b_tts_fit_c6",
-      "name": "Court 6 - Fitness - 5:00 to 6:00pm",
+      "name": "Court 6 - Fitness - 17:45 to 18:45",
       "dayPattern": "TTS",
       "courtId": "court_6",
-      "startTime": "17:00",
-      "endTime": "18:00",
+      "startTime": "17:45",
+      "endTime": "18:45",
       "program": "FITNESS",
       "ballLevel": "",
       "capacity": 6,
@@ -5061,6 +5061,358 @@
       "sheetValue": 1,
       "rosterValue": 3,
       "note": "Intermediate booked recorded as 1; three INT-tagged names appear on TTS rosters."
+    }
+  ],
+  "privateSessions": [
+    {
+      "id": "ps_mwf_c2_6am",
+      "courtId": "court_2",
+      "dayPattern": "MWF",
+      "startTime": "06:00",
+      "endTime": "07:00",
+      "clientName": "Vivaan Lodha",
+      "coachId": "coach_jagdish",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_mwf_c3_6am",
+      "courtId": "court_3",
+      "dayPattern": "MWF",
+      "startTime": "06:00",
+      "endTime": "07:00",
+      "clientName": "Mihail M",
+      "coachId": "coach_santosh",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_mwf_c4_6am",
+      "courtId": "court_4",
+      "dayPattern": "MWF",
+      "startTime": "06:00",
+      "endTime": "07:00",
+      "clientName": "Arjun Choudhary",
+      "coachId": "coach_nanu",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_mwf_c4_7am",
+      "courtId": "court_4",
+      "dayPattern": "MWF",
+      "startTime": "07:00",
+      "endTime": "08:00",
+      "clientName": "Shauraya Sekhani",
+      "coachId": "coach_karim",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_mwf_c4_8am",
+      "courtId": "court_4",
+      "dayPattern": "MWF",
+      "startTime": "08:00",
+      "endTime": "09:00",
+      "clientName": "Arhaan Sanghvi",
+      "coachId": "coach_nanu",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_mwf_c4_9am",
+      "courtId": "court_4",
+      "dayPattern": "MWF",
+      "startTime": "09:00",
+      "endTime": "10:00",
+      "clientName": "Ananya Rajani",
+      "coachId": "coach_santosh",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_mwf_c4_6pm",
+      "courtId": "court_4",
+      "dayPattern": "MWF",
+      "startTime": "18:00",
+      "endTime": "19:00",
+      "clientName": "Amara Yalla",
+      "coachId": "coach_vinod",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_mwf_c4_7pm",
+      "courtId": "court_4",
+      "dayPattern": "MWF",
+      "startTime": "19:00",
+      "endTime": "20:00",
+      "clientName": "Ivana Ganeriwal",
+      "coachId": "coach_anil",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_mwf_c4_8pm",
+      "courtId": "court_4",
+      "dayPattern": "MWF",
+      "startTime": "20:00",
+      "endTime": "21:00",
+      "clientName": "Zayn Winston",
+      "coachId": "coach_anil",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_mwf_c5_6am",
+      "courtId": "court_5",
+      "dayPattern": "MWF",
+      "startTime": "06:00",
+      "endTime": "07:00",
+      "clientName": "Aadvik Shah",
+      "coachId": "coach_sunil",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_mwf_c5_7am",
+      "courtId": "court_5",
+      "dayPattern": "MWF",
+      "startTime": "07:00",
+      "endTime": "08:00",
+      "clientName": "Devin Pittan",
+      "coachId": "coach_karan",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_mwf_c5_8am",
+      "courtId": "court_5",
+      "dayPattern": "MWF",
+      "startTime": "08:00",
+      "endTime": "09:00",
+      "clientName": "Hirvaan Mehta",
+      "coachId": "coach_sunil",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_mwf_c5_9am",
+      "courtId": "court_5",
+      "dayPattern": "MWF",
+      "startTime": "09:00",
+      "endTime": "10:00",
+      "clientName": "Kaira Vajifdar",
+      "coachId": "coach_karan",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_mwf_c5_615pm",
+      "courtId": "court_5",
+      "dayPattern": "MWF",
+      "startTime": "18:15",
+      "endTime": "19:15",
+      "clientName": "Kavir Chopra",
+      "coachId": "coach_anil",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_mwf_c5_715pm",
+      "courtId": "court_5",
+      "dayPattern": "MWF",
+      "startTime": "19:15",
+      "endTime": "20:15",
+      "clientName": "Shivan Chauhan",
+      "coachId": "coach_anil",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_mwf_c5_815pm",
+      "courtId": "court_5",
+      "dayPattern": "MWF",
+      "startTime": "20:15",
+      "endTime": "21:15",
+      "clientName": "Advait Parekh",
+      "coachId": "coach_anil",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_mwf_c6_6am",
+      "courtId": "court_6",
+      "dayPattern": "MWF",
+      "startTime": "06:00",
+      "endTime": "07:00",
+      "clientName": "Aarush Mehta",
+      "coachId": "coach_sunil",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_mwf_c6_7am",
+      "courtId": "court_6",
+      "dayPattern": "MWF",
+      "startTime": "07:00",
+      "endTime": "08:00",
+      "clientName": "Vivaan Mehra",
+      "coachId": "coach_karan",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_tts_c3_230pm",
+      "courtId": "court_3",
+      "dayPattern": "TTS",
+      "startTime": "14:30",
+      "endTime": "15:30",
+      "clientName": "Arun N",
+      "coachId": "coach_jagdish",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_tts_c3_330pm",
+      "courtId": "court_3",
+      "dayPattern": "TTS",
+      "startTime": "15:30",
+      "endTime": "16:30",
+      "clientName": "Ahaan Kewalramani",
+      "coachId": "coach_jagdish",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_tts_c4_730am",
+      "courtId": "court_4",
+      "dayPattern": "TTS",
+      "startTime": "07:30",
+      "endTime": "08:30",
+      "clientName": "Viana Shah",
+      "coachId": "coach_nanu",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_tts_c4_830am",
+      "courtId": "court_4",
+      "dayPattern": "TTS",
+      "startTime": "08:30",
+      "endTime": "10:00",
+      "clientName": "Anahat Goenka",
+      "coachId": "coach_nanu",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_tts_c4_230pm",
+      "courtId": "court_4",
+      "dayPattern": "TTS",
+      "startTime": "14:30",
+      "endTime": "15:30",
+      "clientName": "Avish Shah",
+      "coachId": "coach_santosh",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_tts_c4_330pm",
+      "courtId": "court_4",
+      "dayPattern": "TTS",
+      "startTime": "15:30",
+      "endTime": "17:00",
+      "clientName": "Anaiza Jhaveri",
+      "coachId": "coach_santosh",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_tts_c4_6pm",
+      "courtId": "court_4",
+      "dayPattern": "TTS",
+      "startTime": "18:00",
+      "endTime": "19:00",
+      "clientName": "Kianna Jain",
+      "coachId": "coach_vinod",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_tts_c4_7pm",
+      "courtId": "court_4",
+      "dayPattern": "TTS",
+      "startTime": "19:00",
+      "endTime": "20:00",
+      "clientName": "Parth Mehta",
+      "coachId": "coach_vinod",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_tts_c4_8pm",
+      "courtId": "court_4",
+      "dayPattern": "TTS",
+      "startTime": "20:00",
+      "endTime": "21:00",
+      "clientName": "Tanuj Gupte",
+      "coachId": "coach_vinod",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_tts_c5_8am",
+      "courtId": "court_5",
+      "dayPattern": "TTS",
+      "startTime": "08:00",
+      "endTime": "09:00",
+      "clientName": "Shivaay Ruia",
+      "coachId": "coach_karan",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_tts_c5_9am",
+      "courtId": "court_5",
+      "dayPattern": "TTS",
+      "startTime": "09:00",
+      "endTime": "10:00",
+      "clientName": "Vansh Katari",
+      "coachId": "coach_karan",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_tts_c5_6pm",
+      "courtId": "court_5",
+      "dayPattern": "TTS",
+      "startTime": "18:00",
+      "endTime": "19:00",
+      "clientName": "Prabhit Kanakia",
+      "coachId": "coach_anil",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_tts_c5_7pm",
+      "courtId": "court_5",
+      "dayPattern": "TTS",
+      "startTime": "19:00",
+      "endTime": "20:00",
+      "clientName": "Dhven Mukhi",
+      "coachId": "coach_anil",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_tts_c5_8pm",
+      "courtId": "court_5",
+      "dayPattern": "TTS",
+      "startTime": "20:00",
+      "endTime": "21:00",
+      "clientName": "Ziana Vora",
+      "coachId": "coach_anil",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_tts_c6_6am",
+      "courtId": "court_6",
+      "dayPattern": "TTS",
+      "startTime": "06:00",
+      "endTime": "07:00",
+      "clientName": "Kyra Golcha",
+      "coachId": "coach_sunil",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_tts_c6_7am",
+      "courtId": "court_6",
+      "dayPattern": "TTS",
+      "startTime": "07:00",
+      "endTime": "08:00",
+      "clientName": "Aditya Kapadia",
+      "coachId": "coach_sunil",
+      "status": "CONFIRMED"
+    },
+    {
+      "id": "ps_tts_c6_8am",
+      "courtId": "court_6",
+      "dayPattern": "TTS",
+      "startTime": "08:00",
+      "endTime": "09:00",
+      "clientName": "Ananya Kapadia",
+      "coachId": "coach_sunil",
+      "status": "CONFIRMED"
     }
   ]
 }

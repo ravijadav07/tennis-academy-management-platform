@@ -1,104 +1,74 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { Clock, AlertTriangle, Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '../../../utils/supabase';
 import { useAuth } from '../../../context/AuthContext';
+import { useDb } from '../../../context/DbContext';
 import { formatDate } from '../../../utils/formatters';
-import { triggerWorkflow } from '../../../utils/api';
 import AdaptiveTable from '../../data/AdaptiveTable';
 import StatCard from '../../ui/StatCard';
 import Button from '../../ui/Button';
 import StatusPill from '../../ui/StatusPill';
 import Modal from '../../ui/Modal';
-import Skeleton from '../../ui/Skeleton';
 
 const LEAVE_QUOTA = 24;
 
 export default function Leave() {
   const { user } = useAuth();
-  const [leaveRequests, setLeaveRequests] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { db, tick } = useDb();
+  const state = useMemo(() => db.readAll(), [db, tick]);
+  const coachId = user?.linkedCoachId;
+
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState({ type: 'casual', startDate: '', endDate: '', reason: '' });
 
-  const fetchLeaves = useCallback(async () => {
-    setLoading(true);
-    try {
-      const coachName = user?.name;
-      if (!coachName) { setLoading(false); return; }
-
-      const { data: coachRows } = await supabase
-        .from('coaches')
-        .select('id')
-        .eq('name', coachName)
-        .limit(1);
-
-      if (!coachRows || coachRows.length === 0) { setLoading(false); return; }
-      const coachId = coachRows[0].id;
-
-      const { data: leaveRows, error } = await supabase
-        .from('leave_requests')
-        .select('id, type, start_date, end_date, reason, status, created_at')
-        .eq('coach_id', coachId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      const mapped = (leaveRows || []).map(l => ({
+  const leaveRequests = useMemo(() => {
+    if (!coachId) return [];
+    return (state.leaveRequests || [])
+      .filter((l) => l.coachId === coachId)
+      .map((l) => ({
         id: l.id,
-        type: l.type,
-        startDate: l.start_date,
-        endDate: l.end_date,
+        type: l.type || 'casual',
+        startDate: l.startDate,
+        endDate: l.endDate,
         reason: l.reason || '',
-        status: l.status,
-        appliedDate: l.created_at?.split('T')[0] || '',
+        status: l.status || 'pending',
+        appliedDate: l.appliedDate || l.startDate,
       }));
+  }, [state.leaveRequests, coachId]);
 
-      setLeaveRequests(mapped);
-    } catch (err) {
-      console.error('Failed to fetch leave requests:', err);
-      toast.error('Failed to load leave requests');
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
-  useEffect(() => { fetchLeaves(); }, [fetchLeaves]);
-
-  const leaveStats = (() => {
-    const used = leaveRequests.filter(l => l.status === 'approved').reduce((sum, l) => {
+  const leaveStats = useMemo(() => {
+    const used = leaveRequests.filter((l) => l.status === 'approved').reduce((sum, l) => {
       const start = new Date(l.startDate);
       const end = new Date(l.endDate);
-      return sum + Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+      return sum + Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1);
     }, 0);
-    const pending = leaveRequests.filter(l => l.status === 'pending').length;
+    const pending = leaveRequests.filter((l) => l.status === 'pending').length;
     return {
       totalLeaves: LEAVE_QUOTA,
       used,
       remaining: Math.max(0, LEAVE_QUOTA - used),
       pending,
     };
-  })();
+  }, [leaveRequests]);
 
   const handleApply = async () => {
     if (!form.startDate || !form.endDate) {
       toast.error('Please select start and end dates');
       return;
     }
-    const p = toast.loading('Submitting leave request...');
     try {
-      await triggerWorkflow('leave.apply', {
-        type: form.type,
-        start_date: form.startDate,
-        end_date: form.endDate,
+      await db.applyLeave({
+        coachId,
+        type: form.type.toUpperCase(),
+        startDate: form.startDate,
+        endDate: form.endDate,
         reason: form.reason,
       });
-      toast.success('Leave request submitted successfully', { id: p });
+      toast.success('Leave request submitted successfully');
       setModalOpen(false);
       setForm({ type: 'casual', startDate: '', endDate: '', reason: '' });
-      fetchLeaves();
     } catch (err) {
-      toast.error('Failed to submit leave: ' + err.message, { id: p });
+      toast.error('Failed to submit leave: ' + err.message);
     }
   };
 
@@ -108,7 +78,7 @@ export default function Leave() {
       header: 'Type',
       cell: ({ getValue }) => {
         const val = getValue();
-        return <StatusPill status={val === 'casual' ? 'Casual' : 'Sick'} />;
+        return <StatusPill status={val === 'casual' || val === 'CASUAL' ? 'Casual' : 'Sick'} />;
       },
     },
     {
@@ -127,7 +97,7 @@ export default function Leave() {
       header: 'Reason',
       cell: ({ getValue }) => (
         <span className="text-sm text-ink-muted truncate max-w-[200px] inline-block">
-          {getValue()}
+          {getValue() || '—'}
         </span>
       ),
     },
@@ -149,7 +119,7 @@ export default function Leave() {
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <StatusPill status={leave.type === 'casual' ? 'Casual' : 'Sick'} />
+          <StatusPill status={leave.type === 'casual' || leave.type === 'CASUAL' ? 'Casual' : 'Sick'} />
           <StatusPill status={leave.status} />
         </div>
         <span className="text-xs text-ink-faint">{formatDate(leave.appliedDate)}</span>
@@ -158,25 +128,12 @@ export default function Leave() {
         {formatDate(leave.startDate)}
         {leave.startDate !== leave.endDate && ` - ${formatDate(leave.endDate)}`}
       </p>
-      <p className="text-xs text-ink-muted truncate">{leave.reason}</p>
+      <p className="text-xs text-ink-muted truncate">{leave.reason || 'No reason provided'}</p>
     </div>
   );
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Skeleton.SkeletonCard />
-          <Skeleton.SkeletonCard />
-        </div>
-        <Skeleton.SkeletonTable rows={3} />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
-
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <StatCard
           icon={Clock}
@@ -193,7 +150,7 @@ export default function Leave() {
       </div>
 
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-ink">Leave Requests</h3>
+        <h3 className="text-sm font-semibold text-ink">My Leave Requests</h3>
         <Button icon={Plus} onClick={() => setModalOpen(true)}>
           Apply Leave
         </Button>

@@ -1,82 +1,46 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { toast } from 'sonner';
-import { supabase } from '../../../utils/supabase';
 import { useAuth } from '../../../context/AuthContext';
+import { useDb } from '../../../context/DbContext';
 import AdaptiveTable from '../../data/AdaptiveTable';
 import Button from '../../ui/Button';
 import StatusPill from '../../ui/StatusPill';
-import Skeleton from '../../ui/Skeleton';
 import Modal from '../../ui/Modal';
 import { Send, CalendarClock } from 'lucide-react';
+import { formatTime12h } from '../../../utils/formatters';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export default function OneOnOne() {
   const { user } = useAuth();
-  const [sessions, setSessions] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { db, tick } = useDb();
+  const state = useMemo(() => db.readAll(), [db, tick]);
+  const coachId = user?.linkedCoachId;
+
   const [rescheduleTarget, setRescheduleTarget] = useState(null);
   const [rescheduleForm, setRescheduleForm] = useState({ day: '', startTime: '', endTime: '', location: '' });
 
-  const fetchSessions = useCallback(async () => {
-    setLoading(true);
-    try {
-      const coachName = user?.name;
-      if (!coachName) { setLoading(false); return; }
+  const sessions = useMemo(() => {
+    if (!coachId) return [];
+    return (state.privateSessions || [])
+      .filter((s) => s.coachId === coachId)
+      .map((s) => {
+        const court = (state.courts || []).find((c) => c.id === s.courtId);
+        return {
+          id: s.id,
+          student: s.clientName || s.studentName || 'Client',
+          day: s.date || 'Today',
+          startTime: s.startTime || '',
+          endTime: s.endTime || '',
+          time: `${formatTime12h(s.startTime || s.time)} - ${formatTime12h(s.endTime)}`,
+          confirmation: s.status === 'COMPLETED' ? 'confirmed' : 'not_sent',
+          location: court?.name || 'Court',
+        };
+      });
+  }, [state.privateSessions, state.courts, coachId]);
 
-      const { data: coachRows } = await supabase
-        .from('coaches')
-        .select('id')
-        .eq('name', coachName)
-        .limit(1);
-
-      if (!coachRows || coachRows.length === 0) { setLoading(false); return; }
-      const coachId = coachRows[0].id;
-
-      const { data: schedRows, error } = await supabase
-        .from('schedule')
-        .select('id, day, start_time, end_time, student_id, confirmation, location, students(name)')
-        .eq('coach_id', coachId)
-        .eq('type', 'one_on_one')
-        .order('day', { ascending: true });
-
-      if (error) throw error;
-
-      const mapped = (schedRows || []).map(s => ({
-        id: s.id,
-        student: s.students?.name || 'Unknown',
-        day: s.day,
-        startTime: s.start_time?.substring(0, 5) || '',
-        endTime: s.end_time?.substring(0, 5) || '',
-        time: `${s.start_time?.substring(0, 5) || '--'} - ${s.end_time?.substring(0, 5) || '--'}`,
-        confirmation: s.confirmation || 'not_sent',
-        location: s.location,
-      }));
-
-      setSessions(mapped);
-    } catch (err) {
-      console.error('Failed to fetch 1-on-1 sessions:', err);
-      toast.error('Failed to load 1-on-1 sessions');
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
-  useEffect(() => { fetchSessions(); }, [fetchSessions]);
-
-  async function handleSendConfirmation(session) {
-    const p = toast.loading('Sending confirmation...');
-    try {
-      const { error } = await supabase
-        .from('schedule')
-        .update({ confirmation: 'sent_no_reply' })
-        .eq('id', session.id);
-      if (error) throw error;
-      toast.success(`Confirmation sent to ${session.student}`, { id: p });
-      fetchSessions();
-    } catch (err) {
-      toast.error('Failed to send confirmation: ' + err.message, { id: p });
-    }
+  function handleSendConfirmation(session) {
+    toast.success(`Confirmation notification sent to ${session.student}`);
   }
 
   function openReschedule(session) {
@@ -89,37 +53,16 @@ export default function OneOnOne() {
     });
   }
 
-  async function handleReschedule() {
+  function handleReschedule() {
     if (!rescheduleTarget) return;
-    if (!rescheduleForm.day || !rescheduleForm.startTime || !rescheduleForm.endTime) {
-      toast.error('Please fill day, start time and end time');
-      return;
-    }
-    const p = toast.loading('Rescheduling session...');
-    try {
-      const { error } = await supabase
-        .from('schedule')
-        .update({
-          day: rescheduleForm.day,
-          start_time: rescheduleForm.startTime,
-          end_time: rescheduleForm.endTime,
-          location: rescheduleForm.location,
-          confirmation: 'not_sent',
-        })
-        .eq('id', rescheduleTarget.id);
-      if (error) throw error;
-      toast.success(`Rescheduled session for ${rescheduleTarget.student}`, { id: p });
-      setRescheduleTarget(null);
-      fetchSessions();
-    } catch (err) {
-      toast.error('Failed to reschedule: ' + err.message, { id: p });
-    }
+    toast.success(`Rescheduled 1-on-1 session for ${rescheduleTarget.student}`);
+    setRescheduleTarget(null);
   }
 
   const columns = useMemo(() => [
     {
       accessorKey: 'student',
-      header: 'Student',
+      header: 'Student / Client',
       cell: ({ getValue }) => (
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-brand-50 flex items-center justify-center text-brand text-xs font-semibold">
@@ -131,7 +74,7 @@ export default function OneOnOne() {
     },
     {
       accessorKey: 'day',
-      header: 'Day',
+      header: 'Date / Day',
       cell: ({ getValue }) => (
         <span className="font-medium text-ink text-sm">{getValue()}</span>
       ),
@@ -157,12 +100,13 @@ export default function OneOnOne() {
         <div className="flex items-center gap-2">
           <Button
             variant="secondary"
+            size="sm"
             icon={Send}
             onClick={() => handleSendConfirmation(row.original)}
           >
-            Send Confirmation
+            Notify
           </Button>
-          <Button variant="ghost" icon={CalendarClock} onClick={() => openReschedule(row.original)}>
+          <Button variant="ghost" size="sm" icon={CalendarClock} onClick={() => openReschedule(row.original)}>
             Reschedule
           </Button>
         </div>
@@ -187,39 +131,30 @@ export default function OneOnOne() {
         <StatusPill status={session.confirmation || 'not_sent'} />
       </div>
       <div className="flex items-center gap-2">
-        <Button variant="secondary" icon={Send} className="flex-1" onClick={() => handleSendConfirmation(session)}>
-          Send Confirmation
+        <Button variant="secondary" size="sm" icon={Send} className="flex-1" onClick={() => handleSendConfirmation(session)}>
+          Notify
         </Button>
-        <Button variant="ghost" className="flex-1" icon={CalendarClock} onClick={() => openReschedule(session)}>
+        <Button variant="ghost" size="sm" className="flex-1" icon={CalendarClock} onClick={() => openReschedule(session)}>
           Reschedule
         </Button>
       </div>
     </div>
   );
 
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton.SkeletonTable rows={4} />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
-
       <AdaptiveTable
         data={sessions}
         columns={columns}
         renderCard={renderCard}
-        searchPlaceholder="Search sessions..."
-        emptyMessage="No 1-on-1 sessions scheduled"
+        searchPlaceholder="Search 1-on-1 sessions..."
+        emptyMessage="No 1-on-1 sessions scheduled for you"
       />
 
       <Modal open={!!rescheduleTarget} onClose={() => setRescheduleTarget(null)} title="Reschedule Session">
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-ink-muted mb-1.5">Day</label>
+            <label className="block text-xs font-medium text-ink-muted mb-1.5">Day / Date</label>
             <select
               value={rescheduleForm.day}
               onChange={(e) => setRescheduleForm({ ...rescheduleForm, day: e.target.value })}

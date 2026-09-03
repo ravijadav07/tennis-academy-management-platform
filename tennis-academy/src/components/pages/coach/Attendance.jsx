@@ -19,7 +19,7 @@ import {
   Calendar,
   MessageSquare
 } from 'lucide-react';
-import { formatDateDDMMYY, formatTime12h } from '../../../utils/formatters';
+import { formatDateDDMMYY, formatTime12h, getBatchDisplayName, getTodayPattern } from '../../../utils/formatters';
 
 function getToday() {
   const d = new Date();
@@ -38,12 +38,16 @@ export default function CoachAttendance() {
   const [selectedDate, setSelectedDate] = useState(today);
   const isPastDate = selectedDate < today;
 
-  // Coach's assigned batches
+  const todayPattern = getTodayPattern();
+  // Coach's assigned batches for today's pattern
   const coachBatches = useMemo(() => {
+    if (!coachId) return [];
     return (state.batches || []).filter(
-      (b) => (b.primaryCoachId === coachId || b.supportCoachId === coachId) && b.status === 'ACTIVE'
+      (b) => (b.primaryCoachId === coachId || b.supportCoachId === coachId) &&
+             b.status === 'ACTIVE' &&
+             b.dayPattern === todayPattern
     );
-  }, [state.batches, coachId]);
+  }, [state.batches, coachId, todayPattern]);
 
   const paramBatchId = searchParams.get('batchId');
   const [selectedBatchId, setSelectedBatchId] = useState(
@@ -242,7 +246,7 @@ export default function CoachAttendance() {
                 }}
                 options={coachBatches.map((b) => ({
                   value: b.id,
-                  label: b.name || `${b.program} ${b.dayPattern} (${formatTime12h(b.startTime)})`,
+                  label: getBatchDisplayName(b, state.courts),
                 }))}
                 getOptionLabel={(o) => o?.label || ''}
                 getOptionValue={(o) => o?.value || ''}

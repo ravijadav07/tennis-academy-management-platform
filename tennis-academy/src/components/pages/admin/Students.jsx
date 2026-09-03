@@ -13,7 +13,7 @@ import { Search, Plus, Pencil, Archive, UserPlus, FileText, RefreshCw, Mail } fr
 import { GST_RATE } from '../../../utils/settings';
 import { preparePaymentReminder } from '../../../utils/notificationEngine';
 import { triggerWorkflow } from '../../../utils/api';
-import { formatDateDDMMYY, formatTime12h } from '../../../utils/formatters';
+import { formatDateDDMMYY, formatTime12h, getBatchDisplayName } from '../../../utils/formatters';
 
 const fieldBase = 'w-full h-[38px] px-3 rounded-lg border border-line bg-white text-[13px] text-ink outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand transition-all';
 const labelCls = 'block text-[10px] font-semibold text-ink-muted uppercase tracking-[0.04em] mb-1';
@@ -185,7 +185,7 @@ function renderEnrollmentBlock(blk, setBlk, removable, onRemove, batchOptions = 
       React.createElement('div', { className: 'grid grid-cols-2 gap-3 mt-3' },
         React.createElement('div', { className: 'space-y-1' },
           React.createElement('label', { className: labelCls }, 'Batch (Priority 3) *'),
-          React.createElement(Dropdown, { value: blk.batchId, onChange: (v) => setBlk({ ...blk, batchId: typeof v === 'object' ? (v?.value || '') : (v || '') }), placeholder: !blk.program ? 'Select Category first' : batches.length === 0 ? 'No batches available' : 'Select batch...', disabled: !blk.program || batches.length === 0, options: batches.map((b) => ({ value: b.id, label: `${b.name || `${b.program}${b.ballLevel ? ' · ' + b.ballLevel : ''} (${b.startTime || ''})`} (${b.dayPattern})` })), getOptionLabel: (o) => o?.label || '', getOptionValue: (o) => o?.value || '' })),
+          React.createElement(Dropdown, { value: blk.batchId, onChange: (v) => setBlk({ ...blk, batchId: typeof v === 'object' ? (v?.value || '') : (v || '') }), placeholder: !blk.program ? 'Select Category first' : batches.length === 0 ? 'No batches available' : 'Select batch...', disabled: !blk.program || batches.length === 0, options: batches.map((b) => ({ value: b.id, label: `${getBatchDisplayName(b, state.courts)} (${b.dayPattern})` })), getOptionLabel: (o) => o?.label || '', getOptionValue: (o) => o?.value || '' })),
         React.createElement('div', { className: 'space-y-1' },
           React.createElement('label', { className: labelCls }, 'Joining Date'),
           React.createElement('input', { type: 'date', value: blk.joiningDate, onChange: (e) => setBlk({ ...blk, joiningDate: e.target.value }), className: fieldBase }))),
@@ -618,7 +618,7 @@ export default function AdminStudents() {
       {/* Filters row */}
       <div className="flex items-center gap-2 flex-wrap">
         <Dropdown className="w-full sm:w-36" value={categoryFilter} onChange={(v) => setCategoryFilter(typeof v === 'object' ? (v.value || '') : v)} placeholder="All Categories" options={[{ value: '', label: 'All' }, ...CATEGORY_OPTIONS]} getOptionLabel={(o) => o.label || 'All'} getOptionValue={(o) => o.value || ''} />
-        <Dropdown className="w-full sm:w-44" value={batchFilter} onChange={(v) => setBatchFilter(typeof v === 'object' ? (v.value || '') : v)} placeholder="All Batches" options={[{ value: '', label: 'All' }, ...batchOptions.map((b) => ({ value: b.id, label: `${b.program} ${b.dayPattern}` }))]} getOptionLabel={(o) => o.label || 'All'} getOptionValue={(o) => o.value || ''} />
+        <Dropdown className="w-full sm:w-64" value={batchFilter} onChange={(v) => setBatchFilter(typeof v === 'object' ? (v.value || '') : v)} placeholder="All Batches" options={[{ value: '', label: 'All Batches' }, ...batchOptions.map((b) => ({ value: b.id, label: `${getBatchDisplayName(b, state.courts)} (${b.dayPattern})` }))]} getOptionLabel={(o) => o.label || 'All Batches'} getOptionValue={(o) => o.value || ''} />
         <Dropdown className="w-full sm:w-36" value={membershipFilter} onChange={(v) => setMembershipFilter(typeof v === 'object' ? (v.value || '') : v)} placeholder="All Membership" options={[{ value: '', label: 'All' }, { value: 'Member', label: 'Member' }, { value: 'Non-member', label: 'Non-member' }, { value: 'Guest', label: 'Guest' }]} getOptionLabel={(o) => o.label || 'All'} getOptionValue={(o) => o.value || ''} />
         <Dropdown className="w-full sm:w-36" value={paymentFilter} onChange={(v) => setPaymentFilter(typeof v === 'object' ? (v.value || '') : v)} placeholder="All Payment" options={[{ value: '', label: 'All' }, { value: 'PAID', label: 'Paid' }, { value: 'PENDING', label: 'Pending' }, { value: 'PARTIAL', label: 'Partial' }, { value: 'COMPLIMENTARY', label: 'Complimentary' }]} getOptionLabel={(o) => o.label || 'All'} getOptionValue={(o) => o.value || ''} />
       </div>
@@ -681,9 +681,8 @@ export default function AdminStudents() {
                     return (
                       <div key={enr.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-lg bg-canvas-soft text-xs border border-line/40">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-ink">{enr.billingProgram || b?.program}</span>
-                          {enr.ballLevel && <span className="text-brand-600 font-medium">{enr.ballLevel}</span>}
-                          <span className="text-ink-muted">{b?.dayPattern} · {b ? `${formatTime12h(b.startTime)} - ${formatTime12h(b.endTime)}` : 'No batch'}</span>
+                          <span className="font-semibold text-ink">{b ? getBatchDisplayName(b, state.courts) : (enr.billingProgram || 'Batch')}</span>
+                          <span className="font-mono text-ink-muted">({b?.dayPattern})</span>
                           {enr.enrollmentType && enr.enrollmentType !== 'Group' && (
                             <span className="px-1.5 py-0.5 rounded text-[10px] bg-brand-50 text-brand-600 font-medium">{enr.enrollmentType}</span>
                           )}
@@ -887,7 +886,7 @@ export default function AdminStudents() {
               </div>
               <div className="space-y-1 mt-2">
                 <label className={labelCls}>Trial Batch</label>
-                <Dropdown value={addForm.enrollments[0].batchId} onChange={(v) => setAddForm((f) => ({ ...f, enrollments: [{ ...f.enrollments[0], batchId: typeof v === 'object' ? (v.value || '') : (v || '') }] }))} placeholder="Select batch..." options={batchOptions.map((b) => ({ value: b.id, label: `${b.name || `${b.program}${b.ballLevel ? ' · ' + b.ballLevel : ''} (${b.startTime || ''})`} (${b.dayPattern})` }))} getOptionLabel={(o) => o?.label || ''} getOptionValue={(o) => o?.value || ''} />
+                <Dropdown value={addForm.enrollments[0].batchId} onChange={(v) => setAddForm((f) => ({ ...f, enrollments: [{ ...f.enrollments[0], batchId: typeof v === 'object' ? (v.value || '') : (v || '') }] }))} placeholder="Select batch..." options={batchOptions.map((b) => ({ value: b.id, label: `${getBatchDisplayName(b, state.courts)} (${b.dayPattern})` }))} getOptionLabel={(o) => o?.label || ''} getOptionValue={(o) => o?.value || ''} />
               </div>
             </div>
           ) : (

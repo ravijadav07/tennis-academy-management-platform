@@ -2,7 +2,7 @@
   "created": "1754800000001",
   "updated": "1754800000001",
   "name": "WF-I Direct Payment Capture",
-  "description": "Captures Stripe payment_intent.succeeded webhook, creates payment record, updates package status, resets reminder workflows, sends email confirmation",
+  "description": "Captures Stripe payment_intent.succeeded webhook, creates payment record, updates package status, resets reminder workflows",
   "tags": [],
   "pieces": [
     "@puchoaistudio/tool-webhook",
@@ -108,40 +108,24 @@
               "settings": {
                 "input": {
                   "auth": "",
-                  "table_name": "students",
-                  "page": 1,
-                  "pageSize": 20,
-                  "filters": [
-                    {
-                      "column": "id",
-                      "operator": "eq",
-                      "value": "{{step_1['student_id']}}"
-                    }
-                  ]
+                  "table": "students",
+                  "search_column": "id",
+                  "search_value": "{{step_1['student_id']}}"
                 },
                 "pieceName": "@puchoaistudio/tool-supabase",
                 "actionName": "search_rows",
-                "pieceVersion": "^2.0.1",
+                "pieceVersion": "^2.0.0",
                 "propertySettings": {
                   "auth": {
                     "type": "MANUAL"
                   },
-                  "page": {
+                  "table": {
                     "type": "MANUAL"
                   },
-                  "columns": {
+                  "search_column": {
                     "type": "MANUAL"
                   },
-                  "filters": {
-                    "type": "MANUAL"
-                  },
-                  "pageSize": {
-                    "type": "MANUAL"
-                  },
-                  "table_name": {
-                    "type": "MANUAL"
-                  },
-                  "countOption": {
+                  "search_value": {
                     "type": "MANUAL"
                   }
                 },
@@ -163,76 +147,28 @@
                 "settings": {
                   "input": {
                     "auth": "",
-                    "table_name": "payments",
-                    "row_data": {
+                    "table": "payments",
+                    "values": {
                       "student_id": "{{step_1['student_id']}}",
                       "amount": "{{step_1['amount']}}",
                       "gateway": "{{step_1['gateway']}}",
-                      "type": "Monthly",
+                      "type": "direct",
                       "status": "paid",
                       "date": "{{step_1['date']}}",
                       "stripe_payment_intent_id": "{{step_1['payment_intent_id']}}"
-                    },
-                    "return_row": true
+                    }
                   },
                   "pieceName": "@puchoaistudio/tool-supabase",
                   "actionName": "create_row",
-                  "pieceVersion": "^2.0.1",
+                  "pieceVersion": "^2.0.0",
                   "propertySettings": {
                     "auth": {
                       "type": "MANUAL"
                     },
-                    "row_data": {
-                      "type": "MANUAL",
-                      "schema": {
-                        "student_id": {
-                          "type": "SHORT_TEXT",
-                          "required": false,
-                          "displayName": "student_id",
-                          "defaultValue": ""
-                        },
-                        "amount": {
-                          "type": "SHORT_TEXT",
-                          "required": false,
-                          "displayName": "amount",
-                          "defaultValue": ""
-                        },
-                        "gateway": {
-                          "type": "SHORT_TEXT",
-                          "required": false,
-                          "displayName": "gateway",
-                          "defaultValue": ""
-                        },
-                        "type": {
-                          "type": "SHORT_TEXT",
-                          "required": false,
-                          "displayName": "type",
-                          "defaultValue": ""
-                        },
-                        "status": {
-                          "type": "SHORT_TEXT",
-                          "required": false,
-                          "displayName": "status",
-                          "defaultValue": ""
-                        },
-                        "date": {
-                          "type": "SHORT_TEXT",
-                          "required": false,
-                          "displayName": "date",
-                          "defaultValue": ""
-                        },
-                        "stripe_payment_intent_id": {
-                          "type": "SHORT_TEXT",
-                          "required": false,
-                          "displayName": "stripe_payment_intent_id",
-                          "defaultValue": ""
-                        }
-                      }
-                    },
-                    "return_row": {
+                    "table": {
                       "type": "MANUAL"
                     },
-                    "table_name": {
+                    "values": {
                       "type": "MANUAL"
                     }
                   },
@@ -247,112 +183,77 @@
                   }
                 },
                 "nextAction": {
-                  "name": "step_5",
+                  "name": "step_4",
                   "type": "PIECE",
-                  "displayName": "Find & Update Package to Paid",
                   "valid": true,
                   "skip": false,
                   "settings": {
                     "input": {
                       "auth": "",
-                      "table_name": "packages",
-                      "page": 1,
-                      "pageSize": 1,
-                      "filters": [
-                        {
-                          "column": "student_id",
-                          "operator": "eq",
-                          "value": "{{step_1['student_id']}}"
-                        },
-                        {
-                          "column": "status",
-                          "operator": "eq",
-                          "value": "active"
-                        }
-                      ]
+                      "table": "packages",
+                      "search_column": "student_id",
+                      "search_value": "{{step_1['student_id']}}"
                     },
                     "pieceName": "@puchoaistudio/tool-supabase",
                     "actionName": "search_rows",
-                    "pieceVersion": "^2.0.1",
+                    "pieceVersion": "^2.0.0",
                     "propertySettings": {
-                      "auth": { "type": "MANUAL" },
-                      "page": { "type": "MANUAL" },
-                      "columns": { "type": "MANUAL" },
-                      "filters": { "type": "MANUAL" },
-                      "pageSize": { "type": "MANUAL" },
-                      "table_name": { "type": "MANUAL" },
-                      "countOption": { "type": "MANUAL" }
+                      "auth": {
+                        "type": "MANUAL"
+                      },
+                      "table": {
+                        "type": "MANUAL"
+                      },
+                      "search_column": {
+                        "type": "MANUAL"
+                      },
+                      "search_value": {
+                        "type": "MANUAL"
+                      }
                     },
                     "sampleData": {},
                     "errorHandlingOptions": {
-                      "retryOnFailure": { "value": true },
-                      "continueOnFailure": { "value": false }
+                      "retryOnFailure": {
+                        "value": false
+                      },
+                      "continueOnFailure": {
+                        "value": false
+                      }
                     }
                   },
                   "nextAction": {
-                    "name": "step_5b",
+                    "name": "step_5",
                     "type": "PIECE",
-                    "displayName": "Update Package Payment Status",
                     "valid": true,
                     "skip": false,
                     "settings": {
                       "input": {
                         "auth": "",
-                        "table_name": "packages",
-                        "update_data": {
+                        "table": "packages",
+                        "values": {
                           "payment_status": "paid",
                           "status": "active"
                         },
-                        "filter_column": "id",
-                        "filter_value": "{{step_5[0]['id']}}",
-                        "filter_type": "eq",
-                        "count_updated": false,
-                        "filter_values": [],
-                        "return_updated": false
+                        "search_column": "student_id",
+                        "search_value": "{{step_1['student_id']}}"
                       },
                       "pieceName": "@puchoaistudio/tool-supabase",
                       "actionName": "update_row",
-                      "pieceVersion": "^2.0.1",
+                      "pieceVersion": "^2.0.0",
                       "propertySettings": {
                         "auth": {
                           "type": "MANUAL"
                         },
-                        "table_name": {
+                        "table": {
                           "type": "MANUAL"
                         },
-                        "filter_type": {
+                        "values": {
                           "type": "MANUAL"
                         },
-                        "update_data": {
-                          "type": "MANUAL",
-                          "schema": {
-                            "payment_status": {
-                              "type": "SHORT_TEXT",
-                              "required": false,
-                              "displayName": "payment_status",
-                              "defaultValue": ""
-                            },
-                            "status": {
-                              "type": "SHORT_TEXT",
-                              "required": false,
-                              "displayName": "status",
-                              "defaultValue": ""
-                            }
-                          }
-                        },
-                        "filter_value": {
+                        "search_column": {
                           "type": "MANUAL"
                         },
-                        "count_updated": {
-                          "type": "MANUAL"
-                        },
-                        "filter_column": {
-                          "type": "MANUAL"
-                        },
-                        "filter_values": {
-                          "type": "MANUAL"
-                        },
-                        "return_updated": {
+                        "search_value": {
                           "type": "MANUAL"
                         }
                       },
@@ -374,64 +275,27 @@
                       "settings": {
                         "input": {
                           "auth": "",
-                          "table_name": "workflow_state",
-                          "row_data": {
+                          "table": "workflow_state",
+                          "values": {
                             "workflow_key": "WF-H_stop",
                             "entity_key": "student_id",
                             "entity_value": "{{step_1['student_id']}}",
                             "state_json": {
                               "stop": true
                             }
-                          },
-                          "count_upserted": false,
-                          "return_upserted": false
+                          }
                         },
                         "pieceName": "@puchoaistudio/tool-supabase",
                         "actionName": "upsert_row",
-                        "pieceVersion": "^2.0.1",
+                        "pieceVersion": "^2.0.0",
                         "propertySettings": {
                           "auth": {
                             "type": "MANUAL"
                           },
-                          "row_data": {
-                            "type": "MANUAL",
-                            "schema": {
-                              "workflow_key": {
-                                "type": "SHORT_TEXT",
-                                "required": false,
-                                "displayName": "workflow_key",
-                                "defaultValue": ""
-                              },
-                              "entity_key": {
-                                "type": "SHORT_TEXT",
-                                "required": false,
-                                "displayName": "entity_key",
-                                "defaultValue": ""
-                              },
-                              "entity_value": {
-                                "type": "SHORT_TEXT",
-                                "required": false,
-                                "displayName": "entity_value",
-                                "defaultValue": ""
-                              },
-                              "state_json": {
-                                "type": "SHORT_TEXT",
-                                "required": false,
-                                "displayName": "state_json",
-                                "defaultValue": ""
-                              }
-                            }
-                          },
-                          "table_name": {
+                          "table": {
                             "type": "MANUAL"
                           },
-                          "on_conflict": {
-                            "type": "MANUAL"
-                          },
-                          "count_upserted": {
-                            "type": "MANUAL"
-                          },
-                          "return_upserted": {
+                          "values": {
                             "type": "MANUAL"
                           }
                         },
@@ -453,64 +317,27 @@
                         "settings": {
                           "input": {
                             "auth": "",
-                            "table_name": "workflow_state",
-                            "row_data": {
+                            "table": "workflow_state",
+                            "values": {
                               "workflow_key": "WF-G_reset",
                               "entity_key": "student_id",
                               "entity_value": "{{step_1['student_id']}}",
                               "state_json": {
                                 "reset": true
                               }
-                            },
-                            "count_upserted": false,
-                            "return_upserted": false
+                            }
                           },
                           "pieceName": "@puchoaistudio/tool-supabase",
                           "actionName": "upsert_row",
-                          "pieceVersion": "^2.0.1",
+                          "pieceVersion": "^2.0.0",
                           "propertySettings": {
                             "auth": {
                               "type": "MANUAL"
                             },
-                            "row_data": {
-                              "type": "MANUAL",
-                              "schema": {
-                                "workflow_key": {
-                                  "type": "SHORT_TEXT",
-                                  "required": false,
-                                  "displayName": "workflow_key",
-                                  "defaultValue": ""
-                                },
-                                "entity_key": {
-                                  "type": "SHORT_TEXT",
-                                  "required": false,
-                                  "displayName": "entity_key",
-                                  "defaultValue": ""
-                                },
-                                "entity_value": {
-                                  "type": "SHORT_TEXT",
-                                  "required": false,
-                                  "displayName": "entity_value",
-                                  "defaultValue": ""
-                                },
-                                "state_json": {
-                                  "type": "SHORT_TEXT",
-                                  "required": false,
-                                  "displayName": "state_json",
-                                  "defaultValue": ""
-                                }
-                              }
-                            },
-                            "table_name": {
+                            "table": {
                               "type": "MANUAL"
                             },
-                            "on_conflict": {
-                              "type": "MANUAL"
-                            },
-                            "count_upserted": {
-                              "type": "MANUAL"
-                            },
-                            "return_upserted": {
+                            "values": {
                               "type": "MANUAL"
                             }
                           },
@@ -531,142 +358,63 @@
                           "skip": false,
                           "settings": {
                             "input": {
-                              "auth": "",
-                              "table_name": "communications_log",
-                              "row_data": {
-                                "student_id": "{{step_1['student_id']}}",
-                                "type": "payment_confirmation",
-                                "channel": "email",
-                                "status": "sent",
-                                "date": "{{step_1['date']}}"
+                              "fields": {
+                                "body": {
+                                  "success": true,
+                                  "student_id": "{{step_1['student_id']}}",
+                                  "payment_id": "{{step_3['id']}}",
+                                  "message": "Payment captured successfully"
+                                },
+                                "status": 200,
+                                "headers": {}
                               },
-                              "return_row": true
+                              "respond": "stop",
+                              "responseType": "json"
                             },
-                            "pieceName": "@puchoaistudio/tool-supabase",
-                            "actionName": "create_row",
-                            "pieceVersion": "^2.0.1",
+                            "pieceName": "@puchoaistudio/tool-webhook",
+                            "actionName": "return_response",
+                            "pieceVersion": "^2.0.4",
                             "propertySettings": {
-                              "auth": {
-                                "type": "MANUAL"
-                              },
-                              "row_data": {
+                              "fields": {
                                 "type": "MANUAL",
                                 "schema": {
-                                  "student_id": {
-                                    "type": "SHORT_TEXT",
-                                    "required": false,
-                                    "displayName": "student_id",
-                                    "defaultValue": ""
-                                  },
-                                  "type": {
-                                    "type": "SHORT_TEXT",
-                                    "required": false,
-                                    "displayName": "type",
-                                    "defaultValue": ""
-                                  },
-                                  "channel": {
-                                    "type": "SHORT_TEXT",
-                                    "required": false,
-                                    "displayName": "channel",
-                                    "defaultValue": ""
+                                  "body": {
+                                    "type": "JSON",
+                                    "required": true,
+                                    "displayName": "JSON Body"
                                   },
                                   "status": {
-                                    "type": "SHORT_TEXT",
+                                    "type": "NUMBER",
                                     "required": false,
-                                    "displayName": "status",
-                                    "defaultValue": ""
+                                    "displayName": "Status",
+                                    "defaultValue": 200
                                   },
-                                  "date": {
-                                    "type": "SHORT_TEXT",
+                                  "headers": {
+                                    "type": "OBJECT",
                                     "required": false,
-                                    "displayName": "date",
-                                    "defaultValue": ""
+                                    "displayName": "Headers"
                                   }
                                 }
                               },
-                              "return_row": {
+                              "respond": {
                                 "type": "MANUAL"
                               },
-                              "table_name": {
+                              "responseType": {
                                 "type": "MANUAL"
                               }
                             },
                             "sampleData": {},
                             "errorHandlingOptions": {
                               "retryOnFailure": {
-                                "value": true
+                                "value": false
                               },
                               "continueOnFailure": {
                                 "value": false
                               }
                             }
                           },
-                          "nextAction": {
-                            "name": "step_10",
-                            "type": "PIECE",
-                            "valid": true,
-                            "skip": false,
-                            "settings": {
-                              "input": {
-                                "fields": {
-                                  "body": {
-                                    "success": true,
-                                    "student_id": "{{step_1['student_id']}}",
-                                    "payment_id": "{{step_3['id']}}",
-                                    "message": "Payment captured successfully"
-                                  },
-                                  "status": 200,
-                                  "headers": {}
-                                },
-                                "respond": "stop",
-                                "responseType": "json"
-                              },
-                              "pieceName": "@puchoaistudio/tool-webhook",
-                              "actionName": "return_response",
-                              "pieceVersion": "^2.0.4",
-                              "propertySettings": {
-                                "fields": {
-                                  "type": "MANUAL",
-                                  "schema": {
-                                    "body": {
-                                      "type": "JSON",
-                                      "required": true,
-                                      "displayName": "JSON Body"
-                                    },
-                                    "status": {
-                                      "type": "NUMBER",
-                                      "required": false,
-                                      "displayName": "Status",
-                                      "defaultValue": 200
-                                    },
-                                    "headers": {
-                                      "type": "OBJECT",
-                                      "required": false,
-                                      "displayName": "Headers"
-                                    }
-                                  }
-                                },
-                                "respond": {
-                                  "type": "MANUAL"
-                                },
-                                "responseType": {
-                                  "type": "MANUAL"
-                                }
-                              },
-                              "sampleData": {},
-                              "errorHandlingOptions": {
-                                "retryOnFailure": {
-                                  "value": false
-                                },
-                                "continueOnFailure": {
-                                  "value": false
-                                }
-                              }
-                            },
-                            "nextAction": null,
-                            "displayName": "Return Success Response"
-                          },
-                          "displayName": "Log Communication"
+                          "nextAction": null,
+                          "displayName": "Return Success Response"
                         },
                         "displayName": "Reset GC Workflow WF-G"
                       },
