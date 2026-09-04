@@ -12,6 +12,7 @@ import { formatDateDDMMYY, formatTime12h, getBatchDisplayName } from '../../../u
 import { prepareAbsenceEmail, getNotificationWindow } from '../../../utils/notificationEngine';
 import { triggerWorkflow } from '../../../utils/api';
 import { toast } from 'sonner';
+import { validateName, validatePhone } from '../../../utils/validators';
 import { useAuth } from '../../../context/AuthContext';
 
 const FIELD = 'w-full h-[38px] px-3 rounded-lg border border-line bg-white text-[13px] text-ink outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand transition-all';
@@ -160,7 +161,10 @@ export default function AdminAttendance() {
   };
 
   const handleAddTrial = async () => {
-    if (!trialName.trim()) { toast.error('Name is required'); return; }
+    const nameErr = validateName(trialName, 'Trial student name'); if (nameErr) { toast.error(nameErr); return; }
+    if (trialPhone && trialPhone.trim()) {
+      const phoneErr = validatePhone(trialPhone); if (phoneErr) { toast.error(phoneErr); return; }
+    }
     try {
       await db.createTrialStudent({ name: trialName, guardianPhone: trialPhone, batchId: selectedBatchId, date: selectedDate });
       toast.success('Trial student ' + trialName + ' logged and marked present');
@@ -307,7 +311,11 @@ export default function AdminAttendance() {
                     </span>
                   )}
                   {r.membershipType && r.membershipType !== 'Member' && <StatusPill status={r.membershipType.toLowerCase()} />}
-                  {displayStatus ? <StatusPill status={displayStatus} /> : <span className="text-ink-faint">{'\u2014'}</span>}
+                  {displayStatus ? <StatusPill status={displayStatus} /> : (
+                    <button onClick={(e) => { e.stopPropagation(); handleToggleOrRequest(r); }} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-canvas-soft border border-line text-ink-muted hover:bg-brand-50 hover:text-brand-600 hover:border-brand/30 transition-colors cursor-pointer">
+                      Mark Attendance
+                    </button>
+                  )}
                   {r.blocked && <EligibilityStatusPill package={r.package} date={selectedDate} />}
 
                   {r.latestNote && (
@@ -391,7 +399,7 @@ export default function AdminAttendance() {
           <div className="print-only">
             <h3 className="text-lg font-bold mb-2">{batch && batch.program} {'\u2014'} {selectedDate}</h3>
             <table className="w-full text-sm border-collapse"><thead><tr className="border-b"><th className="text-left py-1">Student</th><th className="text-left py-1">Status</th><th className="text-left py-1">Notes</th></tr></thead>
-              <tbody>{roster.map((r) => (<tr key={r.studentId} className="border-b"><td className="py-1">{r.name}</td><td className="py-1">{r.attendance ? r.attendance.status : '\u2014'}</td><td className="py-1">{r.attendance && r.attendance.notes || ''}</td></tr>))}</tbody></table>
+              <tbody>{roster.map((r) => (<tr key={r.studentId} className="border-b"><td className="py-1">{r.name}</td><td className="py-1">{r.attendance ? r.attendance.status : 'Unmarked'}</td><td className="py-1">{r.attendance && r.attendance.notes || ''}</td></tr>))}</tbody></table>
           </div>
           <div className="flex justify-end mt-4"><Button onClick={() => window.print()}>Print</Button></div>
         </Modal>

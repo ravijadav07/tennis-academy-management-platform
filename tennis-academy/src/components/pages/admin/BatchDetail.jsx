@@ -193,7 +193,6 @@ export default function BatchDetail() {
             <input type="checkbox" checked={nf.isSemiBatch || false} onChange={(e) => setNf((f) => ({ ...f, isSemiBatch: e.target.checked }))} />
             Semi-batch (paired)
           </label>
-          <p className="text-[10px] text-ink-faint mt-2">Coach management coming in a later phase. Picker is read-only from existing coaches.</p>
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="secondary" onClick={() => navigate(parent)}>Cancel</Button>
             <Button onClick={handleCreate} disabled={!nf.program || !nf.startTime}>Create Batch</Button>

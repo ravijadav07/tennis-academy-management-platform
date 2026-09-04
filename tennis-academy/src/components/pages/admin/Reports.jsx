@@ -15,6 +15,7 @@ import * as XLSX from 'xlsx';
 import { Download, AlertTriangle, TrendingUp, Radio, ShieldCheck, Send, Settings, Mail, Clock, CheckCircle, Table, Grid } from 'lucide-react';
 
 import { triggerWorkflow } from '../../../utils/api';
+import { validateEmail } from '../../../utils/validators';
 
 function timeAgo(ms) { const sec = Math.floor((Date.now() - ms) / 1000); if (sec < 5) return 'just now'; if (sec < 60) return sec + 's ago'; if (sec < 3600) return Math.floor(sec / 60) + 'm ago'; return Math.floor(sec / 3600) + 'h ago'; }
 
@@ -118,6 +119,9 @@ export default function Reports() {
   const handleSaveRecipients = async () => {
     try {
       if (!recipients.emails.length) { toast.error('Add at least one recipient'); return; }
+      for (const email of recipients.emails) {
+        const err = validateEmail(email); if (err) { toast.error(`Invalid email: ${email}`); return; }
+      }
       const r = await db.saveReportRecipients({ emails: recipients.emails, preferredTime: recipients.preferredTime });
       setRecipients(r);
       setShowRecipients(false);

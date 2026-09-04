@@ -371,6 +371,34 @@ export const db = {
     });
   },
 
+  // --- coach management (Item 4)
+  async upsertCoach(coach) {
+    await sleep(LATENCY);
+    return mutate((s) => {
+      if (!s.coaches) s.coaches = [];
+      const i = s.coaches.findIndex((c) => c.id === coach.id);
+      const before = i >= 0 ? s.coaches[i] : null;
+      const row = { ...coach, id: coach.id || uid('coach') };
+      if (i >= 0) s.coaches[i] = row; else s.coaches.push(row);
+      audit(s, before ? 'UPDATE' : 'CREATE', 'coach', row.id, before, row);
+      return row;
+    });
+  },
+
+  async archiveCoach({ coachId, reason }) {
+    await sleep(LATENCY);
+    if (!reason?.trim()) throw new Error('REASON_REQUIRED');
+    return mutate((s) => {
+      const coach = (s.coaches || []).find((c) => c.id === coachId);
+      if (!coach) throw new Error('COACH_NOT_FOUND');
+      coach.status = 'INACTIVE';
+      coach.archivedReason = reason;
+      coach.archivedAt = new Date().toISOString();
+      audit(s, 'ARCHIVE', 'coach', coachId, null, coach);
+      return coach;
+    });
+  },
+
   // --- enrollments & packages
   async listEnrollments(filter = {}) {
     await sleep(LATENCY);

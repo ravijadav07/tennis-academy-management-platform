@@ -14,6 +14,7 @@ import { GST_RATE } from '../../../utils/settings';
 import { preparePaymentReminder } from '../../../utils/notificationEngine';
 import { triggerWorkflow } from '../../../utils/api';
 import { formatDateDDMMYY, formatTime12h, getBatchDisplayName } from '../../../utils/formatters';
+import { validatePhone, validateEmail, validateName } from '../../../utils/validators';
 
 const fieldBase = 'w-full h-[38px] px-3 rounded-lg border border-line bg-white text-[13px] text-ink outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand transition-all';
 const labelCls = 'block text-[10px] font-semibold text-ink-muted uppercase tracking-[0.04em] mb-1';
@@ -75,7 +76,7 @@ function newEnrollmentBlock() {
     nextPaymentDue: '', balanceAmount: 0, customLineItems: [] };
 }
 
-function renderEnrollmentBlock(blk, setBlk, removable, onRemove, batchOptions = []) {
+function renderEnrollmentBlock(blk, setBlk, removable, onRemove, batchOptions = [], coaches = [], courts = []) {
   const BALL_COLORS = ['Yellow', 'Green', 'Orange', 'Red'];
   const CATEGORIES_WITH_BALL = new Set(['ADV', 'INT', 'BEG', 'WEEKEND', 'JDP', 'HPP']);
   
@@ -167,7 +168,7 @@ function renderEnrollmentBlock(blk, setBlk, removable, onRemove, batchOptions = 
           React.createElement('div', { className: 'space-y-1' },
             React.createElement('label', { className: labelCls }, 'Assigned Coach'),
             React.createElement('select', { value: blk.coachId || '', onChange: (e) => setBlk({ ...blk, coachId: e.target.value }), className: fieldBase },
-              React.createElement('option', { value: '' }, 'Select coach...'), ...(state.coaches || []).map((c) => React.createElement('option', { key: c.id, value: c.id }, c.name))))),
+              React.createElement('option', { value: '' }, 'Select coach...'), ...(coaches || []).map((c) => React.createElement('option', { key: c.id, value: c.id }, c.name))))),
         React.createElement('div', { className: 'grid grid-cols-2 gap-3' },
           React.createElement('div', { className: 'space-y-1' },
             React.createElement('label', { className: labelCls }, 'Joining Date'),
@@ -180,12 +181,12 @@ function renderEnrollmentBlock(blk, setBlk, removable, onRemove, batchOptions = 
           React.createElement('div', null, React.createElement('span', { className: 'text-ink-faint' }, 'Rate'), React.createElement('p', { className: 'font-semibold text-ok' }, 'Rs.' + (parseFloat(blk.amount) || 0))),
           React.createElement('div', null, React.createElement('span', { className: 'text-ink-faint' }, 'GST'), React.createElement('p', { className: 'font-semibold text-ink' }, 'Rs.' + Math.round((parseFloat(blk.amount) || 0) * GST_RATE))),
           React.createElement('div', null, React.createElement('span', { className: 'text-ink-faint' }, 'Final'), React.createElement('p', { className: 'font-semibold text-ok' }, 'Rs.' + Math.round((parseFloat(blk.amount) || 0) * (1 + GST_RATE)))),
-          React.createElement('div', null, React.createElement('span', { className: 'text-ink-faint' }, 'Coach'), React.createElement('p', { className: 'font-semibold text-ink' }, (state.coaches || []).find((c) => c.id === blk.coachId)?.name || '—'))) : null) : null) : null,
+          React.createElement('div', null, React.createElement('span', { className: 'text-ink-faint' }, 'Coach'), React.createElement('p', { className: 'font-semibold text-ink' }, (coaches || []).find((c) => c.id === blk.coachId)?.name || '—'))) : null) : null) : null,
     !isPrivate ? React.createElement(React.Fragment, null,
       React.createElement('div', { className: 'grid grid-cols-2 gap-3 mt-3' },
         React.createElement('div', { className: 'space-y-1' },
           React.createElement('label', { className: labelCls }, 'Batch (Priority 3) *'),
-          React.createElement(Dropdown, { value: blk.batchId, onChange: (v) => setBlk({ ...blk, batchId: typeof v === 'object' ? (v?.value || '') : (v || '') }), placeholder: !blk.program ? 'Select Category first' : batches.length === 0 ? 'No batches available' : 'Select batch...', disabled: !blk.program || batches.length === 0, options: batches.map((b) => ({ value: b.id, label: `${getBatchDisplayName(b, state.courts)} (${b.dayPattern})` })), getOptionLabel: (o) => o?.label || '', getOptionValue: (o) => o?.value || '' })),
+          React.createElement(Dropdown, { value: blk.batchId, onChange: (v) => setBlk({ ...blk, batchId: typeof v === 'object' ? (v?.value || '') : (v || '') }), placeholder: !blk.program ? 'Select Category first' : batches.length === 0 ? 'No batches available' : 'Select batch...', disabled: !blk.program || batches.length === 0, options: batches.map((b) => ({ value: b.id, label: `${getBatchDisplayName(b, courts)} (${b.dayPattern})` })), getOptionLabel: (o) => o?.label || '', getOptionValue: (o) => o?.value || '' })),
         React.createElement('div', { className: 'space-y-1' },
           React.createElement('label', { className: labelCls }, 'Joining Date'),
           React.createElement('input', { type: 'date', value: blk.joiningDate, onChange: (e) => setBlk({ ...blk, joiningDate: e.target.value }), className: fieldBase }))),
@@ -202,7 +203,7 @@ function renderEnrollmentBlock(blk, setBlk, removable, onRemove, batchOptions = 
           React.createElement('div', { className: 'space-y-1' }, React.createElement('label', { className: labelCls }, 'Amount (Rs.)'), React.createElement('input', { type: 'number', value: blk.amount, onChange: (e) => setBlk({ ...blk, amount: e.target.value }), className: fieldBase, placeholder: '8000' })),
           React.createElement('div', { className: 'space-y-1 pt-5' }, React.createElement('label', { className: 'flex items-center gap-2 text-xs' }, React.createElement('input', { type: 'checkbox', checked: blk.taxInclusive, onChange: (e) => setBlk({ ...blk, taxInclusive: e.target.checked }) }), 'Tax-inclusive'))),
         React.createElement('div', { className: 'grid grid-cols-2 gap-3 mt-2' },
-          React.createElement('div', { className: 'space-y-1' }, React.createElement('label', { className: labelCls }, 'Discount'), React.createElement('div', { className: 'flex gap-1.5 items-center' }, React.createElement('select', { value: blk.discountType, onChange: (e) => setBlk({ ...blk, discountType: e.target.value }), className: 'flex-shrink-0 h-[38px] w-[72px] sm:w-[80px] px-2 rounded-lg border border-line bg-white text-[12px] text-ink outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand transition-all' }, React.createElement('option', { value: '' }, 'None'), React.createElement('option', { value: '%' }, '%'), React.createElement('option', { value: 'flat' }, 'Rs.')), React.createElement('input', { type: 'number', value: blk.discountVal, onChange: (e) => setBlk({ ...blk, discountVal: e.target.value }), className: fieldBase + ' flex-1 min-w-0', disabled: !blk.discountType, placeholder: '0' }))),
+          React.createElement('div', { className: 'space-y-1' }, React.createElement('label', { className: labelCls }, 'Discount'), React.createElement('div', { className: 'flex gap-1.5 items-center' }, React.createElement(Dropdown, { value: blk.discountType, onChange: (v) => setBlk({ ...blk, discountType: typeof v === 'object' ? (v.value || '') : (v || '') }), placeholder: 'None', options: [{ value: '', label: 'None' }, { value: '%', label: '%' }, { value: 'flat', label: 'Rs.' }], getOptionLabel: (o) => o.label, getOptionValue: (o) => o.value }), React.createElement('input', { type: 'number', value: blk.discountVal, onChange: (e) => setBlk({ ...blk, discountVal: e.target.value }), className: fieldBase + ' flex-1 min-w-0', disabled: !blk.discountType, placeholder: '0' }))),
           React.createElement('div', { className: 'space-y-1' }, React.createElement('label', { className: labelCls }, 'Discount Reason'), React.createElement('input', { value: blk.discountReason || '', onChange: (e) => setBlk({ ...blk, discountReason: e.target.value }), className: fieldBase, disabled: !blk.discountType, placeholder: 'Required if discount applied' }))),
         blk.amount ? React.createElement('div', { className: 'grid grid-cols-4 gap-2 mt-2 text-[10px] bg-white rounded-lg p-2 border border-line/50' },
           React.createElement('div', null, React.createElement('span', { className: 'text-ink-faint' }, 'Base'), React.createElement('p', { className: 'font-semibold text-ink' }, 'Rs.' + fee.baseAmount)),
@@ -348,7 +349,12 @@ export default function AdminStudents() {
 
   const handleAddStudent = async () => {
     const errors = {};
-    if (!addForm.name.trim()) errors.name = 'Name is required';
+    const nameErr = validateName(addForm.name, 'Student name'); if (nameErr) errors.name = nameErr;
+    const gNameErr = validateName(addForm.guardianName, 'Guardian name'); if (gNameErr) errors.guardianName = gNameErr;
+    const phoneErr = validatePhone(addForm.guardianPhone); if (phoneErr) errors.guardianPhone = phoneErr;
+    if (addForm.guardianEmail && addForm.guardianEmail.trim()) {
+      const emailErr = validateEmail(addForm.guardianEmail); if (emailErr) errors.guardianEmail = emailErr;
+    }
     if (Object.keys(errors).length > 0) { setAddErrors(errors); return; }
     try {
       const student = await db.upsertStudent({
@@ -837,18 +843,23 @@ export default function AdminStudents() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className={labelCls}>Guardian Name</label>
-              <input value={addForm.guardianName} onChange={(e) => setAddForm((f) => ({ ...f, guardianName: e.target.value }))} className={fieldBase} placeholder="Guardian" />
+              <label className={labelCls}>Guardian Name *</label>
+              <input value={addForm.guardianName} onChange={(e) => setAddForm((f) => ({ ...f, guardianName: e.target.value }))} className={`${fieldBase} ${addErrors.guardianName ? 'border-red-300' : ''}`} placeholder="Guardian" />
+              {addErrors.guardianName && <p className="text-[10px] text-err mt-0.5">{addErrors.guardianName}</p>}
             </div>
             <div className="space-y-1">
-              <label className={labelCls}>Guardian Phone</label>
-              <input value={addForm.guardianPhone} onChange={(e) => setAddForm((f) => ({ ...f, guardianPhone: e.target.value }))} onBlur={checkDup} className={fieldBase} placeholder="Phone" />
+              <label className={labelCls}>Guardian Phone *</label>
+              <input value={addForm.guardianPhone} onChange={(e) => { setAddForm((f) => ({ ...f, guardianPhone: e.target.value })); setAddErrors((prev) => { const n = { ...prev }; delete n.guardianPhone; return n; }); }} onBlur={checkDup} className={`${fieldBase} ${addErrors.guardianPhone ? 'border-red-300' : ''}`} placeholder="Phone" />
+              {addErrors.guardianPhone && <p className="text-[10px] text-err mt-0.5">{addErrors.guardianPhone}</p>}
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2">
             <div className="space-y-1">
               <label className={labelCls}>Guardian Email</label>
               <input type="email" value={addForm.guardianEmail || ''} onChange={(e) => setAddForm((f) => ({ ...f, guardianEmail: e.target.value }))} className={fieldBase} placeholder="email@example.com" />
+              {!addForm.guardianEmail && addForm.name && (
+                <p className="text-[10px] text-warn mt-0.5">Guardian email is recommended — absence alerts and payment reminders cannot be sent without it.</p>
+              )}
             </div>
             <div className="space-y-1">
               <label className={labelCls}>Relationship</label>
@@ -894,7 +905,7 @@ export default function AdminStudents() {
               <p className="text-[10px] font-semibold text-ink-muted uppercase mb-2">Enrollments</p>
               {addForm.enrollments.map((blk, idx) => (
                 <div key={idx} className="mb-3">
-                  {renderEnrollmentBlock(blk, (newBlk) => { const e = [...addForm.enrollments]; e[idx] = newBlk; setAddForm((f) => ({ ...f, enrollments: e })); }, addForm.enrollments.length > 1, () => { const e = [...addForm.enrollments]; e.splice(idx, 1); setAddForm((f) => ({ ...f, enrollments: e.length > 0 ? e : [newEnrollmentBlock()] })); }, batchOptions)}
+                  {renderEnrollmentBlock(blk, (newBlk) => { const e = [...addForm.enrollments]; e[idx] = newBlk; setAddForm((f) => ({ ...f, enrollments: e })); }, addForm.enrollments.length > 1, () => { const e = [...addForm.enrollments]; e.splice(idx, 1); setAddForm((f) => ({ ...f, enrollments: e.length > 0 ? e : [newEnrollmentBlock()] })); }, batchOptions, state.coaches, state.courts)}
                 </div>
               ))}
               <Button size="sm" variant="ghost" icon={Plus} onClick={() => setAddForm((f) => ({ ...f, enrollments: [...f.enrollments, newEnrollmentBlock()] }))} className="w-full">+ Add Another Enrollment</Button>
@@ -928,7 +939,7 @@ export default function AdminStudents() {
       {/* Add Enrollment Modal (for existing students) */}
       <Modal open={showEnroll} onClose={() => setShowEnroll(false)} title="Add Enrollment" size="lg">
         <div className="space-y-4 max-h-[65vh] overflow-y-auto">
-          {renderEnrollmentBlock(enrollForm, setEnrollForm, false, null, batchOptions)}
+          {renderEnrollmentBlock(enrollForm, setEnrollForm, false, null, batchOptions, state.coaches, state.courts)}
           <div className="flex justify-end gap-2 pt-2"><Button variant="secondary" onClick={() => setShowEnroll(false)}>Cancel</Button><Button onClick={handleAddEnrollment} disabled={!enrollForm.program}>Add Enrollment</Button></div>
         </div>
       </Modal>
@@ -937,7 +948,7 @@ export default function AdminStudents() {
       <Modal open={showConvert} onClose={() => setShowConvert(false)} title={`Convert "${selected?.name}" to Enrollment`} size="lg">
         <div className="space-y-4 max-h-[65vh] overflow-y-auto">
           <p className="text-xs text-ink-muted">Convert this trial student to a regular enrollment.</p>
-          {renderEnrollmentBlock(convertForm, setConvertForm, false, null, batchOptions)}
+          {renderEnrollmentBlock(convertForm, setConvertForm, false, null, batchOptions, state.coaches, state.courts)}
           <div className="flex justify-end gap-2 pt-2"><Button variant="secondary" onClick={() => setShowConvert(false)}>Cancel</Button><Button onClick={handleConvert} disabled={!convertForm.program}>Convert to Enrollment</Button></div>
         </div>
       </Modal>

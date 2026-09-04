@@ -5,7 +5,7 @@
 import {
   LayoutGrid, Calendar, GraduationCap, ClipboardCheck,
   BarChart3, IndianRupee, CheckCircle, MapPin, Receipt,
-  Clock, TrendingUp, UserSquare2, Package, CreditCard,
+  Clock, TrendingUp, UserSquare2, Package, CreditCard, UserCheck,
 } from 'lucide-react';
 
 // CHILD_ROUTE_MAP: maps any route prefix → parent nav path + header override
@@ -20,6 +20,7 @@ export const adminNav = [
   ]},
   { section: 'OPERATIONS', items: [
     { path: '/admin/courts', label: 'Court Master', subtitle: 'Configure courts and time slots', icon: MapPin },
+    { path: '/admin/coaches', label: 'Coach Mgmt', subtitle: 'Add, edit, and archive coaches', icon: UserCheck },
     { path: '/admin/schedule', label: 'Schedule', subtitle: 'Court schedule grid', icon: Calendar },
     { path: '/admin/students', label: 'Students', subtitle: 'Manage student profiles and enrollment', icon: GraduationCap },
     { path: '/admin/attendance', label: 'Attendance', subtitle: 'Track student and coach attendance', icon: ClipboardCheck },
@@ -48,7 +49,7 @@ export const opsHeadNav = [
 export const coachNav = [
   { section: 'MY WORK', items: [
     { path: '/coach', label: 'Today', subtitle: 'Your coaching day', icon: LayoutGrid },
-    { path: '/coach/private-log', label: 'Private Log', subtitle: 'Track private sessions', icon: UserSquare2 },
+    { path: '/coach/private-log', label: 'Private Coaching', subtitle: 'Manage private coaching sessions', icon: UserSquare2 },
     { path: '/coach/leave', label: 'Leave', subtitle: 'Apply and track leave requests', icon: Clock },
     { path: '/coach/stats', label: 'My Stats', subtitle: 'Coaching performance', icon: TrendingUp },
   ]},

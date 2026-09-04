@@ -5,8 +5,9 @@ import Button from '../../ui/Button';
 import Dropdown from '../../ui/Dropdown';
 import StatusPill from '../../ui/StatusPill';
 import { toast } from 'sonner';
-import { Download, IndianRupee, Printer, Mail, AlertCircle } from 'lucide-react';
+import { Download, IndianRupee, Printer, Mail, AlertCircle, CheckSquare, Square } from 'lucide-react';
 import { preparePaymentReminder } from '../../../utils/notificationEngine';
+import { triggerWorkflow } from '../../../utils/api';
 import { formatDateDDMMYY, getBatchDisplayName } from '../../../utils/formatters';
 
 export default function RevenueReport() {
@@ -15,7 +16,8 @@ export default function RevenueReport() {
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
-  const [activeTab, setActiveTab] = useState('category'); // 'category' | 'entity' | 'service' | 'dues'
+  const [activeTab, setActiveTab] = useState('category');
+  const [selectedDues, setSelectedDues] = useState(new Set());
 
   const packages = state.packages || [];
   const students = state.students || [];
@@ -159,6 +161,53 @@ export default function RevenueReport() {
     });
     toast.success(`Opening payment reminder email for ${due.studentName}`);
     window.open(mailto, '_blank');
+  };
+
+  // Bulk send — handles selection toggles
+  const toggleSelectDue = (packageId, isComplimentary) => {
+    if (isComplimentary) return;
+    setSelectedDues((prev) => {
+      const next = new Set(prev);
+      next.has(packageId) ? next.delete(packageId) : next.add(packageId);
+      return next;
+    });
+  };
+  const toggleSelectAll = () => {
+    const selectable = outstandingDues.filter((d) => d.paymentStatus !== 'complimentary');
+    if (selectedDues.size === selectable.length) {
+      setSelectedDues(new Set());
+    } else {
+      setSelectedDues(new Set(selectable.map((d) => d.packageId)));
+    }
+  };
+
+  // Bulk payment reminder — one email per parent, failure tracking
+  const handleBulkSendReminders = async () => {
+    if (selectedDues.size === 0) return;
+    const failures = [];
+    let successCount = 0;
+    for (const packageId of selectedDues) {
+      const due = outstandingDues.find((d) => d.packageId === packageId);
+      if (!due || due.paymentStatus === 'complimentary') continue;
+      try {
+        await triggerWorkflow('payment.reminder', {
+          packages: [{
+            id: due.packageId, amount: due.totalAmount, amount_received: due.amountPaid,
+            program: due.category, student_id: due.studentId, payment_status: due.paymentStatus
+          }],
+          students: [{ id: due.studentId, name: due.studentName, guardianEmail: due.guardianEmail }],
+          alreadyReminded: []
+        });
+        await db.logPaymentReminder({ studentId: due.studentId, packageId: due.packageId, guardianEmail: due.guardianEmail, pendingAmount: due.pendingAmount });
+        successCount++;
+      } catch (e) { failures.push(due.studentName); }
+    }
+    if (failures.length > 0) {
+      toast.error(`${successCount} of ${selectedDues.size} sent. ${failures.length} failed: ${failures.join(', ')}`);
+    } else {
+      toast.success(`All ${successCount} reminders sent successfully`);
+    }
+    setSelectedDues(new Set());
   };
 
   const handleExportCSV = () => {
@@ -385,7 +434,14 @@ export default function RevenueReport() {
               <h3 className="text-sm font-semibold text-ink">Outstanding Dues</h3>
               <p className="text-xs text-ink-muted">Uncollected balances by player, batch and category</p>
             </div>
-            <span className="text-xs font-bold text-err">Total Due: ₹{totals.pending.toLocaleString('en-IN')}</span>
+            <div className="flex items-center gap-3">
+              {selectedDues.size > 0 && (
+                <Button size="sm" variant="primary" icon={Mail} onClick={handleBulkSendReminders}>
+                  Send Payment Reminder ({selectedDues.size})
+                </Button>
+              )}
+              <span className="text-xs font-bold text-err">Total Due: ₹{totals.pending.toLocaleString('en-IN')}</span>
+            </div>
           </div>
 
           {outstandingDues.length === 0 ? (
@@ -394,9 +450,14 @@ export default function RevenueReport() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-xs min-w-[680px]">
+              <table className="w-full text-xs min-w-[720px]">
                 <thead>
                   <tr className="border-b border-line text-left text-ink-muted bg-canvas-soft/40">
+                    <th className="py-2.5 px-2 font-semibold w-8">
+                      <button onClick={toggleSelectAll} className="text-ink-faint hover:text-ink transition-colors">
+                        {selectedDues.size === outstandingDues.filter((d) => d.paymentStatus !== 'complimentary').length && selectedDues.size > 0 ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                      </button>
+                    </th>
                     <th className="py-2.5 px-3 font-semibold whitespace-nowrap">Player</th>
                     <th className="py-2.5 px-3 font-semibold whitespace-nowrap">Category / Batch</th>
                     <th className="py-2.5 px-3 font-semibold whitespace-nowrap">Guardian / Phone</th>
@@ -407,8 +468,16 @@ export default function RevenueReport() {
                   </tr>
                 </thead>
                 <tbody>
-                  {outstandingDues.map((due) => (
+                  {outstandingDues.map((due) => {
+                    const isComplimentary = due.paymentStatus === 'complimentary';
+                    return (
                     <tr key={due.packageId} className="border-b border-line/40 hover:bg-canvas-soft/50 transition-colors">
+                      <td className="py-2.5 px-2">
+                        <button onClick={() => toggleSelectDue(due.packageId, isComplimentary)} disabled={isComplimentary}
+                          className={`${isComplimentary ? 'text-ink-faint/30 cursor-not-allowed' : 'text-ink-faint hover:text-ink cursor-pointer'} transition-colors`}>
+                          {selectedDues.has(due.packageId) ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                        </button>
+                      </td>
                       <td className="py-2.5 px-3 font-semibold text-ink whitespace-nowrap">{due.studentName}</td>
                       <td className="py-2.5 px-3 text-ink-muted whitespace-nowrap">
                         <span className="font-medium text-ink">{due.category}</span>
@@ -422,18 +491,15 @@ export default function RevenueReport() {
                       <td className="py-2.5 px-3 text-right text-ok whitespace-nowrap">₹{due.amountPaid.toLocaleString('en-IN')}</td>
                       <td className="py-2.5 px-3 text-right text-err font-bold whitespace-nowrap">₹{due.pendingAmount.toLocaleString('en-IN')}</td>
                       <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          icon={Mail}
+                        <Button size="sm" variant="ghost" icon={Mail}
                           className="!h-7 !px-2.5 !text-[11px] text-brand hover:bg-brand-50"
-                          onClick={() => handleSendReminder(due)}
-                        >
+                          onClick={() => handleSendReminder(due)}>
                           Email Reminder
                         </Button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

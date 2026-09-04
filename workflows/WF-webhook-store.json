@@ -1,0 +1,284 @@
+{
+  "created": 1758000000000,
+  "updated": 1758000000000,
+  "name": "WF-Webhook-Store Data Persistence",
+  "description": "Generic key/value data storage via webhook. Use Pucho AI Studio's built-in store tool to persist and retrieve arbitrary JSON data. POST with action:'put' + key + value to store, action:'get' + key to retrieve. Scope: Flow-level persistence (data survives between webhook invocations within the same flow).",
+  "tags": [],
+  "pieces": [
+    "@puchoaistudio/tool-webhook",
+    "@puchoaistudio/tool-store"
+  ],
+  "template": {
+    "displayName": "WF-Webhook-Store Data",
+    "trigger": {
+      "name": "trigger",
+      "type": "TOOL_TRIGGER",
+      "displayName": "Catch Data Store Webhook",
+      "valid": true,
+      "settings": {
+        "pieceName": "@puchoaistudio/tool-webhook",
+        "pieceVersion": "^2.0.4",
+        "triggerName": "catch_webhook",
+        "input": {
+          "authType": "none",
+          "authFields": {}
+        },
+        "propertySettings": {
+          "authType": { "type": "MANUAL" },
+          "authFields": { "type": "MANUAL", "schema": {} },
+          "liveMarkdown": { "type": "MANUAL" },
+          "syncMarkdown": { "type": "MANUAL" },
+          "testMarkdown": { "type": "MANUAL" }
+        },
+        "sampleData": {}
+      },
+      "nextAction": {
+        "name": "step_1",
+        "type": "CODE",
+        "displayName": "Parse Incoming Payload",
+        "valid": true,
+        "skip": false,
+        "settings": {
+          "input": {
+            "payload": "{{trigger['body']}}"
+          },
+          "sourceCode": {
+            "code": "export const code = async (inputs) => {\n  const p = inputs.payload || {};\n  const action = p.action || (Object.keys(p).length > 0 ? 'put' : 'empty');\n  return {\n    action: action,\n    key: p.key || 'default_data',\n    value: action === 'put' ? JSON.stringify(p.value || p) : '',\n    raw: p\n  };\n};",
+            "packageJson": "{}"
+          },
+          "propertySettings": {
+            "payload": { "type": "MANUAL" }
+          },
+          "sampleData": {},
+          "errorHandlingOptions": {
+            "retryOnFailure": { "value": false },
+            "continueOnFailure": { "value": false }
+          }
+        },
+        "nextAction": {
+          "name": "step_2",
+          "type": "ROUTER",
+          "displayName": "Route by Action Type",
+          "valid": true,
+          "skip": false,
+          "settings": {
+            "branches": [
+              {
+                "branchName": "Store Data",
+                "branchType": "CONDITION",
+                "conditions": [[
+                  { "operator": "TEXT_EXACTLY_MATCHES", "firstValue": "{{step_1['action']}}", "secondValue": "put", "caseSensitive": false }
+                ]]
+              },
+              {
+                "branchName": "Retrieve Data",
+                "branchType": "CONDITION",
+                "conditions": [[
+                  { "operator": "TEXT_EXACTLY_MATCHES", "firstValue": "{{step_1['action']}}", "secondValue": "get", "caseSensitive": false }
+                ]]
+              },
+              {
+                "branchName": "Otherwise",
+                "branchType": "FALLBACK"
+              }
+            ],
+            "executionType": "EXECUTE_FIRST_MATCH"
+          },
+          "children": [
+            {
+              "name": "step_3_put",
+              "type": "PIECE",
+              "displayName": "Store Data (Put)",
+              "valid": true,
+              "skip": false,
+              "settings": {
+                "input": {
+                  "auth": "",
+                  "key": "{{step_1['key']}}",
+                  "value": "{{step_1['value']}}",
+                  "store_scope": "FLOW"
+                },
+                "pieceName": "@puchoaistudio/tool-store",
+                "actionName": "put",
+                "pieceVersion": "^2.0.0",
+                "propertySettings": {
+                  "auth": { "type": "MANUAL" },
+                  "key": { "type": "MANUAL" },
+                  "value": { "type": "MANUAL" },
+                  "store_scope": { "type": "MANUAL" }
+                },
+                "sampleData": {},
+                "errorHandlingOptions": {
+                  "retryOnFailure": { "value": false },
+                  "continueOnFailure": { "value": false }
+                }
+              },
+              "nextAction": {
+                "name": "step_4_put_response",
+                "type": "PIECE",
+                "displayName": "Return Store Success",
+                "valid": true,
+                "skip": false,
+                "settings": {
+                  "input": {
+                    "fields": {
+                      "body": {
+                        "success": true,
+                        "action": "stored",
+                        "key": "{{step_1['key']}}",
+                        "message": "Data stored successfully under key: {{step_1['key']}}"
+                      },
+                      "status": 200,
+                      "headers": {}
+                    },
+                    "respond": "stop",
+                    "responseType": "json"
+                  },
+                  "pieceName": "@puchoaistudio/tool-webhook",
+                  "actionName": "return_response",
+                  "pieceVersion": "^2.0.4",
+                  "propertySettings": {
+                    "fields": {
+                      "type": "MANUAL",
+                      "schema": {
+                        "body": { "type": "JSON", "required": true, "displayName": "JSON Body" },
+                        "status": { "type": "NUMBER", "required": false, "displayName": "Status", "defaultValue": 200 },
+                        "headers": { "type": "OBJECT", "required": false, "displayName": "Headers" }
+                      }
+                    },
+                    "respond": { "type": "MANUAL" },
+                    "responseType": { "type": "MANUAL" }
+                  },
+                  "sampleData": {},
+                  "errorHandlingOptions": {
+                    "retryOnFailure": { "value": false },
+                    "continueOnFailure": { "value": false }
+                  }
+                }
+              }
+            },
+            {
+              "name": "step_3_get",
+              "type": "PIECE",
+              "displayName": "Retrieve Data (Get)",
+              "valid": true,
+              "skip": false,
+              "settings": {
+                "input": {
+                  "auth": "",
+                  "key": "{{step_1['key']}}",
+                  "store_scope": "FLOW"
+                },
+                "pieceName": "@puchoaistudio/tool-store",
+                "actionName": "get",
+                "pieceVersion": "^2.0.0",
+                "propertySettings": {
+                  "auth": { "type": "MANUAL" },
+                  "key": { "type": "MANUAL" },
+                  "defaultValue": { "type": "MANUAL" },
+                  "store_scope": { "type": "MANUAL" }
+                },
+                "sampleData": {},
+                "errorHandlingOptions": {
+                  "retryOnFailure": { "value": false },
+                  "continueOnFailure": { "value": false }
+                }
+              },
+              "nextAction": {
+                "name": "step_4_get_response",
+                "type": "PIECE",
+                "displayName": "Return Retrieved Data",
+                "valid": true,
+                "skip": false,
+                "settings": {
+                  "input": {
+                    "fields": {
+                      "body": {
+                        "success": true,
+                        "action": "retrieved",
+                        "key": "{{step_1['key']}}",
+                        "data": "{{step_3_get['value']}}"
+                      },
+                      "status": 200,
+                      "headers": {}
+                    },
+                    "respond": "stop",
+                    "responseType": "json"
+                  },
+                  "pieceName": "@puchoaistudio/tool-webhook",
+                  "actionName": "return_response",
+                  "pieceVersion": "^2.0.4",
+                  "propertySettings": {
+                    "fields": {
+                      "type": "MANUAL",
+                      "schema": {
+                        "body": { "type": "JSON", "required": true, "displayName": "JSON Body" },
+                        "status": { "type": "NUMBER", "required": false, "displayName": "Status", "defaultValue": 200 },
+                        "headers": { "type": "OBJECT", "required": false, "displayName": "Headers" }
+                      }
+                    },
+                    "respond": { "type": "MANUAL" },
+                    "responseType": { "type": "MANUAL" }
+                  },
+                  "sampleData": {},
+                  "errorHandlingOptions": {
+                    "retryOnFailure": { "value": false },
+                    "continueOnFailure": { "value": false }
+                  }
+                }
+              }
+            },
+            {
+              "name": "step_3_fallback",
+              "type": "PIECE",
+              "displayName": "Return Bad Request",
+              "valid": true,
+              "skip": false,
+              "settings": {
+                "input": {
+                  "fields": {
+                    "body": {
+                      "success": false,
+                      "error": "INVALID_ACTION",
+                      "message": "Specify action: 'put' to store data or 'get' to retrieve data. Send JSON body with action, key, and value fields."
+                    },
+                    "status": 400,
+                    "headers": {}
+                  },
+                  "respond": "stop",
+                  "responseType": "json"
+                },
+                "pieceName": "@puchoaistudio/tool-webhook",
+                "actionName": "return_response",
+                "pieceVersion": "^2.0.4",
+                "propertySettings": {
+                  "fields": {
+                    "type": "MANUAL",
+                    "schema": {
+                      "body": { "type": "JSON", "required": true, "displayName": "JSON Body" },
+                      "status": { "type": "NUMBER", "required": false, "displayName": "Status", "defaultValue": 200 },
+                      "headers": { "type": "OBJECT", "required": false, "displayName": "Headers" }
+                    }
+                  },
+                  "respond": { "type": "MANUAL" },
+                  "responseType": { "type": "MANUAL" }
+                },
+                "sampleData": {},
+                "errorHandlingOptions": {
+                  "retryOnFailure": { "value": false },
+                  "continueOnFailure": { "value": false }
+                }
+              }
+            }
+          ],
+          "nextAction": null
+        }
+      }
+    },
+    "valid": true,
+    "agentIds": [],
+    "connectionIds": [],
+    "schemaVersion": "7"
+  },
+  "blogUrl": ""
+}

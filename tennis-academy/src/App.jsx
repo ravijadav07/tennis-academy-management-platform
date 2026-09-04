@@ -17,6 +17,7 @@ import Verification from './components/pages/admin/Verification';
 import Payroll from './components/pages/admin/Payroll';
 import CourtMaster from './components/pages/admin/CourtMaster';
 import RevenueReport from './components/pages/admin/RevenueReport';
+import CoachManagement from './components/pages/admin/CoachManagement';
 
 // Coach pages
 import CoachDashboard from './components/pages/coach/Dashboard';
@@ -69,6 +70,7 @@ export default function App() {
             <Route path="reports" element={<ErrorBoundary><AdminReports /></ErrorBoundary>} />
             <Route path="payroll" element={<Payroll />} />
             <Route path="courts" element={<ErrorBoundary><CourtMaster /></ErrorBoundary>} />
+            <Route path="coaches" element={<ErrorBoundary><CoachManagement /></ErrorBoundary>} />
             <Route path="revenue" element={<ErrorBoundary><RevenueReport /></ErrorBoundary>} />
           </Route>
 
