@@ -1,7 +1,13 @@
 const ACTION_WEBHOOK_MAP = {
-  'absence.alert':     import.meta.env.VITE_PUCHO_WF_ABSENCE_ALERT,
-  'payment.reminder':  import.meta.env.VITE_PUCHO_WF_PAYMENT_REMINDER,
-  'report.send':       import.meta.env.VITE_PUCHO_WF_SLOT_REPORT,
+  'absence.alert':         import.meta.env.VITE_PUCHO_WF_ABSENCE_ALERT,
+  'payment.reminder':      import.meta.env.VITE_PUCHO_WF_PAYMENT_REMINDER,
+  'report.send':           import.meta.env.VITE_PUCHO_WF_SLOT_REPORT,
+  'payment.capture':       import.meta.env.VITE_PUCHO_WF_PAYMENT_CAPTURE,
+  'reconciliation.upload': import.meta.env.VITE_PUCHO_WF_RECONCILIATION,
+  'certificate.download':  import.meta.env.VITE_PUCHO_WF_COURSE_COMPLETION,
+  'student.onboard':       import.meta.env.VITE_PUCHO_WF_STUDENT_ONBOARDING,
+  'leave.apply':           import.meta.env.VITE_PUCHO_WF_COACH_LEAVE,
+  'invoice.occupancy':     import.meta.env.VITE_PUCHO_WF_INVOICE_OCCUPANCY,
 };
 
 const ACTION_NAMES = new Set(Object.keys(ACTION_WEBHOOK_MAP));

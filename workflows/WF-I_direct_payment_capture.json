@@ -114,7 +114,7 @@
                 },
                 "pieceName": "@puchoaistudio/tool-supabase",
                 "actionName": "search_rows",
-                "pieceVersion": "^2.0.0",
+                "pieceVersion": "^2.0.1",
                 "propertySettings": {
                   "auth": {
                     "type": "MANUAL"
@@ -160,7 +160,7 @@
                   },
                   "pieceName": "@puchoaistudio/tool-supabase",
                   "actionName": "create_row",
-                  "pieceVersion": "^2.0.0",
+                  "pieceVersion": "^2.0.1",
                   "propertySettings": {
                     "auth": {
                       "type": "MANUAL"
@@ -196,7 +196,7 @@
                     },
                     "pieceName": "@puchoaistudio/tool-supabase",
                     "actionName": "search_rows",
-                    "pieceVersion": "^2.0.0",
+                    "pieceVersion": "^2.0.1",
                     "propertySettings": {
                       "auth": {
                         "type": "MANUAL"
@@ -239,7 +239,7 @@
                       },
                       "pieceName": "@puchoaistudio/tool-supabase",
                       "actionName": "update_row",
-                      "pieceVersion": "^2.0.0",
+                      "pieceVersion": "^2.0.1",
                       "propertySettings": {
                         "auth": {
                           "type": "MANUAL"
@@ -287,7 +287,7 @@
                         },
                         "pieceName": "@puchoaistudio/tool-supabase",
                         "actionName": "upsert_row",
-                        "pieceVersion": "^2.0.0",
+                        "pieceVersion": "^2.0.1",
                         "propertySettings": {
                           "auth": {
                             "type": "MANUAL"
@@ -329,7 +329,7 @@
                           },
                           "pieceName": "@puchoaistudio/tool-supabase",
                           "actionName": "upsert_row",
-                          "pieceVersion": "^2.0.0",
+                          "pieceVersion": "^2.0.1",
                           "propertySettings": {
                             "auth": {
                               "type": "MANUAL"

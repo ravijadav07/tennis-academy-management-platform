@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { useAuth } from '../../../context/AuthContext';
 import { useDb } from '../../../context/DbContext';
 import { formatDate } from '../../../utils/formatters';
+import { triggerWorkflow } from '../../../utils/api';
 import AdaptiveTable from '../../data/AdaptiveTable';
 import StatCard from '../../ui/StatCard';
 import Button from '../../ui/Button';
@@ -56,6 +57,10 @@ export default function Leave() {
       toast.error('Please select start and end dates');
       return;
     }
+    if (!form.reason || !form.reason.trim()) {
+      toast.error('Reason is required for leave request');
+      return;
+    }
     try {
       await db.applyLeave({
         coachId,
@@ -64,6 +69,13 @@ export default function Leave() {
         endDate: form.endDate,
         reason: form.reason,
       });
+      triggerWorkflow('leave.apply', {
+        coachId,
+        type: form.type.toUpperCase(),
+        startDate: form.startDate,
+        endDate: form.endDate,
+        reason: form.reason,
+      }).catch((wErr) => console.warn('[api] leave.apply workflow skip:', wErr));
       toast.success('Leave request submitted successfully');
       setModalOpen(false);
       setForm({ type: 'casual', startDate: '', endDate: '', reason: '' });
@@ -179,7 +191,7 @@ export default function Leave() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-ink-muted mb-1.5">Start Date</label>
+              <label className="block text-xs font-medium text-ink-muted mb-1.5">Start Date *</label>
               <input
                 type="date"
                 value={form.startDate}
@@ -188,7 +200,7 @@ export default function Leave() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-ink-muted mb-1.5">End Date</label>
+              <label className="block text-xs font-medium text-ink-muted mb-1.5">End Date *</label>
               <input
                 type="date"
                 value={form.endDate}
@@ -198,7 +210,7 @@ export default function Leave() {
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-ink-muted mb-1.5">Reason</label>
+            <label className="block text-xs font-medium text-ink-muted mb-1.5">Reason *</label>
             <textarea
               value={form.reason}
               onChange={(e) => setForm({ ...form, reason: e.target.value })}

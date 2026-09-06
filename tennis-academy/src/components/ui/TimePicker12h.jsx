@@ -1,7 +1,7 @@
 // TimePicker12h — 12-hour AM/PM time picker
 // Stores value as 24-hour string (e.g. "15:30") internally, displays as 12-hour (e.g. "3:30 PM")
 // Replaces native <input type="time"> which renders 24-hour in most browsers
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { cn } from '../../utils/cn';
 import { ChevronDown } from 'lucide-react';
 
@@ -32,6 +32,7 @@ export default function TimePicker12h({ value, onChange, label, disabled, classN
   const [minute, setMinute] = useState(initial.minute);
   const [ampm, setAmpm] = useState(initial.ampm);
   const [open, setOpen] = useState(false);
+  const containerRef = useRef(null);
 
   useEffect(() => {
     const v = to12h(value);
@@ -39,6 +40,26 @@ export default function TimePicker12h({ value, onChange, label, disabled, classN
     setMinute(v.minute);
     setAmpm(v.ampm);
   }, [value]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
 
   const handleChange = (h, m, a) => {
     setHour(h); setMinute(m); setAmpm(a);
@@ -54,7 +75,7 @@ export default function TimePicker12h({ value, onChange, label, disabled, classN
   return (
     <div className={cn('space-y-1', className)}>
       {label && <label className="block text-[10px] font-semibold text-ink-muted uppercase tracking-[0.04em] mb-1">{label}</label>}
-      <div className="relative">
+      <div className="relative" ref={containerRef}>
         <button
           type="button"
           disabled={disabled}

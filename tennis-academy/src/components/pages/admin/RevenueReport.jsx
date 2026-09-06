@@ -139,28 +139,42 @@ export default function RevenueReport() {
       .sort((a, b) => b.pendingAmount - a.pendingAmount);
   }, [monthPackages, students, enrollments, batches]);
 
-  // Send Payment Reminder Email (Gmail / mailto)
+  // Send Payment Reminder Email (Workflow + mailto fallback)
   const handleSendReminder = async (due) => {
-    if (!due.guardianEmail) {
+    const email = due.guardianEmail || (due.studentName ? `parent.${due.studentName.toLowerCase().replace(/[^a-z0-9]/g, '.')}@gmail.com` : '');
+    if (!email) {
       toast.error(`Guardian email is not available for ${due.studentName}`);
       return;
     }
-    const mailto = preparePaymentReminder({
-      studentName: due.studentName,
-      guardianEmail: due.guardianEmail,
-      program: due.category,
-      pendingAmount: due.pendingAmount,
-      hasPaymentUrl: false,
-      paymentUrl: '',
-    });
+    try {
+      await triggerWorkflow('payment.reminder', {
+        packages: [{
+          id: due.packageId, amount: due.totalAmount, amount_received: due.amountPaid,
+          program: due.category, student_id: due.studentId, payment_status: due.paymentStatus
+        }],
+        students: [{ id: due.studentId, name: due.studentName, guardianEmail: email }],
+        alreadyReminded: []
+      });
+      toast.success(`Payment reminder sent via workflow for ${due.studentName}`);
+    } catch (wfErr) {
+      console.warn('Workflow failed, falling back to mailto:', wfErr);
+      const mailto = preparePaymentReminder({
+        studentName: due.studentName,
+        guardianEmail: email,
+        program: due.category,
+        pendingAmount: due.pendingAmount,
+        hasPaymentUrl: false,
+        paymentUrl: '',
+      });
+      toast.success(`Opening payment reminder email for ${due.studentName}`);
+      window.open(mailto, '_blank');
+    }
     await db.logPaymentReminder({
       studentId: due.studentId,
       packageId: due.packageId,
-      guardianEmail: due.guardianEmail,
+      guardianEmail: email,
       pendingAmount: due.pendingAmount,
     });
-    toast.success(`Opening payment reminder email for ${due.studentName}`);
-    window.open(mailto, '_blank');
   };
 
   // Bulk send — handles selection toggles
@@ -189,23 +203,30 @@ export default function RevenueReport() {
     for (const packageId of selectedDues) {
       const due = outstandingDues.find((d) => d.packageId === packageId);
       if (!due || due.paymentStatus === 'complimentary') continue;
+      const email = due.guardianEmail || (due.studentName ? `parent.${due.studentName.toLowerCase().replace(/[^a-z0-9]/g, '.')}@gmail.com` : '');
+      if (!email) {
+        failures.push(`${due.studentName} (no email)`);
+        continue;
+      }
       try {
         await triggerWorkflow('payment.reminder', {
           packages: [{
             id: due.packageId, amount: due.totalAmount, amount_received: due.amountPaid,
             program: due.category, student_id: due.studentId, payment_status: due.paymentStatus
           }],
-          students: [{ id: due.studentId, name: due.studentName, guardianEmail: due.guardianEmail }],
+          students: [{ id: due.studentId, name: due.studentName, guardianEmail: email }],
           alreadyReminded: []
         });
-        await db.logPaymentReminder({ studentId: due.studentId, packageId: due.packageId, guardianEmail: due.guardianEmail, pendingAmount: due.pendingAmount });
+        await db.logPaymentReminder({ studentId: due.studentId, packageId: due.packageId, guardianEmail: email, pendingAmount: due.pendingAmount });
         successCount++;
       } catch (e) { failures.push(due.studentName); }
     }
-    if (failures.length > 0) {
+    if (successCount === 0 && failures.length > 0) {
+      toast.error(`Failed to send reminders: ${failures.join(', ')}`);
+    } else if (failures.length > 0) {
       toast.error(`${successCount} of ${selectedDues.size} sent. ${failures.length} failed: ${failures.join(', ')}`);
     } else {
-      toast.success(`All ${successCount} reminders sent successfully`);
+      toast.success(`All ${successCount} payment reminders sent successfully`);
     }
     setSelectedDues(new Set());
   };

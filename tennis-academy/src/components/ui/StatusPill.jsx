@@ -38,6 +38,9 @@ const colorMap = {
   'non-member': 'bg-warn-bg text-warn',
   guest: 'bg-off-bg text-off',
   trial: 'bg-off-bg text-off',
+  high: 'bg-ok-bg text-ok',
+  medium: 'bg-warn-bg text-warn',
+  low: 'bg-off-bg text-ink-muted',
 };
 
 export default function StatusPill({ status, className = '' }) {

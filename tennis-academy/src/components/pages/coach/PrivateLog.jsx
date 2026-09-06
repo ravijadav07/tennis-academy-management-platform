@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { CheckCircle, Plus, Clock, MapPin, User } from 'lucide-react';
 import TimePicker12h from '../../ui/TimePicker12h';
 import { formatDateDDMMYY, formatTime12h } from '../../../utils/formatters';
+import { validateName } from '../../../utils/validators';
 
 function getToday() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 
@@ -45,15 +46,17 @@ export default function PrivateLog() {
   };
 
   const handleCreate = async () => {
-    if (!newName.trim()) { toast.error('Enter client/student name'); return; }
+    const nameErr = validateName(newName, 'Client/Student name');
+    if (nameErr) { toast.error(nameErr); return; }
+    if (!newTime) { toast.error('Start time is required'); return; }
     try {
       await db.createPrivateSession({
         coachId,
         date: today,
-        startTime: newTime || new Date().toTimeString().slice(0, 5),
-        endTime: newTime ? addHour(newTime) : addHour(new Date().toTimeString().slice(0, 5)),
+        startTime: newTime,
+        endTime: addHour(newTime),
         courtId: newCourtId || courts[0]?.id || '',
-        clientName: newName,
+        clientName: newName.trim(),
         studentId: null,
         notes: '',
       });
@@ -152,12 +155,12 @@ export default function PrivateLog() {
             <h3 className="text-base font-semibold text-ink mb-4">New Private Session</h3>
             <div className="space-y-3">
               <div>
-                <label className="block text-[10px] font-semibold text-ink-muted uppercase tracking-[0.04em] mb-1">Client / Student Name</label>
+                <label className="block text-[10px] font-semibold text-ink-muted uppercase tracking-[0.04em] mb-1">Client / Student Name *</label>
                 <input value={newName} onChange={(e) => setNewName(e.target.value)}
                   className="w-full h-[38px] px-3 rounded-lg border border-line text-[13px] outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand" placeholder="Name" />
               </div>
               <div>
-                <TimePicker12h label="Start Time" value={newTime} onChange={setNewTime} />
+                <TimePicker12h label="Start Time *" value={newTime} onChange={setNewTime} />
               </div>
               <div>
                 <label className="block text-[10px] font-semibold text-ink-muted uppercase tracking-[0.04em] mb-1">Court</label>

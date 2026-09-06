@@ -134,13 +134,13 @@ export default function BatchDetail() {
         </button>
         <Card>
           <div className="space-y-3">
-            {/* Priority 1: Category & Priority 2: Ball Color */}
+            {/* Category & Ball Color */}
             <div className="rounded-xl border border-line bg-canvas-soft/40 p-3 space-y-3">
               <div className={CATEGORIES_WITH_BALL.has(nf.program) ? "grid grid-cols-2 gap-3 items-center" : "space-y-1"}>
-                <Sel label="Category (Priority 1) *" value={nf.program} onChange={handleNfCategoryChange} options={CATEGORY_OPTIONS} emptyOption="Select Category..." />
+                <Sel label="Category *" value={nf.program} onChange={handleNfCategoryChange} options={CATEGORY_OPTIONS} emptyOption="Select Category..." />
                 {CATEGORIES_WITH_BALL.has(nf.program) && (
                   <div className="space-y-1">
-                    <label className={LBL + " text-brand-600 font-bold"}>Ball Color (Priority 2) *</label>
+                    <label className={LBL + " text-brand-600 font-bold"}>Ball Color *</label>
                     <Dropdown
                       value={nf.ballLevel || ''}
                       onChange={(v) => setNf((f) => ({ ...f, ballLevel: typeof v === 'object' ? (v.value || v) : v }))}
@@ -160,18 +160,18 @@ export default function BatchDetail() {
               </div>
             </div>
 
-            {/* Priority 3 & 4: Court → Day Pattern → Timing → Capacity → Coaches */}
+            {/* Court → Day Pattern → Timing → Capacity → Coaches */}
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <Sel
-                  label="Court (Priority 3) *"
+                  label="Court *"
                   value={nf.courtId}
                   onChange={(v) => setNf((f) => ({ ...f, courtId: v }))}
                   options={courts.map((c) => ({ value: c.id, label: c.name }))}
                   emptyOption="Select Court..."
                 />
                 <Sel
-                  label="Day Pattern (Priority 4) *"
+                  label="Day Pattern *"
                   value={nf.dayPattern}
                   onChange={(v) => setNf((f) => ({ ...f, dayPattern: v }))}
                   options={PATTERNS.map((p) => ({ value: p, label: p === 'WEEKEND' ? 'Sat-Sun' : p }))}
@@ -373,13 +373,13 @@ export default function BatchDetail() {
 
       <Modal open={showEdit} onClose={() => setShowEdit(false)} title="Edit Batch" size="md">
         <div className="space-y-3">
-          {/* Priority 1: Category & Priority 2: Ball Color */}
+          {/* Category & Ball Color */}
           <div className="rounded-xl border border-line bg-canvas-soft/40 p-3 space-y-3">
             <div className={CATEGORIES_WITH_BALL.has(ef.program) ? "grid grid-cols-2 gap-3 items-center" : "space-y-1"}>
-              <Sel label="Category (Priority 1) *" value={ef.program || ''} onChange={handleEfCategoryChange} options={CATEGORY_OPTIONS} emptyOption="Select Category..." />
+              <Sel label="Category *" value={ef.program || ''} onChange={handleEfCategoryChange} options={CATEGORY_OPTIONS} emptyOption="Select Category..." />
               {CATEGORIES_WITH_BALL.has(ef.program) && (
                 <div className="space-y-1">
-                  <label className={LBL + " text-brand-600 font-bold"}>Ball Color (Priority 2) *</label>
+                  <label className={LBL + " text-brand-600 font-bold"}>Ball Color *</label>
                   <Dropdown
                     value={ef.ballLevel || ''}
                     onChange={(v) => setEf((f) => ({ ...f, ballLevel: typeof v === 'object' ? (v.value || v) : v }))}
@@ -399,17 +399,17 @@ export default function BatchDetail() {
             </div>
           </div>
 
-          {/* Priority 3 & 4: Court → Day Pattern → Timing → Capacity → Coaches */}
+          {/* Court → Day Pattern → Timing → Capacity → Coaches */}
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <Sel
-                label="Court (Priority 3) *"
+                label="Court *"
                 value={ef.courtId || ''}
                 onChange={(v) => setEf((f) => ({ ...f, courtId: v }))}
                 options={courts.map((c) => ({ value: c.id, label: c.name }))}
                 emptyOption="Select Court..."
               />
-              <Sel label="Day Pattern (Priority 4) *" value={ef.dayPattern || 'MWF'} onChange={(v) => setEf((f) => ({ ...f, dayPattern: v }))} options={PATTERNS.map((p) => ({ value: p, label: p === 'WEEKEND' ? 'Sat-Sun' : p }))} />
+              <Sel label="Day Pattern *" value={ef.dayPattern || 'MWF'} onChange={(v) => setEf((f) => ({ ...f, dayPattern: v }))} options={PATTERNS.map((p) => ({ value: p, label: p === 'WEEKEND' ? 'Sat-Sun' : p }))} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Start Time *" type="time" value={ef.startTime || ''} onChange={(v) => setEf((f) => ({ ...f, startTime: v }))} />

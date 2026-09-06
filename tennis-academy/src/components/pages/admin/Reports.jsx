@@ -130,7 +130,9 @@ export default function Reports() {
   };
 
   const addRecipient = () => {
-    if (!newEmail.trim()) return;
+    if (!newEmail.trim()) { toast.error('Enter an email address'); return; }
+    const err = validateEmail(newEmail.trim());
+    if (err) { toast.error(err); return; }
     setRecipients((r) => ({ ...r, emails: [...r.emails, newEmail.trim()] }));
     setNewEmail('');
   };
@@ -781,7 +783,7 @@ export default function Reports() {
                     <td className="py-2.5 px-3 text-center whitespace-nowrap">{r.totalGuests}</td>
                     <td className="py-2.5 px-3 text-center whitespace-nowrap">
                       <div className="inline-flex items-center justify-center gap-1.5">
-                        <StatusPill status={r.occupancy >= 80 ? 'success' : r.occupancy >= 50 ? 'warning' : 'error'} />
+                        <StatusPill status={r.occupancy >= 80 ? 'High' : r.occupancy >= 50 ? 'Medium' : 'Low'} />
                         <span className="font-semibold">{r.occupancy}%</span>
                       </div>
                     </td>

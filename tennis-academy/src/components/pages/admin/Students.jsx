@@ -154,10 +154,10 @@ function renderEnrollmentBlock(blk, setBlk, removable, onRemove, batchOptions = 
     !isCustomised ? React.createElement(React.Fragment, null,
       React.createElement('div', { className: CATEGORIES_WITH_BALL.has(blk.program) ? 'grid grid-cols-2 gap-3 items-center' : 'space-y-1' },
         React.createElement('div', { className: 'space-y-1' },
-          React.createElement('label', { className: labelCls }, 'Category (Priority 1) *'),
+          React.createElement('label', { className: labelCls }, 'Category *'),
           React.createElement(Dropdown, { value: blk.program, onChange: (v) => { const p = typeof v === 'object' ? (v?.value || '') : (v || ''); setBlk({ ...blk, program: p, ballColor: '', batchId: '' }); }, placeholder: 'Select category...', options: CATEGORY_OPTIONS, getOptionLabel: (o) => o?.label || '', getOptionValue: (o) => o?.value || '' })),
         CATEGORIES_WITH_BALL.has(blk.program) ? React.createElement('div', { className: 'space-y-1' },
-          React.createElement('label', { className: labelCls + ' text-brand-600 font-bold' }, 'Ball Color (Priority 2) *'),
+          React.createElement('label', { className: labelCls + ' text-brand-600 font-bold' }, 'Ball Color *'),
           React.createElement(Dropdown, { value: blk.ballColor, onChange: (v) => { const c = typeof v === 'object' ? (v?.value || '') : (v || ''); setBlk({ ...blk, ballColor: c, batchId: '' }); }, placeholder: 'Select ball color...', options: BALL_COLORS.map((c) => ({ value: c, label: c })), getOptionLabel: (o) => o?.label || '', getOptionValue: (o) => o?.value || '' })) : null),
 
       isPrivate ? React.createElement('div', { className: 'space-y-3 mt-3' },
@@ -185,7 +185,7 @@ function renderEnrollmentBlock(blk, setBlk, removable, onRemove, batchOptions = 
     !isPrivate ? React.createElement(React.Fragment, null,
       React.createElement('div', { className: 'grid grid-cols-2 gap-3 mt-3' },
         React.createElement('div', { className: 'space-y-1' },
-          React.createElement('label', { className: labelCls }, 'Batch (Priority 3) *'),
+          React.createElement('label', { className: labelCls }, 'Batch *'),
           React.createElement(Dropdown, { value: blk.batchId, onChange: (v) => setBlk({ ...blk, batchId: typeof v === 'object' ? (v?.value || '') : (v || '') }), placeholder: !blk.program ? 'Select Category first' : batches.length === 0 ? 'No batches available' : 'Select batch...', disabled: !blk.program || batches.length === 0, options: batches.map((b) => ({ value: b.id, label: `${getBatchDisplayName(b, courts)} (${b.dayPattern})` })), getOptionLabel: (o) => o?.label || '', getOptionValue: (o) => o?.value || '' })),
         React.createElement('div', { className: 'space-y-1' },
           React.createElement('label', { className: labelCls }, 'Joining Date'),
@@ -238,8 +238,10 @@ export default function AdminStudents() {
 
   // Add Student modal
   const [showAdd, setShowAdd] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [addForm, setAddForm] = useState({ name: '', guardianName: '', guardianPhone: '', guardianEmail: '', membershipType: 'Member', program: '', ballColor: '', batchId: '', sessionsPurchased: '', amount: '', paymentStatus: 'PAID', enrollments: [newEnrollmentBlock()] });
   const [addErrors, setAddErrors] = useState({});
+  const [editErrors, setEditErrors] = useState({});
   const [dupCheck, setDupCheck] = useState(null);
 
   // Edit Student modal
@@ -348,6 +350,7 @@ export default function AdminStudents() {
   };
 
   const handleAddStudent = async () => {
+    if (isSubmitting) return;
     const errors = {};
     const nameErr = validateName(addForm.name, 'Student name'); if (nameErr) errors.name = nameErr;
     const gNameErr = validateName(addForm.guardianName, 'Guardian name'); if (gNameErr) errors.guardianName = gNameErr;
@@ -355,7 +358,16 @@ export default function AdminStudents() {
     if (addForm.guardianEmail && addForm.guardianEmail.trim()) {
       const emailErr = validateEmail(addForm.guardianEmail); if (emailErr) errors.guardianEmail = emailErr;
     }
-    if (Object.keys(errors).length > 0) { setAddErrors(errors); return; }
+    if (addForm.alternatePhone && addForm.alternatePhone.trim()) {
+      const altErr = validatePhone(addForm.alternatePhone); if (altErr) errors.alternatePhone = altErr;
+    }
+    if (Object.keys(errors).length > 0) {
+      setAddErrors(errors);
+      const firstErr = Object.values(errors)[0];
+      toast.error(firstErr);
+      return;
+    }
+    setIsSubmitting(true);
     try {
       const student = await db.upsertStudent({
         name: addForm.name.trim(),
@@ -488,6 +500,15 @@ export default function AdminStudents() {
         }
       }
 
+      // Trigger WF-D Student Onboarding Webhook
+      triggerWorkflow('student.onboard', {
+        studentId: student.id,
+        name: student.name,
+        guardianName: student.guardianName,
+        guardianEmail: student.guardianEmail,
+        guardianPhone: student.guardianPhone,
+      }).catch(err => console.error('[Students] WF-D Onboarding trigger error:', err));
+
       toast.success(`Student "${addForm.name}" created with enrollment(s)`);
       setShowAdd(false);
       setAddForm({
@@ -498,12 +519,20 @@ export default function AdminStudents() {
         enrollments: [newEnrollmentBlock()]
       });
       setAddErrors({}); setDupCheck(null);
-    } catch (e) { toast.error(e.message); }
+    } catch (e) { toast.error(e.message || 'Failed to create student'); }
+    finally { setIsSubmitting(false); }
   };
 
 
   const handleEdit = async () => {
     if (!selected) return;
+    const nameErr = validateName(editForm.name, 'Student name'); if (nameErr) { toast.error(nameErr); return; }
+    const gNameErr = validateName(editForm.guardianName, 'Guardian name'); if (gNameErr) { toast.error(gNameErr); return; }
+    const phoneErr = validatePhone(editForm.guardianPhone); if (phoneErr) { toast.error(phoneErr); return; }
+    const emailErr = validateEmail(editForm.guardianEmail); if (emailErr) { toast.error(emailErr); return; }
+    if (editForm.alternatePhone && editForm.alternatePhone.trim()) {
+      const altErr = validatePhone(editForm.alternatePhone); if (altErr) { toast.error(altErr); return; }
+    }
     try {
       await db.upsertStudent({ ...selected, name: editForm.name, guardianName: editForm.guardianName, guardianPhone: editForm.guardianPhone, guardianEmail: editForm.guardianEmail, guardianRelationship: editForm.guardianRelationship, alternatePhone: editForm.alternatePhone, membershipType: editForm.membershipType, remarks: editForm.remarks });
       toast.success('Student updated');
@@ -838,28 +867,27 @@ export default function AdminStudents() {
           {/* Basic Details */}
           <div className="space-y-1">
             <label className={labelCls}>Name *</label>
-            <input value={addForm.name} onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))} onBlur={checkDup}
-              className={`${fieldBase} ${addErrors.name ? 'border-red-300' : ''}`} placeholder="Student name" />
+            <input value={addForm.name} onChange={(e) => { const v = e.target.value; setAddForm((f) => ({ ...f, name: v })); setAddErrors((prev) => ({ ...prev, name: validateName(v, 'Student name') })); }} onBlur={checkDup}
+              className={`${fieldBase} ${addErrors.name ? 'border-red-400' : ''}`} placeholder="Student name" />
+            {addErrors.name && <p className="text-[10px] text-err mt-0.5">{addErrors.name}</p>}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <label className={labelCls}>Guardian Name *</label>
-              <input value={addForm.guardianName} onChange={(e) => setAddForm((f) => ({ ...f, guardianName: e.target.value }))} className={`${fieldBase} ${addErrors.guardianName ? 'border-red-300' : ''}`} placeholder="Guardian" />
+              <input value={addForm.guardianName} onChange={(e) => { const v = e.target.value; setAddForm((f) => ({ ...f, guardianName: v })); setAddErrors((prev) => ({ ...prev, guardianName: validateName(v, 'Guardian name') })); }} className={`${fieldBase} ${addErrors.guardianName ? 'border-red-400' : ''}`} placeholder="Guardian" />
               {addErrors.guardianName && <p className="text-[10px] text-err mt-0.5">{addErrors.guardianName}</p>}
             </div>
             <div className="space-y-1">
               <label className={labelCls}>Guardian Phone *</label>
-              <input value={addForm.guardianPhone} onChange={(e) => { setAddForm((f) => ({ ...f, guardianPhone: e.target.value })); setAddErrors((prev) => { const n = { ...prev }; delete n.guardianPhone; return n; }); }} onBlur={checkDup} className={`${fieldBase} ${addErrors.guardianPhone ? 'border-red-300' : ''}`} placeholder="Phone" />
+              <input value={addForm.guardianPhone} onChange={(e) => { const v = e.target.value; setAddForm((f) => ({ ...f, guardianPhone: v })); setAddErrors((prev) => ({ ...prev, guardianPhone: validatePhone(v) })); }} onBlur={checkDup} className={`${fieldBase} ${addErrors.guardianPhone ? 'border-red-400' : ''}`} placeholder="10-digit mobile number" />
               {addErrors.guardianPhone && <p className="text-[10px] text-err mt-0.5">{addErrors.guardianPhone}</p>}
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2">
             <div className="space-y-1">
               <label className={labelCls}>Guardian Email</label>
-              <input type="email" value={addForm.guardianEmail || ''} onChange={(e) => setAddForm((f) => ({ ...f, guardianEmail: e.target.value }))} className={fieldBase} placeholder="email@example.com" />
-              {!addForm.guardianEmail && addForm.name && (
-                <p className="text-[10px] text-warn mt-0.5">Guardian email is recommended — absence alerts and payment reminders cannot be sent without it.</p>
-              )}
+              <input type="email" value={addForm.guardianEmail || ''} onChange={(e) => { const v = e.target.value; setAddForm((f) => ({ ...f, guardianEmail: v })); setAddErrors((prev) => ({ ...prev, guardianEmail: validateEmail(v, false) })); }} className={`${fieldBase} ${addErrors.guardianEmail ? 'border-red-400' : ''}`} placeholder="email@example.com" />
+              {addErrors.guardianEmail && <p className="text-[10px] text-err mt-0.5">{addErrors.guardianEmail}</p>}
             </div>
             <div className="space-y-1">
               <label className={labelCls}>Relationship</label>
@@ -867,7 +895,8 @@ export default function AdminStudents() {
             </div>
             <div className="space-y-1">
               <label className={labelCls}>Alt Phone</label>
-              <input value={addForm.alternatePhone} onChange={(e) => setAddForm((f) => ({ ...f, alternatePhone: e.target.value }))} className={fieldBase} placeholder="Optional" />
+              <input value={addForm.alternatePhone} onChange={(e) => { const v = e.target.value; setAddForm((f) => ({ ...f, alternatePhone: v })); setAddErrors((prev) => ({ ...prev, alternatePhone: v ? validatePhone(v, false) : '' })); }} className={`${fieldBase} ${addErrors.alternatePhone ? 'border-red-400' : ''}`} placeholder="Optional" />
+              {addErrors.alternatePhone && <p className="text-[10px] text-err mt-0.5">{addErrors.alternatePhone}</p>}
             </div>
           </div>
           <div className="space-y-1">
@@ -914,7 +943,7 @@ export default function AdminStudents() {
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="secondary" onClick={() => { setShowAdd(false); setDupCheck(null); }}>Cancel</Button>
-            <Button onClick={handleAddStudent}>Create Student</Button>
+            <Button onClick={handleAddStudent} disabled={isSubmitting}>{isSubmitting ? 'Creating...' : 'Create Student'}</Button>
           </div>
         </div>
       </Modal>
@@ -922,13 +951,33 @@ export default function AdminStudents() {
       {/* Edit Student Modal */}
       <Modal open={showEdit} onClose={() => setShowEdit(false)} title="Edit Student" size="sm">
         <div className="space-y-3">
-          <div className="space-y-1"><label className={labelCls}>Name</label><input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} className={fieldBase} /></div>
-          <div className="space-y-1"><label className={labelCls}>Guardian Name</label><input value={editForm.guardianName} onChange={(e) => setEditForm((f) => ({ ...f, guardianName: e.target.value }))} className={fieldBase} /></div>
-          <div className="space-y-1"><label className={labelCls}>Guardian Phone</label><input value={editForm.guardianPhone} onChange={(e) => setEditForm((f) => ({ ...f, guardianPhone: e.target.value }))} className={fieldBase} /></div>
-          <div className="space-y-1"><label className={labelCls}>Guardian Email</label><input type="email" value={editForm.guardianEmail || ''} onChange={(e) => setEditForm((f) => ({ ...f, guardianEmail: e.target.value }))} className={fieldBase} placeholder="email@example.com" /></div>
+          <div className="space-y-1">
+            <label className={labelCls}>Name *</label>
+            <input value={editForm.name} onChange={(e) => { const v = e.target.value; setEditForm((f) => ({ ...f, name: v })); setEditErrors((prev) => ({ ...prev, name: validateName(v, 'Student name') })); }} className={`${fieldBase} ${editErrors.name ? 'border-red-400' : ''}`} />
+            {editErrors.name && <p className="text-[10px] text-err mt-0.5">{editErrors.name}</p>}
+          </div>
+          <div className="space-y-1">
+            <label className={labelCls}>Guardian Name *</label>
+            <input value={editForm.guardianName} onChange={(e) => { const v = e.target.value; setEditForm((f) => ({ ...f, guardianName: v })); setEditErrors((prev) => ({ ...prev, guardianName: validateName(v, 'Guardian name') })); }} className={`${fieldBase} ${editErrors.guardianName ? 'border-red-400' : ''}`} />
+            {editErrors.guardianName && <p className="text-[10px] text-err mt-0.5">{editErrors.guardianName}</p>}
+          </div>
+          <div className="space-y-1">
+            <label className={labelCls}>Guardian Phone *</label>
+            <input value={editForm.guardianPhone} onChange={(e) => { const v = e.target.value; setEditForm((f) => ({ ...f, guardianPhone: v })); setEditErrors((prev) => ({ ...prev, guardianPhone: validatePhone(v) })); }} className={`${fieldBase} ${editErrors.guardianPhone ? 'border-red-400' : ''}`} />
+            {editErrors.guardianPhone && <p className="text-[10px] text-err mt-0.5">{editErrors.guardianPhone}</p>}
+          </div>
+          <div className="space-y-1">
+            <label className={labelCls}>Guardian Email</label>
+            <input type="email" value={editForm.guardianEmail || ''} onChange={(e) => { const v = e.target.value; setEditForm((f) => ({ ...f, guardianEmail: v })); setEditErrors((prev) => ({ ...prev, guardianEmail: validateEmail(v, false) })); }} className={`${fieldBase} ${editErrors.guardianEmail ? 'border-red-400' : ''}`} placeholder="email@example.com" />
+            {editErrors.guardianEmail && <p className="text-[10px] text-err mt-0.5">{editErrors.guardianEmail}</p>}
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1"><label className={labelCls}>Relationship</label><Dropdown value={editForm.guardianRelationship} onChange={(v) => setEditForm((f) => ({ ...f, guardianRelationship: typeof v === 'object' ? (v.value || v) : v }))} options={GUARDIAN_RELATIONSHIPS.map((r) => ({ value: r, label: r }))} getOptionLabel={(o) => o.label} getOptionValue={(o) => o.value} /></div>
-            <div className="space-y-1"><label className={labelCls}>Alt Phone</label><input value={editForm.alternatePhone || ''} onChange={(e) => setEditForm((f) => ({ ...f, alternatePhone: e.target.value }))} className={fieldBase} /></div>
+            <div className="space-y-1">
+              <label className={labelCls}>Alt Phone</label>
+              <input value={editForm.alternatePhone || ''} onChange={(e) => { const v = e.target.value; setEditForm((f) => ({ ...f, alternatePhone: v })); setEditErrors((prev) => ({ ...prev, alternatePhone: v ? validatePhone(v, false) : '' })); }} className={`${fieldBase} ${editErrors.alternatePhone ? 'border-red-400' : ''}`} />
+              {editErrors.alternatePhone && <p className="text-[10px] text-err mt-0.5">{editErrors.alternatePhone}</p>}
+            </div>
           </div>
           <div className="space-y-1"><label className={labelCls}>Membership</label><Dropdown value={editForm.membershipType} onChange={(v) => setEditForm((f) => ({ ...f, membershipType: typeof v === 'object' ? (v.value || 'Member') : (v || 'Member') }))} options={[{ value: 'Member', label: 'Member' }, { value: 'Non-member', label: 'Non-member' }, { value: 'Guest', label: 'Guest / Trial' }]} getOptionLabel={(o) => o.label} getOptionValue={(o) => o.value} /></div>
           <div className="space-y-1"><label className={labelCls}>Remarks</label><textarea value={editForm.remarks || ''} onChange={(e) => setEditForm((f) => ({ ...f, remarks: e.target.value }))} className="w-full h-16 px-3 py-2 rounded-lg border border-line text-[13px] outline-none focus:ring-2 focus:ring-brand/10 resize-none" /></div>

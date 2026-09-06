@@ -86,7 +86,6 @@ export default function CourtMaster() {
               <div key={c.id} className="flex items-center gap-2 sm:gap-3 px-3 py-2 rounded-lg bg-canvas-soft text-xs">
                 <MapPin className="w-3.5 h-3.5 text-ink-faint flex-shrink-0" />
                 <span className="font-semibold text-ink flex-1 truncate">{c.name}</span>
-                <span className="text-ink-muted flex-shrink-0">{c.id}</span>
                 <Button size="sm" variant="ghost" icon={Pencil} className="flex-shrink-0" onClick={() => openEdit(c)}>Edit</Button>
                 <Button size="sm" variant="ghost" icon={Archive} className="flex-shrink-0" onClick={() => openArchive(c)}>Archive</Button>
               </div>
@@ -114,14 +113,14 @@ export default function CourtMaster() {
 
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Add Court" size="sm">
         <div className="space-y-3">
-          <div className="space-y-1"><label className={LBL}>Court Name</label><input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className={FIELD} placeholder="e.g. Court 2" /></div>
+          <div className="space-y-1"><label className={LBL}>Court Name *</label><input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className={FIELD} placeholder="e.g. Court 2" /></div>
           <div className="flex justify-end gap-2 pt-2"><Button variant="secondary" onClick={() => setShowAdd(false)}>Cancel</Button><Button onClick={handleAdd}>Create Court</Button></div>
         </div>
       </Modal>
 
       <Modal open={showEdit} onClose={() => setShowEdit(false)} title="Edit Court" size="sm">
         <div className="space-y-3">
-          <div className="space-y-1"><label className={LBL}>Court Name</label><input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className={FIELD} /></div>
+          <div className="space-y-1"><label className={LBL}>Court Name *</label><input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className={FIELD} /></div>
           <div className="space-y-1"><label className={LBL}>Status</label><Dropdown value={form.status} onChange={(v) => setForm((f) => ({ ...f, status: typeof v === 'object' ? (v.value || v) : v }))} options={[{ value: 'ACTIVE', label: 'Active' }, { value: 'INACTIVE', label: 'Inactive' }]} getOptionLabel={(o) => o.label} getOptionValue={(o) => o.value} /></div>
           <div className="flex justify-end gap-2 pt-2"><Button variant="secondary" onClick={() => setShowEdit(false)}>Cancel</Button><Button onClick={handleEdit}>Save</Button></div>
         </div>

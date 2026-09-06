@@ -6,7 +6,7 @@ import Modal from '../../ui/Modal';
 import Dropdown from '../../ui/Dropdown';
 import StatusPill from '../../ui/StatusPill';
 import { toast } from 'sonner';
-import { validatePhone, validateName } from '../../../utils/validators';
+import { validatePhone, validateName, validateRequired, sanitizePhone } from '../../../utils/validators';
 import { Plus, Pencil, Archive, RotateCcw } from 'lucide-react';
 
 const FIELD = 'w-full h-[38px] px-3 rounded-lg border border-line bg-white text-[13px] text-ink outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand transition-all';
@@ -27,13 +27,23 @@ export default function CoachManagement() {
   const [archiveId, setArchiveId] = useState('');
   const [archiveReason, setArchiveReason] = useState('');
   const [form, setForm] = useState({ name: '', phone: '', designation: '', dutyType: 'FULL_TIME', baseSalary: '', rate1on1PerHour: '', rateOvertimePerHour: '', paidHolidaysPerMonth: '1' });
+  const [formErrors, setFormErrors] = useState({ name: '', phone: '' });
+
+  const validateForm = () => {
+    const nameErr = validateName(form.name, 'Coach name');
+    const phoneErr = validatePhone(form.phone);
+    const desigErr = validateRequired(form.designation, 'Designation');
+    const dutyErr = validateRequired(form.dutyType, 'Duty type');
+    setFormErrors({ name: nameErr, phone: phoneErr });
+    if (nameErr) { toast.error(nameErr); return false; }
+    if (phoneErr) { toast.error(phoneErr); return false; }
+    if (desigErr) { toast.error(desigErr); return false; }
+    if (dutyErr) { toast.error(dutyErr); return false; }
+    return true;
+  };
 
   const handleAdd = async () => {
-    const nameErr = validateName(form.name, 'Coach name');
-    if (nameErr) { toast.error(nameErr); return; }
-    if (form.phone && form.phone.trim()) {
-      const phoneErr = validatePhone(form.phone); if (phoneErr) { toast.error(phoneErr); return; }
-    }
+    if (!validateForm()) return;
     try {
       await db.upsertCoach({
         name: form.name, phone: form.phone, designation: form.designation,
@@ -49,11 +59,7 @@ export default function CoachManagement() {
   };
 
   const handleEdit = async () => {
-    const nameErr = validateName(form.name, 'Coach name');
-    if (nameErr) { toast.error(nameErr); return; }
-    if (form.phone && form.phone.trim()) {
-      const phoneErr = validatePhone(form.phone); if (phoneErr) { toast.error(phoneErr); return; }
-    }
+    if (!validateForm()) return;
     try {
       await db.upsertCoach({
         id: editId, name: form.name, phone: form.phone, designation: form.designation,
@@ -139,10 +145,18 @@ export default function CoachManagement() {
 
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Add Coach" size="md">
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1"><label className={LBL}>Name *</label><input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className={FIELD} placeholder="Coach name" /></div>
-          <div className="space-y-1"><label className={LBL}>Phone</label><input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} className={FIELD} placeholder="Phone" /></div>
-          <div className="space-y-1"><label className={LBL}>Designation</label><Dropdown value={form.designation} onChange={(v) => setForm((f) => ({ ...f, designation: typeof v === 'object' ? (v.value || v) : v }))} placeholder="Select..." options={DESIGNATIONS.map((d) => ({ value: d, label: d }))} getOptionLabel={(o) => o.label} getOptionValue={(o) => o.value} /></div>
-          <div className="space-y-1"><label className={LBL}>Duty Type</label><Dropdown value={form.dutyType} onChange={(v) => setForm((f) => ({ ...f, dutyType: typeof v === 'object' ? (v.value || v) : v }))} options={DUTY_TYPES.map((d) => ({ value: d, label: d.replace('_', ' ') }))} getOptionLabel={(o) => o.label} getOptionValue={(o) => o.value} /></div>
+          <div className="space-y-1">
+            <label className={LBL}>Name *</label>
+            <input value={form.name} onChange={(e) => { const v = e.target.value; setForm((f) => ({ ...f, name: v })); setFormErrors((errs) => ({ ...errs, name: validateName(v, 'Coach name') })); }} className={`${FIELD} ${formErrors.name ? 'border-red-400' : ''}`} placeholder="Coach name" />
+            {formErrors.name && <p className="text-[10px] text-err mt-0.5">{formErrors.name}</p>}
+          </div>
+          <div className="space-y-1">
+            <label className={LBL}>Phone *</label>
+            <input value={form.phone} onChange={(e) => { const v = e.target.value; setForm((f) => ({ ...f, phone: v })); setFormErrors((errs) => ({ ...errs, phone: validatePhone(v) })); }} className={`${FIELD} ${formErrors.phone ? 'border-red-400' : ''}`} placeholder="10-digit mobile number" />
+            {formErrors.phone && <p className="text-[10px] text-err mt-0.5">{formErrors.phone}</p>}
+          </div>
+          <div className="space-y-1"><label className={LBL}>Designation *</label><Dropdown value={form.designation} onChange={(v) => setForm((f) => ({ ...f, designation: typeof v === 'object' ? (v.value || v) : v }))} placeholder="Select designation..." options={DESIGNATIONS.map((d) => ({ value: d, label: d }))} getOptionLabel={(o) => o.label} getOptionValue={(o) => o.value} /></div>
+          <div className="space-y-1"><label className={LBL}>Duty Type *</label><Dropdown value={form.dutyType} onChange={(v) => setForm((f) => ({ ...f, dutyType: typeof v === 'object' ? (v.value || v) : v }))} options={DUTY_TYPES.map((d) => ({ value: d, label: d.replace('_', ' ') }))} getOptionLabel={(o) => o.label} getOptionValue={(o) => o.value} /></div>
           <div className="space-y-1"><label className={LBL}>Base Salary (Rs.)</label><input type="number" value={form.baseSalary} onChange={(e) => setForm((f) => ({ ...f, baseSalary: e.target.value }))} className={FIELD} placeholder="25000" /></div>
           <div className="space-y-1"><label className={LBL}>1-on-1 Rate (per hr)</label><input type="number" value={form.rate1on1PerHour} onChange={(e) => setForm((f) => ({ ...f, rate1on1PerHour: e.target.value }))} className={FIELD} placeholder="800" /></div>
           <div className="space-y-1"><label className={LBL}>Overtime Rate (per hr)</label><input type="number" value={form.rateOvertimePerHour} onChange={(e) => setForm((f) => ({ ...f, rateOvertimePerHour: e.target.value }))} className={FIELD} placeholder="250" /></div>
@@ -153,10 +167,18 @@ export default function CoachManagement() {
 
       <Modal open={showEdit} onClose={() => setShowEdit(false)} title="Edit Coach" size="md">
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1"><label className={LBL}>Name *</label><input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className={FIELD} /></div>
-          <div className="space-y-1"><label className={LBL}>Phone</label><input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} className={FIELD} /></div>
-          <div className="space-y-1"><label className={LBL}>Designation</label><Dropdown value={form.designation} onChange={(v) => setForm((f) => ({ ...f, designation: typeof v === 'object' ? (v.value || v) : v }))} options={DESIGNATIONS.map((d) => ({ value: d, label: d }))} getOptionLabel={(o) => o.label} getOptionValue={(o) => o.value} /></div>
-          <div className="space-y-1"><label className={LBL}>Duty Type</label><Dropdown value={form.dutyType} onChange={(v) => setForm((f) => ({ ...f, dutyType: typeof v === 'object' ? (v.value || v) : v }))} options={DUTY_TYPES.map((d) => ({ value: d, label: d.replace('_', ' ') }))} getOptionLabel={(o) => o.label} getOptionValue={(o) => o.value} /></div>
+          <div className="space-y-1">
+            <label className={LBL}>Name *</label>
+            <input value={form.name} onChange={(e) => { const v = e.target.value; setForm((f) => ({ ...f, name: v })); setFormErrors((errs) => ({ ...errs, name: validateName(v, 'Coach name') })); }} className={`${FIELD} ${formErrors.name ? 'border-red-400' : ''}`} />
+            {formErrors.name && <p className="text-[10px] text-err mt-0.5">{formErrors.name}</p>}
+          </div>
+          <div className="space-y-1">
+            <label className={LBL}>Phone *</label>
+            <input value={form.phone} onChange={(e) => { const v = e.target.value; setForm((f) => ({ ...f, phone: v })); setFormErrors((errs) => ({ ...errs, phone: validatePhone(v) })); }} className={`${FIELD} ${formErrors.phone ? 'border-red-400' : ''}`} />
+            {formErrors.phone && <p className="text-[10px] text-err mt-0.5">{formErrors.phone}</p>}
+          </div>
+          <div className="space-y-1"><label className={LBL}>Designation *</label><Dropdown value={form.designation} onChange={(v) => setForm((f) => ({ ...f, designation: typeof v === 'object' ? (v.value || v) : v }))} options={DESIGNATIONS.map((d) => ({ value: d, label: d }))} getOptionLabel={(o) => o.label} getOptionValue={(o) => o.value} /></div>
+          <div className="space-y-1"><label className={LBL}>Duty Type *</label><Dropdown value={form.dutyType} onChange={(v) => setForm((f) => ({ ...f, dutyType: typeof v === 'object' ? (v.value || v) : v }))} options={DUTY_TYPES.map((d) => ({ value: d, label: d.replace('_', ' ') }))} getOptionLabel={(o) => o.label} getOptionValue={(o) => o.value} /></div>
           <div className="space-y-1"><label className={LBL}>Base Salary</label><input type="number" value={form.baseSalary} onChange={(e) => setForm((f) => ({ ...f, baseSalary: e.target.value }))} className={FIELD} /></div>
           <div className="space-y-1"><label className={LBL}>1-on-1 Rate</label><input type="number" value={form.rate1on1PerHour} onChange={(e) => setForm((f) => ({ ...f, rate1on1PerHour: e.target.value }))} className={FIELD} /></div>
           <div className="space-y-1"><label className={LBL}>Overtime Rate</label><input type="number" value={form.rateOvertimePerHour} onChange={(e) => setForm((f) => ({ ...f, rateOvertimePerHour: e.target.value }))} className={FIELD} /></div>
