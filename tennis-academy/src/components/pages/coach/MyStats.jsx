@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Users, TrendingUp, BarChart3, Star } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
-import { useDb } from '../../../context/DbContext';
+import { useSupabase } from '../../../context/SupabaseContext';
 import StatCard from '../../ui/StatCard';
 import Card from '../../ui/Card';
 import StatusPill from '../../ui/StatusPill';
@@ -9,9 +9,45 @@ import { formatCurrency } from '../../../utils/formatters';
 
 export default function MyStats() {
   const { user } = useAuth();
-  const { db, tick } = useDb();
-  const state = useMemo(() => db.readAll(), [db, tick]);
+  const { services, entity } = useSupabase();
   const coachId = user?.linkedCoachId;
+
+  const [state, setState] = useState({
+    coaches: [],
+    batches: [],
+    enrollments: [],
+    students: [],
+    attendance: [],
+  });
+
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      try {
+        const entityOpt = entity === 'all' ? undefined : entity;
+        const [coachesRes, batchesRes, enrollmentsRes, studentsRes, attendanceRes] = await Promise.all([
+          services.coaches.list({ entity: entityOpt, pageSize: 200 }),
+          services.batches.list({ entity: entityOpt, pageSize: 500 }),
+          services.enrollments.list({ entity: entityOpt, pageSize: 500 }),
+          services.students.list({ entity: entityOpt, pageSize: 1000 }),
+          services.attendance.list({ entity: entityOpt, pageSize: 1000 }),
+        ]);
+        if (active) {
+          setState({
+            coaches: coachesRes.data || [],
+            batches: batchesRes.data || [],
+            enrollments: enrollmentsRes.data || [],
+            students: studentsRes.data || [],
+            attendance: attendanceRes.data || [],
+          });
+        }
+      } catch (err) {
+        console.error('[MyStats] load error:', err);
+      }
+    }
+    load();
+    return () => { active = false; };
+  }, [services, entity]);
 
   const coach = useMemo(() => {
     return (state.coaches || []).find((c) => c.id === coachId);
@@ -20,7 +56,7 @@ export default function MyStats() {
   const coachBatches = useMemo(() => {
     if (!coachId) return [];
     return (state.batches || []).filter(
-      (b) => (b.primaryCoachId === coachId || b.supportCoachId === coachId) && b.status === 'ACTIVE'
+      (b) => (b.primaryCoachId === coachId || b.supportCoachId === coachId) && (b.status === 'ACTIVE' || b.status === 'active')
     );
   }, [state.batches, coachId]);
 
@@ -29,7 +65,7 @@ export default function MyStats() {
     const batchIds = new Set(coachBatches.map((b) => b.id));
     const studentIds = new Set(
       (state.enrollments || [])
-        .filter((e) => batchIds.has(e.batchId) && e.status === 'ACTIVE')
+        .filter((e) => batchIds.has(e.batchId) && (e.status === 'ACTIVE' || e.status === 'active'))
         .map((e) => e.studentId)
     );
     return (state.students || []).filter((s) => studentIds.has(s.id));
@@ -38,7 +74,7 @@ export default function MyStats() {
   const studentPerformance = useMemo(() => {
     return assignedStudents.map((s) => {
       const studentAtt = (state.attendance || []).filter((a) => a.studentId === s.id);
-      const presentCount = studentAtt.filter((a) => a.status === 'PRESENT').length;
+      const presentCount = studentAtt.filter((a) => a.status === 'PRESENT' || a.status === 'present').length;
       const pct = studentAtt.length > 0 ? Math.round((presentCount / studentAtt.length) * 100) : 100;
       return {
         id: s.id,

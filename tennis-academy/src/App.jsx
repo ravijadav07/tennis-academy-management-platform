@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { AuthProvider } from './context/AuthContext';
+import { SupabaseProvider } from './context/SupabaseContext';
 import CanAccess from './components/rbac/CanAccess';
 import DashboardLayout from './components/layout/DashboardLayout';
 import Login from './components/pages/Login';
@@ -54,6 +55,7 @@ function PuchoBadge() {
 export default function App() {
   return (
     <BrowserRouter>
+      <SupabaseProvider>
       <AuthProvider>
         <Toaster position="top-right" richColors closeButton />
         <Routes>
@@ -105,6 +107,7 @@ export default function App() {
         </Routes>
         <PuchoBadge />
       </AuthProvider>
+      </SupabaseProvider>
     </BrowserRouter>
   );
 }

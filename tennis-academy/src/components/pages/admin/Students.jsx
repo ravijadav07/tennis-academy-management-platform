@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useStudents } from '../../../hooks/useStudents';
+import { db } from '../../../mocks/localDb';
 import { useDebounce } from '../../../hooks/useDebounce';
-import { useDb } from '../../../context/DbContext';
+import { useSupabase } from '../../../context/SupabaseContext';
 import Card from '../../ui/Card';
 import StatusPill from '../../ui/StatusPill';
 import Modal from '../../ui/Modal';
@@ -225,7 +226,6 @@ function renderEnrollmentBlock(blk, setBlk, removable, onRemove, batchOptions = 
 }
 
 export default function AdminStudents() {
-  const { db, tick } = useDb();
   const [rawQuery, setRawQuery] = useState('');
   const query = useDebounce(rawQuery, 300);
   const [status, setStatus] = useState('all');

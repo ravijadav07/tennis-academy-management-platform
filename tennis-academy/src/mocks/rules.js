@@ -47,9 +47,9 @@ export function computeSlotAnalysis(batches, enrollments, { month } = {}) {
   const patternBk = { MWF: {}, TTS: {} };
 
   for (const b of batches) {
-    if (b.status !== 'ACTIVE') continue;
+    if (b.status !== 'ACTIVE' && b.status !== 'active') continue;
     const roster = enrollments.filter(
-      (e) => e.batchId === b.id && e.status === 'ACTIVE' && activeInMonth(e, month)
+      (e) => e.batchId === b.id && (e.status === 'ACTIVE' || e.status === 'active') && activeInMonth(e, month)
     );
 
     if (b.program === 'FITNESS') {

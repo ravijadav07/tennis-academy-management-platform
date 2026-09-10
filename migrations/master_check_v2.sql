@@ -75,4 +75,32 @@ SELECT check_name, status FROM (
     SELECT '007_enum | enum: dormant', CASE WHEN 'dormant'=ANY(SELECT unnest(enum_range(NULL::reminder_stage))::text) THEN 'OK' ELSE 'MISSING' END UNION ALL
     SELECT '007_enum | enum: payment_confirmation', CASE WHEN 'payment_confirmation'=ANY(SELECT unnest(enum_range(NULL::comm_type))::text) THEN 'OK' ELSE 'MISSING' END UNION ALL
     SELECT '007_enum | enum: payroll', CASE WHEN 'payroll'=ANY(SELECT unnest(enum_range(NULL::comm_type))::text) THEN 'OK' ELSE 'MISSING' END
+
+    UNION ALL
+    -- 008_gap_fill: column additions, new table, indexes
+    SELECT '008_gap | col: coaches.designation', CASE WHEN EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='coaches' AND column_name='designation') THEN 'OK' ELSE 'MISSING' END UNION ALL
+    SELECT '008_gap | col: coaches.duty_type', CASE WHEN EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='coaches' AND column_name='duty_type') THEN 'OK' ELSE 'MISSING' END UNION ALL
+    SELECT '008_gap | col: coaches.base_salary', CASE WHEN EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='coaches' AND column_name='base_salary') THEN 'OK' ELSE 'MISSING' END UNION ALL
+    SELECT '008_gap | col: coaches.hours_logged', CASE WHEN EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='coaches' AND column_name='hours_logged') THEN 'OK' ELSE 'MISSING' END UNION ALL
+    SELECT '008_gap | col: attendance.session_period', CASE WHEN EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='attendance' AND column_name='session_period') THEN 'OK' ELSE 'MISSING' END UNION ALL
+    SELECT '008_gap | col: attendance.marked_by', CASE WHEN EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='attendance' AND column_name='marked_by') THEN 'OK' ELSE 'MISSING' END UNION ALL
+    SELECT '008_gap | col: coach_attendance.session_period', CASE WHEN EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='coach_attendance' AND column_name='session_period') THEN 'OK' ELSE 'MISSING' END UNION ALL
+    SELECT '008_gap | col: coach_attendance.approval_status', CASE WHEN EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='coach_attendance' AND column_name='approval_status') THEN 'OK' ELSE 'MISSING' END UNION ALL
+    SELECT '008_gap | col: reconciliation.difference', CASE WHEN EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='reconciliation' AND column_name='difference') THEN 'OK' ELSE 'MISSING' END UNION ALL
+    SELECT '008_gap | col: batches.program', CASE WHEN EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='batches' AND column_name='program') THEN 'OK' ELSE 'MISSING' END UNION ALL
+    SELECT '008_gap | col: batches.primary_coach_id', CASE WHEN EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='batches' AND column_name='primary_coach_id') THEN 'OK' ELSE 'MISSING' END UNION ALL
+    SELECT '008_gap | col: students.guardian_name', CASE WHEN EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='students' AND column_name='guardian_name') THEN 'OK' ELSE 'MISSING' END UNION ALL
+    SELECT '008_gap | col: packages.program', CASE WHEN EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='packages' AND column_name='program') THEN 'OK' ELSE 'MISSING' END UNION ALL
+    SELECT '008_gap | col: packages.valid_to', CASE WHEN EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='packages' AND column_name='valid_to') THEN 'OK' ELSE 'MISSING' END UNION ALL
+    SELECT '008_gap | col: schedule.student_name', CASE WHEN EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='schedule' AND column_name='student_name') THEN 'OK' ELSE 'MISSING' END UNION ALL
+    SELECT '008_gap | col: enrollments.end_date', CASE WHEN EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='enrollments' AND column_name='end_date') THEN 'OK' ELSE 'MISSING' END UNION ALL
+    SELECT '008_gap | table: courts', CASE WHEN EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='courts') THEN 'OK' ELSE 'MISSING' END UNION ALL
+    SELECT '008_gap | enum: duty_type', CASE WHEN EXISTS(SELECT 1 FROM pg_type WHERE typname='duty_type') THEN 'OK' ELSE 'MISSING' END UNION ALL
+    SELECT '008_gap | enum: payment_reminder', CASE WHEN 'payment_reminder'=ANY(SELECT unnest(enum_range(NULL::comm_type))::text) THEN 'OK' ELSE 'MISSING' END UNION ALL
+    SELECT '008_gap | enum: slot_report', CASE WHEN 'slot_report'=ANY(SELECT unnest(enum_range(NULL::comm_type))::text) THEN 'OK' ELSE 'MISSING' END UNION ALL
+    SELECT '008_gap | idx: idx_coaches_entity', CASE WHEN EXISTS(SELECT 1 FROM pg_indexes WHERE indexname='idx_coaches_entity') THEN 'OK' ELSE 'MISSING' END UNION ALL
+    SELECT '008_gap | idx: idx_batches_support_coach_id', CASE WHEN EXISTS(SELECT 1 FROM pg_indexes WHERE indexname='idx_batches_support_coach_id') THEN 'OK' ELSE 'MISSING' END UNION ALL
+    SELECT '008_gap | idx: idx_courts_entity', CASE WHEN EXISTS(SELECT 1 FROM pg_indexes WHERE indexname='idx_courts_entity') THEN 'OK' ELSE 'MISSING' END UNION ALL
+    SELECT '008_gap | pol: public_read_courts', CASE WHEN EXISTS(SELECT 1 FROM pg_policies WHERE policyname='public_read_courts') THEN 'OK' ELSE 'MISSING' END UNION ALL
+    SELECT '008_gap | pol: public_read_enrollments', CASE WHEN EXISTS(SELECT 1 FROM pg_policies WHERE policyname='public_read_enrollments') THEN 'OK' ELSE 'MISSING' END
 ) t;

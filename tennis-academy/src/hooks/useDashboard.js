@@ -1,28 +1,109 @@
 // src/hooks/useDashboard.js
-import { useMemo } from 'react';
-import { useDb } from '../context/DbContext';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSupabase } from '../context/SupabaseContext';
 import { computeSlotAnalysis } from '../mocks/rules';
+import { db } from '../mocks/localDb';
 
 export function useDashboard() {
-  const { db, tick } = useDb();
-  const state = useMemo(() => db.readAll(), [db, tick]);
-  const { batches, courts, coaches, enrollments, students, attendance, coachAttendance } = state;
+  const { services, entity } = useSupabase();
+  const [data, setData] = useState({
+    batches: [],
+    courts: [],
+    coaches: [],
+    enrollments: [],
+    students: [],
+    attendance: [],
+    coachAttendance: [],
+    privateSessions: [],
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const today = new Date().toISOString().split('T')[0];
 
-  const activeBatches = batches.filter((b) => b.status === 'ACTIVE');
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const entityOpt = entity === 'all' ? undefined : entity;
+      const [
+        batchesRes,
+        courtsRes,
+        coachesRes,
+        studentsRes,
+        enrollmentsRes,
+        attendanceRes,
+        coachAttRes,
+        scheduleRes,
+      ] = await Promise.all([
+        services.batches.list({ entity: entityOpt, pageSize: 200 }),
+        services.courts.list({ entity: entityOpt, pageSize: 100 }),
+        services.coaches.list({ entity: entityOpt, pageSize: 100 }),
+        services.students.list({ entity: entityOpt, pageSize: 500 }),
+        services.enrollments.list({ entity: entityOpt, pageSize: 500 }),
+        services.attendance.list({ entity: entityOpt, date: today, pageSize: 500 }),
+        services.attendance.listCoachAttendance({ entity: entityOpt, date: today, pageSize: 100 }),
+        services.schedule.list({ entity: entityOpt, pageSize: 500 }),
+      ]);
 
-  // Today's batches — filter by day of week
+      const schedList = scheduleRes.data || [];
+      const privates = schedList.filter((s) => s.sessionType === 'private' || s.sessionType === '1-on-1' || s.studentName);
+
+      setData({
+        batches: batchesRes.data || [],
+        courts: courtsRes.data || [],
+        coaches: coachesRes.data || [],
+        enrollments: enrollmentsRes.data || [],
+        students: studentsRes.data || [],
+        attendance: attendanceRes.data || [],
+        coachAttendance: coachAttRes.data || [],
+        privateSessions: privates,
+        schedule: schedList,
+      });
+    } catch (err) {
+      console.warn('[useDashboard] Supabase network/QUIC issue, using localDb fallback:', err?.message || err);
+      try {
+        const local = db.readAll();
+        const schedList = local.schedule || [];
+        const privates = local.privateSessions || schedList.filter((s) => s.sessionType === 'private' || s.sessionType === '1-on-1' || s.studentName);
+        setData({
+          batches: local.batches || [],
+          courts: local.courts || [],
+          coaches: local.coaches || [],
+          enrollments: local.enrollments || [],
+          students: local.students || [],
+          attendance: local.attendance || [],
+          coachAttendance: local.coachAttendance || [],
+          privateSessions: privates,
+          schedule: schedList,
+        });
+      } catch (fallbackErr) {
+        console.error('[useDashboard] Local fallback error:', fallbackErr);
+        setError(err);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [services, entity, today]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const { batches, courts, coaches, enrollments, students, attendance, coachAttendance, privateSessions } = data;
+
+  const activeBatches = useMemo(() => batches.filter((b) => b.status === 'ACTIVE' || b.status === 'active'), [batches]);
+
   const todayDay = new Date().getDay();
-  const todayBatches = activeBatches.filter((b) => {
+  const todayBatches = useMemo(() => activeBatches.filter((b) => {
     if (b.dayPattern === 'WEEKEND') return (todayDay === 0 || todayDay === 6);
     if (b.dayPattern === 'MWF') return [1, 3, 5].includes(todayDay);
     if (b.dayPattern === 'TTS') return [2, 4, 6].includes(todayDay);
     return false;
-  });
+  }), [activeBatches, todayDay]);
 
   const todayPattern = (todayDay === 0 || todayDay === 6) ? 'SAT_SUN' : [1, 3, 5].includes(todayDay) ? 'MWF' : 'TTS';
-  const todayPrivates = (state.privateSessions || []).filter((s) => s.dayPattern === todayPattern);
+  const todayPrivates = useMemo(() => (privateSessions || []).filter((s) => s.dayPattern === todayPattern), [privateSessions, todayPattern]);
 
   const todayByCourt = useMemo(() => {
     const map = {};
@@ -53,28 +134,24 @@ export function useDashboard() {
     return Object.values(map);
   }, [todayBatches, todayPrivates, courts, coaches]);
 
-  // Attendance stats
-  const todayAttendance = attendance.filter((a) => a.date === today);
-  const presentCount = todayAttendance.filter((a) => a.status === 'PRESENT').length;
-  const totalActiveStudents = students.filter((s) => s.status === 'ACTIVE').length;
-  const totalMarked = todayAttendance.length;
+  const presentCount = useMemo(() => attendance.filter((a) => a.status === 'PRESENT' || a.status === 'present').length, [attendance]);
+  const totalActiveStudents = useMemo(() => students.filter((s) => s.status === 'ACTIVE' || s.status === 'active').length, [students]);
+  const totalMarked = attendance.length;
 
-  // Coach check-in
   const totalCoaches = coaches.length;
-  const todayCoachAtt = (coachAttendance || []).filter((a) => a.date === today);
-  const checkedInToday = todayCoachAtt.filter((a) => a.checkIn).length;
-  const notCheckedIn = totalCoaches - checkedInToday;
+  const todayCoachAtt = useMemo(() => (coachAttendance || []).filter((a) => a.date === today), [coachAttendance, today]);
+  const checkedInToday = useMemo(() => todayCoachAtt.filter((a) => a.checkIn || a.status === 'checked_in').length, [todayCoachAtt]);
+  const notCheckedIn = Math.max(0, totalCoaches - checkedInToday);
 
-  const coachesCheckedIn = new Set(todayCoachAtt.filter((a) => a.checkIn).map((a) => a.coachId));
-  const uncoveredSlots = todayBatches
+  const coachesCheckedIn = useMemo(() => new Set(todayCoachAtt.filter((a) => a.checkIn || a.status === 'checked_in').map((a) => a.coachId)), [todayCoachAtt]);
+  const uncoveredSlots = useMemo(() => todayBatches
     .filter((b) => b.primaryCoachId && !coachesCheckedIn.has(b.primaryCoachId))
     .map((b) => {
       const coach = coaches.find((c) => c.id === b.primaryCoachId);
       const court = courts.find((c) => c.id === b.courtId);
       return { batchId: b.id, batchName: b.name || `${b.program} ${b.dayPattern}`, coachName: coach?.name, courtName: court?.name, time: `${b.startTime || ''} - ${b.endTime || ''}`, program: b.program };
-    });
+    }), [todayBatches, coachesCheckedIn, coaches, courts]);
 
-  // Coach double-booking conflicts
   const conflicts = useMemo(() => {
     const slots = {};
     activeBatches.forEach((b) => {
@@ -99,7 +176,7 @@ export function useDashboard() {
       coaches: totalCoaches,
       todayAttendance: presentCount,
       totalAttendanceToday: totalMarked,
-      unmarkedToday: totalActiveStudents - totalMarked,
+      unmarkedToday: Math.max(0, totalActiveStudents - totalMarked),
       checkedInToday,
       notCheckedIn,
     },
@@ -107,6 +184,17 @@ export function useDashboard() {
     uncoveredSlots,
     conflicts,
     slotAnalysis,
-    loading: false,
+    courts,
+    batches,
+    coaches,
+    enrollments,
+    students,
+    attendance,
+    coachAttendance,
+    privateSessions,
+    schedule: data.schedule || [],
+    loading,
+    error,
+    refetch: fetchData,
   };
 }

@@ -1,26 +1,56 @@
 // src/components/layout/GlobalSearch.jsx — Enhancement E9
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
-import { useDb } from '../../context/DbContext';
+import { useSupabase } from '../../context/SupabaseContext';
 import { formatTime12h } from '../../utils/formatters';
 
 export default function GlobalSearch() {
-  const { db, tick } = useDb();
+  const { services, entity } = useSupabase();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
   const ref = useRef(null);
   const navigate = useNavigate();
 
-  const results = useMemo(() => {
-    if (!query || query.length < 2) return [];
-    const state = db.readAll();
-    const q = query.toLowerCase();
-    const students = state.students.filter((s) => s.name.toLowerCase().includes(q)).map((s) => ({ type: 'Student', id: s.id, name: s.name, path: '/admin/students', detail: s.guardianName }));
-    const batches = state.batches.filter((b) => (b.program || b.name || '').toLowerCase().includes(q)).map((b) => ({ type: 'Batch', id: b.id, name: b.program, path: `/admin/batches/${b.id}`, detail: `${b.dayPattern} ${formatTime12h(b.startTime)}` }));
-    const coaches = state.coaches.filter((c) => c.name.toLowerCase().includes(q)).map((c) => ({ type: 'Coach', id: c.id, name: c.name, path: '/admin/coaches', detail: c.designation }));
-    return [...students, ...batches, ...coaches].slice(0, 8);
-  }, [query, db, tick]);
+  const handleSearch = useCallback(async (qStr) => {
+    if (!qStr || qStr.length < 2) {
+      setResults([]);
+      return;
+    }
+    const q = qStr.toLowerCase();
+    try {
+      const entityOpt = entity === 'all' ? undefined : entity;
+      const [studentsRes, batchesRes, coachesRes] = await Promise.all([
+        services.students.list({ entity: entityOpt, pageSize: 100 }),
+        services.batches.list({ entity: entityOpt, pageSize: 100 }),
+        services.coaches.list({ entity: entityOpt, pageSize: 100 }),
+      ]);
+
+      const students = (studentsRes.data || [])
+        .filter((s) => (s.name || '').toLowerCase().includes(q) || (s.guardianName || '').toLowerCase().includes(q))
+        .map((s) => ({ type: 'Student', id: s.id, name: s.name, path: '/admin/students', detail: s.guardianName }));
+
+      const batches = (batchesRes.data || [])
+        .filter((b) => (b.program || b.name || '').toLowerCase().includes(q))
+        .map((b) => ({ type: 'Batch', id: b.id, name: b.program || b.name, path: `/admin/batches/${b.id}`, detail: `${b.dayPattern || ''} ${formatTime12h(b.startTime)}` }));
+
+      const coaches = (coachesRes.data || [])
+        .filter((c) => (c.name || '').toLowerCase().includes(q))
+        .map((c) => ({ type: 'Coach', id: c.id, name: c.name, path: '/admin/coaches', detail: c.designation }));
+
+      setResults([...students, ...batches, ...coaches].slice(0, 8));
+    } catch (err) {
+      console.error('[GlobalSearch] search error:', err);
+    }
+  }, [services, entity]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      handleSearch(query);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [query, handleSearch]);
 
   useEffect(() => {
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };

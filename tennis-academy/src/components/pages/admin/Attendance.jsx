@@ -1,6 +1,7 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
-import { useDb } from '../../../context/DbContext';
+import { useSupabase } from '../../../context/SupabaseContext';
 import { getEligibility } from '../../../mocks/rules';
+import { db } from '../../../mocks/localDb';
 import Card from '../../ui/Card';
 import StatusPill from '../../ui/StatusPill';
 import Button from '../../ui/Button';
@@ -21,18 +22,27 @@ const LBL = 'block text-[10px] font-semibold text-ink-muted uppercase tracking-[
 function getToday() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 
 export default function AdminAttendance() {
-  const { db, tick } = useDb();
+  const { services, entity } = useSupabase();
   const { user } = useAuth();
-  const state = useMemo(() => db.readAll(), [db, tick]);
+
+  const [data, setData] = useState({
+    batches: [],
+    courts: [],
+    students: [],
+    enrollments: [],
+    packages: [],
+    attendance: [],
+  });
+  const [loading, setLoading] = useState(true);
+
   const today = getToday();
   const isAdmin = user?.role === 'admin' || user?.role === 'ops_head';
-  const [selectedBatchId, setSelectedBatchId] = useState(state.batches[0] && state.batches[0].id || '');
+  const [selectedBatchId, setSelectedBatchId] = useState('');
   const [selectedDate, setSelectedDate] = useState(today);
   const [showPrint, setShowPrint] = useState(false);
   const [optimistic, setOptimistic] = useState({});
   const [pending, setPending] = useState(new Set());
 
-// Add Student modal state
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [addMode, setAddMode] = useState('existing');
   const [addStudentId, setAddStudentId] = useState('');
@@ -41,82 +51,96 @@ export default function AdminAttendance() {
   const [sessionRemark, setSessionRemark] = useState('');
   const [sessionRemarkSaved, setSessionRemarkSaved] = useState(false);
 
-  // Load notified absences for this session
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const entityOpt = entity === 'all' ? undefined : entity;
+      const [batchesRes, courtsRes, studentsRes, enrollmentsRes, packagesRes, attendanceRes] = await Promise.all([
+        services.batches.list({ entity: entityOpt, pageSize: 500 }),
+        services.courts.list({ entity: entityOpt, pageSize: 100 }),
+        services.students.list({ entity: entityOpt, pageSize: 1000 }),
+        services.enrollments.list({ entity: entityOpt, pageSize: 1000 }),
+        services.packages.list({ entity: entityOpt, pageSize: 1000 }),
+        services.attendance.list({ entity: entityOpt, date: selectedDate, pageSize: 1000 }),
+      ]);
+
+      const bList = batchesRes.data || [];
+      setData({
+        batches: bList,
+        courts: courtsRes.data || [],
+        students: studentsRes.data || [],
+        enrollments: enrollmentsRes.data || [],
+        packages: packagesRes.data || [],
+        attendance: attendanceRes.data || [],
+      });
+
+      if (!selectedBatchId && bList.length > 0) {
+        setSelectedBatchId(bList[0].id);
+      }
+    } catch (err) {
+      console.warn('[AdminAttendance] Supabase load issue, using localDb fallback:', err?.message || err);
+      try {
+        const local = db.readAll();
+        const bList = local.batches || [];
+        setData({
+          batches: bList,
+          courts: local.courts || [],
+          students: local.students || [],
+          enrollments: local.enrollments || [],
+          packages: local.packages || [],
+          attendance: local.attendance || [],
+        });
+        if (!selectedBatchId && bList.length > 0) {
+          setSelectedBatchId(bList[0].id);
+        }
+      } catch (fallbackErr) {
+        console.error('[AdminAttendance] Fallback error:', fallbackErr);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [services, entity, selectedDate, selectedBatchId]);
+
   useEffect(() => {
-    if (selectedBatchId && selectedDate) {
-      const state = db.readAll();
-      const notified = (state.absentNotifications || []).filter(
-        (n) => n.batchId === selectedBatchId && n.date === selectedDate
-      ).map((n) => n.studentId);
-      setNotifiedAbsences(new Set(notified));
-    }
-  }, [selectedBatchId, selectedDate, tick, db]);
+    loadData();
+  }, [loadData]);
 
-  // Notify parent — opens mailto: draft
-  const handleNotifyParent = async (r, e) => {
-    e.stopPropagation();
-    const student = state.students.find((s) => s.id === r.studentId);
-    if (!student || !student.guardianEmail) {
-      toast.error('Guardian email is not available for this student');
-      return;
-    }
-    const mailto = prepareAbsenceEmail({
-      studentName: r.name,
-      guardianEmail: student.guardianEmail,
-      batchName: batch.program + ' ' + batch.dayPattern,
-      batchDate: formatDateDDMMYY(selectedDate),
-      startTime: batch.startTime,
-      endTime: batch.endTime,
-    });
-    await db.logAbsenceNotification({
-      studentId: r.studentId, batchId: selectedBatchId, date: selectedDate,
-      guardianEmail: student.guardianEmail,
-    });
-    setNotifiedAbsences((prev) => new Set(prev).add(r.studentId));
-    toast.success('Opening email draft for ' + r.name);
-    window.open(mailto, '_blank');
-  };
-
-  // Correction requests state
   const [correctionRequests, setCorrectionRequests] = useState([]);
   const [showCorrectionReason, setShowCorrectionReason] = useState(false);
   const [correctionTarget, setCorrectionTarget] = useState(null);
   const [correctionReason, setCorrectionReason] = useState('');
   const [notifiedAbsences, setNotifiedAbsences] = useState(new Set());
 
-  const batch = state.batches.find((b) => b.id === selectedBatchId);
+  const batch = useMemo(() => data.batches.find((b) => b.id === selectedBatchId), [data.batches, selectedBatchId]);
+
   const roster = useMemo(() => {
     if (!batch) return [];
-    const marked = state.attendance.filter((a) => a.batchId === selectedBatchId && a.date === selectedDate);
-    return state.enrollments
-      .filter((e) => e.batchId === selectedBatchId && e.status === 'ACTIVE')
+    const marked = data.attendance.filter((a) => a.batchId === selectedBatchId && a.date === selectedDate);
+    return data.enrollments
+      .filter((e) => e.batchId === selectedBatchId && (e.status === 'ACTIVE' || e.status === 'active'))
       .map((e) => {
-        const student = state.students.find((s) => s.id === e.studentId);
-        const pkg = state.packages.find((p) => p.studentId === e.studentId);
+        const student = data.students.find((s) => s.id === e.studentId);
+        const pkg = data.packages.find((p) => p.studentId === e.studentId);
         const att = marked.find((a) => a.studentId === e.studentId);
-        const notes = (state.playerNotes || []).filter((n) => n.studentId === e.studentId).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
         const elig = getEligibility(pkg, selectedDate);
         const key = e.studentId + '|' + selectedBatchId + '|' + selectedDate;
         const optStatus = optimistic[key];
         return {
           studentId: e.studentId,
-          name: student && student.name || 'Unknown',
-          program: e.billingProgram,
+          name: student?.name || 'Unknown',
+          program: e.billingProgram || e.program,
           membershipType: student?.membershipType || 'Member',
           eligibility: elig,
           package: pkg,
           attendance: att,
           blocked: !elig.markable,
           optStatus,
-          latestNote: notes[0]?.note || student?.remarks || '',
+          latestNote: student?.remarks || '',
         };
       });
+  }, [data, batch, selectedBatchId, selectedDate, optimistic]);
 
-  }, [state, batch, selectedBatchId, selectedDate, optimistic]);
-
-
-  // Students NOT in this batch (for out-of-schedule)
-  const otherStudents = state.students.filter((s) => s.status === 'ACTIVE' && !roster.some((r) => r.studentId === s.id));
+  const otherStudents = useMemo(() => data.students.filter((s) => (s.status === 'ACTIVE' || s.status === 'active') && !roster.some((r) => r.studentId === s.id)), [data.students, roster]);
 
   const markAll = async (status) => {
     const entries = roster.filter((r) => !r.blocked).map((r) => ({ studentId: r.studentId, status }));
@@ -126,29 +150,48 @@ export default function AdminAttendance() {
     setOptimistic(opt);
     setPending(new Set(entries.map((e) => e.studentId)));
     try {
-      await db.markAttendance({ batchId: selectedBatchId, date: selectedDate, entries, markedBy: 'admin', markedByRole: 'ADMIN', source: 'ADMIN' });
-      entries.forEach((e) => toast.success('Marked ' + (roster.find((r) => r.studentId === e.studentId) || {}).name + ' as ' + status, { duration: 2000 }));
+      await Promise.all(
+        entries.map(e => services.attendance.markAttendance({
+          studentId: e.studentId,
+          batchId: selectedBatchId,
+          date: selectedDate,
+          status,
+          markedBy: 'admin',
+        }))
+      );
+      toast.success('Marked all students as ' + status);
       setOptimistic({}); setPending(new Set());
+      loadData();
     } catch (e) { setOptimistic({}); setPending(new Set()); toast.error(e.message || 'Failed'); }
   };
 
-  const toggleStudent = useCallback(async (entry) => {
+  const isPastDate = selectedDate < today;
+
+  const handleToggleOrRequest = useCallback(async (entry) => {
     if (entry.blocked && !entry.attendance) { toast.error('Not markable: ' + entry.eligibility.reason); return; }
-    const nextStatus = entry.attendance && entry.attendance.status === 'PRESENT' ? 'ABSENT' : entry.attendance && entry.attendance.status === 'ABSENT' ? 'PRESENT' : 'PRESENT';
+    const nextStatus = entry.attendance && (entry.attendance.status === 'PRESENT' || entry.attendance.status === 'present') ? 'ABSENT' : 'PRESENT';
+
     const key = entry.studentId + '|' + selectedBatchId + '|' + selectedDate;
     setOptimistic((prev) => ({ ...prev, [key]: nextStatus }));
     setPending((prev) => new Set(prev).add(entry.studentId));
     try {
-      await db.markAttendance({ batchId: selectedBatchId, date: selectedDate, entries: [{ studentId: entry.studentId, status: nextStatus }], markedBy: 'admin', markedByRole: 'ADMIN', source: 'ADMIN' });
+      await services.attendance.markAttendance({
+        studentId: entry.studentId,
+        batchId: selectedBatchId,
+        date: selectedDate,
+        status: nextStatus,
+        markedBy: isAdmin ? 'admin' : 'coach',
+      });
       toast.success(entry.name + ' \u2192 ' + nextStatus, { duration: 2000 });
       setOptimistic((prev) => { const n = { ...prev }; delete n[key]; return n; });
       setPending((prev) => { const s = new Set(prev); s.delete(entry.studentId); return s; });
+      loadData();
     } catch (e) {
       setOptimistic((prev) => { const n = { ...prev }; delete n[key]; return n; });
       setPending((prev) => { const s = new Set(prev); s.delete(entry.studentId); return s; });
       toast.error(e.message);
     }
-  }, [optimistic, selectedBatchId, selectedDate, db]);
+  }, [optimistic, selectedBatchId, selectedDate, services, isAdmin, loadData]);
 
   const handleAddExisting = async () => {
     if (!addStudentId) { toast.error('Select a student'); return; }
@@ -175,7 +218,7 @@ export default function AdminAttendance() {
   // Load correction requests for admin
   useEffect(() => {
     if (isAdmin) { db.getCorrectionRequests().then(setCorrectionRequests); }
-  }, [tick, isAdmin, db]);
+  }, [isAdmin]);
 
   const handleRequestCorrection = async () => {
     if (!correctionReason.trim()) { toast.error('Reason is required'); return; }
@@ -202,51 +245,6 @@ export default function AdminAttendance() {
     catch (e) { toast.error(e.message); }
   };
 
-  // Modified toggleStudent: past-date correction requests go through approval
-  const isPastDate = selectedDate < today;
-  const handleToggleOrRequest = useCallback(async (entry) => {
-    if (entry.blocked && !entry.attendance) { toast.error('Not markable: ' + entry.eligibility.reason); return; }
-    const nextStatus = entry.attendance && entry.attendance.status === 'PRESENT' ? 'ABSENT' : entry.attendance && entry.attendance.status === 'ABSENT' ? 'PRESENT' : 'PRESENT';
-    // For past dates where attendance is already marked, create a correction request instead
-    if (isPastDate && entry.attendance && !isAdmin) {
-      setCorrectionTarget({ studentId: entry.studentId, nextStatus, attendance: entry.attendance });
-      setCorrectionReason('');
-      setShowCorrectionReason(true);
-      return;
-    }
-    // Admin or current date: direct marking
-    const key = entry.studentId + '|' + selectedBatchId + '|' + selectedDate;
-    setOptimistic((prev) => ({ ...prev, [key]: nextStatus }));
-    setPending((prev) => new Set(prev).add(entry.studentId));
-    try {
-      await db.markAttendance({ batchId: selectedBatchId, date: selectedDate, entries: [{ studentId: entry.studentId, status: nextStatus }], markedBy: isAdmin ? 'admin' : 'coach', markedByRole: (user?.role || 'ADMIN').toUpperCase(), source: isAdmin ? 'ADMIN' : 'COACH_APP' });
-      toast.success(entry.name + ' \u2192 ' + nextStatus, { duration: 2000 });
-      setOptimistic((prev) => { const n = { ...prev }; delete n[key]; return n; });
-      setPending((prev) => { const s = new Set(prev); s.delete(entry.studentId); return s; });
-    } catch (e) {
-      setOptimistic((prev) => { const n = { ...prev }; delete n[key]; return n; });
-      setPending((prev) => { const s = new Set(prev); s.delete(entry.studentId); return s; });
-      toast.error(e.message);
-    }
-  }, [optimistic, selectedBatchId, selectedDate, db, isPastDate, isAdmin, user]);
-
-  // Load session remark when batch + date changes
-  useEffect(() => {
-    if (!selectedBatchId || !selectedDate) return;
-    db.getSessionRemark({ batchId: selectedBatchId, date: selectedDate }).then((r) => {
-      setSessionRemark(r ? r.remark : '');
-      setSessionRemarkSaved(!!r);
-    });
-  }, [selectedBatchId, selectedDate, tick]);
-
-  const handleSaveRemark = async () => {
-    try {
-      await db.saveSessionRemark({ batchId: selectedBatchId, date: selectedDate, remark: sessionRemark });
-      setSessionRemarkSaved(true);
-      toast.success('Session remark saved');
-    } catch (e) { toast.error(e.message); }
-  };
-
   const presentCount = roster.filter((r) => (r.optStatus || (r.attendance && r.attendance.status)) === 'PRESENT').length;
   const absentCount = roster.filter((r) => (r.optStatus || (r.attendance && r.attendance.status)) === 'ABSENT').length;
 
@@ -259,9 +257,9 @@ export default function AdminAttendance() {
             value={selectedBatchId}
             onChange={(v) => setSelectedBatchId(typeof v === 'object' ? (v.value || v) : v)}
             placeholder="Select batch..."
-            options={state.batches.filter((b) => b.status === 'ACTIVE').map((b) => ({
+            options={(data.batches || []).filter((b) => b.status === 'ACTIVE' || b.status === 'active').map((b) => ({
               value: b.id,
-              label: `${getBatchDisplayName(b, state.courts)} (${b.dayPattern})`
+              label: `${getBatchDisplayName(b, data.courts)} (${b.dayPattern})`
             }))}
             getOptionLabel={(o) => (o && o.label) || ''}
             getOptionValue={(o) => (o && o.value) || ''}
@@ -285,7 +283,7 @@ export default function AdminAttendance() {
 
       {batch && (
         <Card>
-          <h3 className="text-sm font-semibold text-ink mb-3">{getBatchDisplayName(batch, state.courts)} ({batch.dayPattern}) {'\u2014'} {formatDateDDMMYY(selectedDate)}</h3>
+          <h3 className="text-sm font-semibold text-ink mb-3">{getBatchDisplayName(batch, data.courts)} ({batch.dayPattern}) {'\u2014'} {formatDateDDMMYY(selectedDate)}</h3>
           <div className="space-y-1">
             {roster.map((r) => {
               const displayStatus = r.optStatus || (r.attendance && r.attendance.status);

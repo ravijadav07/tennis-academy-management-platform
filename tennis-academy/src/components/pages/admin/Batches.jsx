@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Layers, Users, GraduationCap, Pencil, Plus, Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useDb } from '../../../context/DbContext';
+import { useSupabase } from '../../../context/SupabaseContext';
 import AdaptiveTable from '../../data/AdaptiveTable';
 import RowActionsMenu from '../../data/RowActionsMenu';
 import StatCard from '../../ui/StatCard';
@@ -9,23 +9,76 @@ import StatusPill from '../../ui/StatusPill';
 import Button from '../../ui/Button';
 import CapacityIndicator from '../../ui/CapacityIndicator';
 import { formatTime12h, getTodayPattern, getBatchDisplayName } from '../../../utils/formatters';
+import { db } from '../../../mocks/localDb';
 
 const PATTERNS = ['TODAY', 'MWF', 'TTS', 'SAT_SUN', 'ALL'];
 
 export default function Batches() {
   const navigate = useNavigate();
-  const { db, tick } = useDb();
-  const state = useMemo(() => db.readAll(), [db, tick]);
-  const { batches = [], courts = [], coaches = [], enrollments = [] } = state;
+  const { services, entity } = useSupabase();
+  const [data, setData] = useState({
+    batches: [],
+    courts: [],
+    coaches: [],
+    enrollments: [],
+  });
+  const [loading, setLoading] = useState(true);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const entityOpt = entity === 'all' ? undefined : entity;
+      const [batchesRes, courtsRes, coachesRes, enrollmentsRes] = await Promise.all([
+        services.batches.list({ entity: entityOpt, pageSize: 500 }),
+        services.courts.list({ entity: entityOpt, pageSize: 100 }),
+        services.coaches.list({ entity: entityOpt, pageSize: 200 }),
+        services.enrollments.list({ entity: entityOpt, pageSize: 1000 }),
+      ]);
+
+      if (!batchesRes.data || batchesRes.data.length === 0) {
+        const local = db.readAll();
+        setData({
+          batches: local.batches || [],
+          courts: local.courts || [],
+          coaches: local.coaches || [],
+          enrollments: local.enrollments || [],
+        });
+      } else {
+        setData({
+          batches: batchesRes.data || [],
+          courts: courtsRes.data || [],
+          coaches: coachesRes.data || [],
+          enrollments: enrollmentsRes.data || [],
+        });
+      }
+    } catch (err) {
+      console.warn('[Batches] load error, using localDb fallback:', err);
+      const local = db.readAll();
+      setData({
+        batches: local.batches || [],
+        courts: local.courts || [],
+        coaches: local.coaches || [],
+        enrollments: local.enrollments || [],
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [services, entity]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const { batches, courts, coaches, enrollments } = data;
 
   const todayPattern = getTodayPattern();
   const [selectedPattern, setSelectedPattern] = useState('TODAY');
 
   const processedBatches = useMemo(() => {
     return batches
-      .filter((b) => b.status === 'ACTIVE')
+      .filter((b) => b.status === 'ACTIVE' || b.status === 'active')
       .map((b) => {
-        const roster = enrollments.filter((e) => e.batchId === b.id && e.status === 'ACTIVE');
+        const roster = enrollments.filter((e) => e.batchId === b.id && (e.status === 'ACTIVE' || e.status === 'active'));
         const court = courts.find((c) => c.id === b.courtId);
         const coach = coaches.find((c) => c.id === b.primaryCoachId);
         const displayName = getBatchDisplayName(b, courts);
@@ -42,10 +95,13 @@ export default function Batches() {
 
   const filteredBatches = useMemo(() => {
     if (selectedPattern === 'TODAY') {
-      return processedBatches.filter((b) => b.dayPattern === todayPattern);
+      return processedBatches.filter((b) => b.dayPattern === todayPattern || (todayPattern === 'SAT_SUN' && (b.dayPattern === 'WEEKEND' || b.dayPattern === 'SAT_SUN')) || (todayPattern === 'WEEKEND' && (b.dayPattern === 'SAT_SUN' || b.dayPattern === 'WEEKEND')));
     }
     if (selectedPattern === 'ALL') {
       return processedBatches;
+    }
+    if (selectedPattern === 'SAT_SUN' || selectedPattern === 'WEEKEND') {
+      return processedBatches.filter((b) => b.dayPattern === 'SAT_SUN' || b.dayPattern === 'WEEKEND');
     }
     return processedBatches.filter((b) => b.dayPattern === selectedPattern);
   }, [processedBatches, selectedPattern, todayPattern]);
@@ -156,6 +212,14 @@ export default function Batches() {
       </div>
     );
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <div className="w-8 h-8 rounded-full border-2 border-brand border-t-transparent animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

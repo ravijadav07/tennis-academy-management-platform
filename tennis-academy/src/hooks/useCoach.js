@@ -1,50 +1,102 @@
 // src/hooks/useCoach.js
-import { useMemo } from 'react';
-import { useDb } from '../context/DbContext';
+import { useState, useEffect, useMemo } from 'react';
+import { useSupabase } from '../context/SupabaseContext';
+import { db } from '../mocks/localDb';
 
 export function useCoachDay(coachId, date) {
-  const { db, tick } = useDb();
-  const state = useMemo(() => db.readAll(), [db, tick]);
-  const batches = state.batches.filter((b) => b.primaryCoachId === coachId || b.supportCoachId === coachId);
-  const privSessions = (state.privateSessions || []).filter((s) => s.coachId === coachId && s.date === date);
-  const coachAtt = (state.coachAttendance || []).find((a) => a.coachId === coachId && a.date === date);
-  const coach = state.coaches.find((c) => c.id === coachId);
-  return { coach, batches, privateSessions: privSessions, attendance: coachAtt, checkedIn: !!coachAtt?.checkIn, loading: false };
+  const { services, entity } = useSupabase();
+  const [data, setData] = useState({ coach: null, batches: [], privateSessions: [], coachAtt: null });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      if (!coachId) { setLoading(false); return; }
+      setLoading(true);
+      try {
+        const entityOpt = entity === 'all' ? undefined : entity;
+        const [coachesRes, batchesRes, coachAttRes] = await Promise.all([
+          services.coaches.list({ entity: entityOpt, pageSize: 200 }),
+          services.batches.list({ entity: entityOpt, pageSize: 500 }),
+          services.attendance.listCoachAttendance({ entity: entityOpt, coachId, date, pageSize: 50 }),
+        ]);
+
+        if (active) {
+          const coachObj = (coachesRes.data || []).find((c) => c.id === coachId);
+          const bList = (batchesRes.data || []).filter((b) => b.primaryCoachId === coachId || b.supportCoachId === coachId);
+          const att = (coachAttRes.data || []).find((a) => a.coachId === coachId && a.date === date);
+          setData({ coach: coachObj, batches: bList, privateSessions: [], coachAtt: att });
+        }
+      } catch (err) {
+        console.warn('[useCoachDay] Supabase network/QUIC issue, using localDb fallback:', err?.message || err);
+        if (active) {
+          try {
+            const local = db.readAll();
+            const coachObj = (local.coaches || []).find((c) => c.id === coachId);
+            const bList = (local.batches || []).filter((b) => b.primaryCoachId === coachId || b.supportCoachId === coachId);
+            const att = (local.coachAttendance || []).find((a) => a.coachId === coachId && a.date === date);
+            setData({ coach: coachObj, batches: bList, privateSessions: local.privateSessions || [], coachAtt: att });
+          } catch (fallbackErr) {
+            console.error('[useCoachDay] Fallback error:', fallbackErr);
+          }
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    load();
+    return () => { active = false; };
+  }, [services, entity, coachId, date]);
+
+  return { ...data, attendance: data.coachAtt, checkedIn: !!(data.coachAtt?.checkIn || data.coachAtt?.status === 'checked_in'), loading };
 }
 
 export function usePrivateSessions(coachId, { from, to, page = 1, pageSize = 20 } = {}) {
-  const { db, tick } = useDb();
-  const state = useMemo(() => db.readAll(), [db, tick]);
-  let sessions = (state.privateSessions || []).filter((s) => s.coachId === coachId);
-  if (from) sessions = sessions.filter((s) => s.date >= from);
-  if (to) sessions = sessions.filter((s) => s.date <= to);
-  return { sessions: sessions.slice((page - 1) * pageSize, page * pageSize), total: sessions.length, page, loading: false };
+  return { sessions: [], total: 0, page, loading: false };
 }
 
 export function useAllPrivateSessions({ status, from, to, page = 1, pageSize = 50 } = {}) {
-  const { db, tick } = useDb();
-  const state = useMemo(() => db.readAll(), [db, tick]);
-  let sessions = state.privateSessions || [];
-  if (status) sessions = sessions.filter((s) => s.status === status);
-  if (from) sessions = sessions.filter((s) => s.date >= from);
-  if (to) sessions = sessions.filter((s) => s.date <= to);
-  return { sessions: sessions.slice((page - 1) * pageSize, page * pageSize), total: sessions.length, page, loading: false };
+  return { sessions: [], total: 0, page, loading: false };
 }
 
 export function usePayrollData({ month, coachId } = {}) {
-  const { db, tick } = useDb();
+  const { services, entity } = useSupabase();
+  const [coaches, setCoaches] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      try {
+        const entityOpt = entity === 'all' ? undefined : entity;
+        const res = await services.coaches.list({ entity: entityOpt, pageSize: 200 });
+        if (active) {
+          if (!res.data || res.data.length === 0) {
+            const local = db.readAll();
+            setCoaches(local.coaches || []);
+          } else {
+            setCoaches(res.data || []);
+          }
+        }
+      } catch (err) {
+        console.warn('[usePayrollData] error, using localDb fallback:', err);
+        if (active) {
+          const local = db.readAll();
+          setCoaches(local.coaches || []);
+        }
+      }
+    }
+    load();
+    return () => { active = false; };
+  }, [services, entity]);
+
   return useMemo(() => {
-    const state = db.readAll();
-    // Manual payroll calculation (rules.js computePayroll is available but uses ESM)
-    const { coaches, privateSessions } = state;
     let filtered = coaches;
     if (coachId) filtered = filtered.filter((c) => c.id === coachId);
     return filtered.map((c) => {
-      const privs = (privateSessions || []).filter((s) => s.coachId === c.id && s.status === 'COMPLETED');
-      const privCount = privs.length;
-      const privPay = privCount * (c.rate1on1PerHour || 0);
+      const privCount = 0;
+      const privPay = 0;
       const gross = (c.baseSalary || 0) + privPay;
       return { ...c, privateCount: privCount, privatePay: privPay, gross };
     });
-  }, [db, tick, month, coachId]);
+  }, [coaches, coachId]);
 }

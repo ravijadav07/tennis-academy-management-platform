@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Clock, AlertTriangle, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../../../context/AuthContext';
-import { useDb } from '../../../context/DbContext';
+import { useSupabase } from '../../../context/SupabaseContext';
 import { formatDate } from '../../../utils/formatters';
 import { triggerWorkflow } from '../../../utils/api';
 import AdaptiveTable from '../../data/AdaptiveTable';
@@ -15,27 +15,24 @@ const LEAVE_QUOTA = 24;
 
 export default function Leave() {
   const { user } = useAuth();
-  const { db, tick } = useDb();
-  const state = useMemo(() => db.readAll(), [db, tick]);
+  const { services, entity } = useSupabase();
   const coachId = user?.linkedCoachId;
 
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState({ type: 'casual', startDate: '', endDate: '', reason: '' });
+  const [leaveRequestsList, setLeaveRequestsList] = useState([]);
 
   const leaveRequests = useMemo(() => {
-    if (!coachId) return [];
-    return (state.leaveRequests || [])
-      .filter((l) => l.coachId === coachId)
-      .map((l) => ({
-        id: l.id,
-        type: l.type || 'casual',
-        startDate: l.startDate,
-        endDate: l.endDate,
-        reason: l.reason || '',
-        status: l.status || 'pending',
-        appliedDate: l.appliedDate || l.startDate,
-      }));
-  }, [state.leaveRequests, coachId]);
+    return leaveRequestsList.map((l) => ({
+      id: l.id,
+      type: l.type || 'casual',
+      startDate: l.startDate,
+      endDate: l.endDate,
+      reason: l.reason || '',
+      status: l.status || 'pending',
+      appliedDate: l.appliedDate || l.startDate,
+    }));
+  }, [leaveRequestsList]);
 
   const leaveStats = useMemo(() => {
     const used = leaveRequests.filter((l) => l.status === 'approved').reduce((sum, l) => {
@@ -62,13 +59,18 @@ export default function Leave() {
       return;
     }
     try {
-      await db.applyLeave({
+      const newLeave = {
+        id: 'leave_' + Date.now(),
         coachId,
         type: form.type.toUpperCase(),
         startDate: form.startDate,
         endDate: form.endDate,
         reason: form.reason,
-      });
+        status: 'pending',
+        appliedDate: new Date().toISOString().split('T')[0],
+      };
+      setLeaveRequestsList((prev) => [newLeave, ...prev]);
+
       triggerWorkflow('leave.apply', {
         coachId,
         type: form.type.toUpperCase(),

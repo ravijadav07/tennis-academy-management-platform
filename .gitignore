@@ -20,6 +20,11 @@ Thumbs.db
 .agent.zip
 .agent/
 
+# Environment files (credentials — NEVER commit)
+.env
+**/.env
+!.env.example
+
 # Supabase
 supabase/.temp/
 supabase/functions/**/node_modules/

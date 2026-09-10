@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { useDb } from '../../../context/DbContext';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSupabase } from '../../../context/SupabaseContext';
 import Card from '../../ui/Card';
 import Button from '../../ui/Button';
 import Modal from '../../ui/Modal';
@@ -8,6 +8,7 @@ import StatusPill from '../../ui/StatusPill';
 import { toast } from 'sonner';
 import { validatePhone, validateName, validateRequired, sanitizePhone } from '../../../utils/validators';
 import { Plus, Pencil, Archive, RotateCcw } from 'lucide-react';
+import { db } from '../../../mocks/localDb';
 
 const FIELD = 'w-full h-[38px] px-3 rounded-lg border border-line bg-white text-[13px] text-ink outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand transition-all';
 const LBL = 'block text-[10px] font-semibold text-ink-muted uppercase tracking-[0.04em] mb-1';
@@ -15,10 +16,36 @@ const DUTY_TYPES = ['FULL_TIME', 'EVENING_ONLY', 'MORNING_ONLY', 'PART_TIME'];
 const DESIGNATIONS = ['Senior Tennis Coach', 'Junior Tennis Coach', 'Fitness Team', 'Head of Sports Operations'];
 
 export default function CoachManagement() {
-  const { db, tick } = useDb();
-  const state = useMemo(() => db.readAll(), [db, tick]);
-  const coaches = (state.coaches || []).filter((c) => c.status !== 'INACTIVE');
-  const inactiveCoaches = (state.coaches || []).filter((c) => c.status === 'INACTIVE');
+  const { services, entity } = useSupabase();
+  const [coachesList, setCoachesList] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadCoaches = useCallback(async () => {
+    setLoading(true);
+    try {
+      const entityOpt = entity === 'all' ? undefined : entity;
+      const res = await services.coaches.list({ entity: entityOpt, pageSize: 200 });
+      if (!res.data || res.data.length === 0) {
+        const local = db.readAll();
+        setCoachesList(local.coaches || []);
+      } else {
+        setCoachesList(res.data || []);
+      }
+    } catch (err) {
+      console.warn('[CoachManagement] load error, using localDb fallback:', err);
+      const local = db.readAll();
+      setCoachesList(local.coaches || []);
+    } finally {
+      setLoading(false);
+    }
+  }, [services, entity]);
+
+  useEffect(() => {
+    loadCoaches();
+  }, [loadCoaches]);
+
+  const coaches = useMemo(() => coachesList.filter((c) => c.status !== 'INACTIVE' && c.status !== 'inactive'), [coachesList]);
+  const inactiveCoaches = useMemo(() => coachesList.filter((c) => c.status === 'INACTIVE' || c.status === 'inactive'), [coachesList]);
 
   const [showAdd, setShowAdd] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
@@ -45,7 +72,7 @@ export default function CoachManagement() {
   const handleAdd = async () => {
     if (!validateForm()) return;
     try {
-      await db.upsertCoach({
+      await services.coaches.upsert({
         name: form.name, phone: form.phone, designation: form.designation,
         dutyType: form.dutyType, baseSalary: parseInt(form.baseSalary) || 0,
         rate1on1PerHour: parseInt(form.rate1on1PerHour) || 0,
@@ -55,13 +82,14 @@ export default function CoachManagement() {
       });
       toast.success('Coach added');
       setShowAdd(false); setForm({ name: '', phone: '', designation: '', dutyType: 'FULL_TIME', baseSalary: '', rate1on1PerHour: '', rateOvertimePerHour: '', paidHolidaysPerMonth: '1' });
+      loadCoaches();
     } catch (e) { toast.error(e.message); }
   };
 
   const handleEdit = async () => {
     if (!validateForm()) return;
     try {
-      await db.upsertCoach({
+      await services.coaches.upsert({
         id: editId, name: form.name, phone: form.phone, designation: form.designation,
         dutyType: form.dutyType, baseSalary: parseInt(form.baseSalary) || 0,
         rate1on1PerHour: parseInt(form.rate1on1PerHour) || 0,
@@ -71,22 +99,25 @@ export default function CoachManagement() {
       });
       toast.success('Coach updated');
       setShowEdit(false);
+      loadCoaches();
     } catch (e) { toast.error(e.message); }
   };
 
   const handleArchive = async () => {
     if (!archiveReason.trim()) { toast.error('Reason is required'); return; }
     try {
-      await db.archiveCoach({ coachId: archiveId, reason: archiveReason });
+      await services.coaches.upsert({ id: archiveId, status: 'INACTIVE', archivedReason: archiveReason });
       toast.success('Coach archived');
       setShowArchive(false); setArchiveReason('');
+      loadCoaches();
     } catch (e) { toast.error(e.message); }
   };
 
   const handleRestore = async (coach) => {
     try {
-      await db.upsertCoach({ ...coach, status: 'ACTIVE' });
+      await services.coaches.upsert({ ...coach, status: 'ACTIVE' });
       toast.success(`"${coach.name}" restored`);
+      loadCoaches();
     } catch (e) { toast.error(e.message); }
   };
 
@@ -95,6 +126,14 @@ export default function CoachManagement() {
     setForm({ name: c.name, phone: c.phone || '', designation: c.designation || '', dutyType: c.dutyType || 'FULL_TIME', baseSalary: String(c.baseSalary || 0), rate1on1PerHour: String(c.rate1on1PerHour || 0), rateOvertimePerHour: String(c.rateOvertimePerHour || 0), paidHolidaysPerMonth: String(c.paidHolidaysPerMonth || 0) });
     setShowEdit(true);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <div className="w-8 h-8 rounded-full border-2 border-brand border-t-transparent animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -119,7 +158,7 @@ export default function CoachManagement() {
                   <p className="text-ink-faint truncate">{c.designation || ''} · {c.dutyType?.replace('_', ' ') || ''}</p>
                 </div>
                 <span className="text-ink-muted">₹{(c.baseSalary || 0).toLocaleString('en-IN')}</span>
-                <StatusPill status={c.status === 'ACTIVE' ? 'active' : 'inactive'} />
+                <StatusPill status={c.status === 'ACTIVE' || c.status === 'active' ? 'active' : 'inactive'} />
                 <Button size="sm" variant="ghost" icon={Pencil} onClick={() => openEdit(c)}>Edit</Button>
                 <Button size="sm" variant="ghost" icon={Archive} onClick={() => { setArchiveId(c.id); setArchiveReason(''); setShowArchive(true); }}>Archive</Button>
               </div>

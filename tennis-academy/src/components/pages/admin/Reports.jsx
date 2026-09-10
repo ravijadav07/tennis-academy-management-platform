@@ -1,5 +1,5 @@
-import { useMemo, useState, useEffect } from 'react';
-import { useDb } from '../../../context/DbContext';
+import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useSupabase } from '../../../context/SupabaseContext';
 import { useAuth } from '../../../context/AuthContext';
 import { computeSlotAnalysis, findAmbiguousStudents } from '../../../mocks/rules';
 import Card from '../../ui/Card';
@@ -16,6 +16,7 @@ import { Download, AlertTriangle, TrendingUp, Radio, ShieldCheck, Send, Settings
 
 import { triggerWorkflow } from '../../../utils/api';
 import { validateEmail } from '../../../utils/validators';
+import { db } from '../../../mocks/localDb';
 
 function timeAgo(ms) { const sec = Math.floor((Date.now() - ms) / 1000); if (sec < 5) return 'just now'; if (sec < 60) return sec + 's ago'; if (sec < 3600) return Math.floor(sec / 60) + 'm ago'; return Math.floor(sec / 3600) + 'h ago'; }
 
@@ -23,9 +24,66 @@ const CATEGORIES = ['ADV', 'INT', 'ADULT', 'GREEN', 'ORANGE', 'RED', 'JDP', 'HPP
 const PATTERNS = ['MWF', 'TTS'];
 
 export default function Reports() {
-  const { db, tick, lastUpdated } = useDb();
+  const { services, entity } = useSupabase();
   const { user } = useAuth();
-  const state = useMemo(() => db.readAll(), [db, tick]);
+  const [state, setState] = useState({
+    batches: [],
+    courts: [],
+    enrollments: [],
+    students: [],
+    attendance: [],
+    coaches: [],
+  });
+
+  const loadData = useCallback(async () => {
+    try {
+      const entityOpt = entity === 'all' ? undefined : entity;
+      const [batchesRes, courtsRes, enrollmentsRes, studentsRes, attendanceRes, coachesRes] = await Promise.all([
+        services.batches.list({ entity: entityOpt, pageSize: 500 }),
+        services.courts.list({ entity: entityOpt, pageSize: 100 }),
+        services.enrollments.list({ entity: entityOpt, pageSize: 1000 }),
+        services.students.list({ entity: entityOpt, pageSize: 1000 }),
+        services.attendance.list({ entity: entityOpt, pageSize: 1000 }),
+        services.coaches.list({ entity: entityOpt, pageSize: 200 }),
+      ]);
+      if (!batchesRes.data || batchesRes.data.length === 0) {
+        const local = db.readAll();
+        setState({
+          batches: local.batches || [],
+          courts: local.courts || [],
+          enrollments: local.enrollments || [],
+          students: local.students || [],
+          attendance: local.attendance || [],
+          coaches: local.coaches || [],
+        });
+      } else {
+        setState({
+          batches: batchesRes.data || [],
+          courts: courtsRes.data || [],
+          enrollments: enrollmentsRes.data || [],
+          students: studentsRes.data || [],
+          attendance: attendanceRes.data || [],
+          coaches: coachesRes.data || [],
+        });
+      }
+    } catch (err) {
+      console.warn('[Reports] load error, using localDb fallback:', err);
+      const local = db.readAll();
+      setState({
+        batches: local.batches || [],
+        courts: local.courts || [],
+        enrollments: local.enrollments || [],
+        students: local.students || [],
+        attendance: local.attendance || [],
+        coaches: local.coaches || [],
+      });
+    }
+  }, [services, entity]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
   const { batches, courts, enrollments, students, attendance, coaches } = state;
 
   // Current month for verification
@@ -63,7 +121,7 @@ export default function Reports() {
     db.getEmailTemplate().then(setEmailTemplate);
     db.getReportRecipients().then(setRecipients);
     db.getDispatchLog().then(setDispatchLog);
-  }, [tick]);
+  }, [currentMonth, currentYear]);
 
   // Handle Verify
   const handleVerify = async () => {
@@ -200,8 +258,9 @@ export default function Reports() {
   const analysis = useMemo(() => computeSlotAnalysis(batches, enrollments), [batches, enrollments]);
   const ambiguous = useMemo(() => findAmbiguousStudents(enrollments), [enrollments]);
   const driftFlags = (state.driftFlags || []);
-  const [ago, setAgo] = useState(timeAgo(lastUpdated || Date.now()));
-  useEffect(() => { setAgo(timeAgo(lastUpdated || Date.now())); const i = setInterval(() => setAgo(timeAgo(lastUpdated || Date.now())), 5000); return () => clearInterval(i); }, [lastUpdated]);
+  const [lastUpdated] = useState(() => Date.now());
+  const [ago, setAgo] = useState(timeAgo(lastUpdated));
+  useEffect(() => { setAgo(timeAgo(lastUpdated)); const i = setInterval(() => setAgo(timeAgo(lastUpdated)), 5000); return () => clearInterval(i); }, [lastUpdated]);
 
   const auditLog = (state.auditLog || []);
   const recentActivity = auditLog.slice(0, 5).map((entry) => ({

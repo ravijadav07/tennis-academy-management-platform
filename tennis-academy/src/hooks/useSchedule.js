@@ -1,31 +1,105 @@
 // src/hooks/useSchedule.js
-import { useMemo } from 'react';
-import { useDb } from '../context/DbContext';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSupabase } from '../context/SupabaseContext';
+import { db } from '../mocks/localDb';
 
 export function useSchedule(dayPattern = 'MWF') {
-  const { db, tick } = useDb();
-  const state = useMemo(() => db.readAll(), [db, tick]);
-  const { batches, courts, enrollments, packages, privateSessions, coaches } = state;
+  const { services, entity } = useSupabase();
+  const [data, setData] = useState({
+    batches: [],
+    courts: [],
+    enrollments: [],
+    packages: [],
+    coaches: [],
+    privateSessions: [],
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const today = new Date().toISOString().split('T')[0];
+
+  const fetchSchedule = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const entityOpt = entity === 'all' ? undefined : entity;
+      const [batchesRes, courtsRes, enrollmentsRes, packagesRes, coachesRes] = await Promise.all([
+        services.batches.list({ entity: entityOpt, pageSize: 500 }),
+        services.courts.list({ entity: entityOpt, pageSize: 100 }),
+        services.enrollments.list({ entity: entityOpt, pageSize: 1000 }),
+        services.packages.list({ entity: entityOpt, pageSize: 1000 }),
+        services.coaches.list({ entity: entityOpt, pageSize: 200 }),
+      ]);
+
+      if (!batchesRes.data || batchesRes.data.length === 0) {
+        const local = db.readAll();
+        setData({
+          batches: local.batches || [],
+          courts: local.courts || [],
+          enrollments: local.enrollments || [],
+          packages: local.packages || [],
+          coaches: local.coaches || [],
+          privateSessions: local.privateSessions || [],
+        });
+      } else {
+        setData({
+          batches: batchesRes.data || [],
+          courts: courtsRes.data || [],
+          enrollments: enrollmentsRes.data || [],
+          packages: packagesRes.data || [],
+          coaches: coachesRes.data || [],
+          privateSessions: [],
+        });
+      }
+    } catch (err) {
+      console.warn('[useSchedule] Supabase network/QUIC issue, using localDb fallback:', err?.message || err);
+      try {
+        const local = db.readAll();
+        setData({
+          batches: local.batches || [],
+          courts: local.courts || [],
+          enrollments: local.enrollments || [],
+          packages: local.packages || [],
+          coaches: local.coaches || [],
+          privateSessions: local.privateSessions || [],
+        });
+      } catch (fallbackErr) {
+        console.error('[useSchedule] Fallback error:', fallbackErr);
+        setError(err);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [services, entity]);
+
+  useEffect(() => {
+    fetchSchedule();
+  }, [fetchSchedule]);
+
+  const { batches, courts, enrollments, packages, privateSessions, coaches } = data;
 
   const filtered = useMemo(() => {
-    const active = batches.filter((b) => b.status === 'ACTIVE' && b.dayPattern === dayPattern);
+    const active = batches.filter((b) => {
+      const matchStatus = b.status === 'ACTIVE' || b.status === 'active';
+      const matchPattern = b.dayPattern === dayPattern ||
+        (dayPattern === 'SAT_SUN' && (b.dayPattern === 'WEEKEND' || b.dayPattern === 'SAT_SUN')) ||
+        (dayPattern === 'WEEKEND' && (b.dayPattern === 'SAT_SUN' || b.dayPattern === 'WEEKEND'));
+      return matchStatus && matchPattern;
+    });
     return active.map((b) => {
-      const roster = enrollments.filter((e) => e.batchId === b.id && e.status === 'ACTIVE');
+      const roster = enrollments.filter((e) => e.batchId === b.id && (e.status === 'ACTIVE' || e.status === 'active'));
       const court = courts.find((c) => c.id === b.courtId);
       const filled = roster.length;
       const blockedCount = roster.filter((e) => {
         const pkg = packages.find((p) => p.studentId === e.studentId);
-        return pkg && (pkg.paymentStatus === 'PENDING' || (pkg.sessionsUsed >= (pkg.sessionsPurchased || 0) + (pkg.makeupCredit || 0)));
+        return pkg && (pkg.paymentStatus === 'PENDING' || pkg.paymentStatus === 'pending' || (pkg.sessionsUsed >= (pkg.sessionsPurchased || 0) + (pkg.makeupCredit || 0)));
       }).length;
       return { ...b, court, roster, filled, capacity: b.capacity || 0, blockedCount, _type: 'batch' };
     });
   }, [batches, enrollments, courts, packages, dayPattern]);
 
-  // Private coaching blocks — today's sessions on the selected dayPattern courts
-  const today = new Date().toISOString().split('T')[0];
   const privateBlocks = useMemo(() => {
     if (!privateSessions) return [];
-    // Show today's private sessions; for the grid, group by court+time
     return privateSessions
       .filter((s) => s.date === today)
       .map((s) => {
@@ -53,7 +127,6 @@ export function useSchedule(dayPattern = 'MWF') {
       if (!map[cid]) map[cid] = { court: b.court, batches: [] };
       map[cid].batches.push(b);
     });
-    // Add private blocks to their courts
     privateBlocks.forEach((p) => {
       const cid = p.courtId || 'unknown';
       if (!map[cid]) {
@@ -66,8 +139,5 @@ export function useSchedule(dayPattern = 'MWF') {
     return Object.values(map);
   }, [filtered, privateBlocks, courts]);
 
-  const totalBatches = filtered.length;
-  const totalPrivate = privateBlocks.length;
-
-  return { batches: filtered, byCourt, total: totalBatches, privateCount: totalPrivate, loading: false };
+  return { batches: filtered, byCourt, total: filtered.length, privateCount: privateBlocks.length, loading, error, refetch: fetchSchedule };
 }

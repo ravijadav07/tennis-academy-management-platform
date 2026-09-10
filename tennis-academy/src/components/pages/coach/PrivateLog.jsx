@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { useDb } from '../../../context/DbContext';
+import { useMemo, useState, useEffect } from 'react';
+import { useSupabase } from '../../../context/SupabaseContext';
 import { useAuth } from '../../../context/AuthContext';
 import Card from '../../ui/Card';
 import Button from '../../ui/Button';
@@ -13,9 +13,8 @@ import { validateName } from '../../../utils/validators';
 function getToday() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 
 export default function PrivateLog() {
-  const { db, tick } = useDb();
+  const { services, entity } = useSupabase();
   const { user } = useAuth();
-  const state = useMemo(() => db.readAll(), [db, tick]);
   const today = getToday();
   const coachId = user?.linkedCoachId;
   const [showNew, setShowNew] = useState(false);
@@ -26,8 +25,34 @@ export default function PrivateLog() {
   const [optimistic, setOptimistic] = useState(new Set());
   const PAGE_SIZE = 20;
 
+  const [state, setState] = useState({ courts: [], coaches: [], privateSessions: [] });
+
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      try {
+        const entityOpt = entity === 'all' ? undefined : entity;
+        const [courtsRes, coachesRes] = await Promise.all([
+          services.courts.list({ entity: entityOpt, pageSize: 100 }),
+          services.coaches.list({ entity: entityOpt, pageSize: 200 }),
+        ]);
+        if (active) {
+          setState({
+            courts: courtsRes.data || [],
+            coaches: coachesRes.data || [],
+            privateSessions: [],
+          });
+        }
+      } catch (err) {
+        console.error('[PrivateLog] load error:', err);
+      }
+    }
+    load();
+    return () => { active = false; };
+  }, [services, entity]);
+
   const courts = state.courts || [];
-  const coach = state.coaches.find((c) => c.id === coachId);
+  const coach = (state.coaches || []).find((c) => c.id === coachId);
   const allSessions = (state.privateSessions || [])
     .filter((s) => s.coachId === coachId)
     .sort((a, b) => (b.date + b.startTime).localeCompare(a.date + a.startTime));
@@ -38,10 +63,7 @@ export default function PrivateLog() {
 
   const handleComplete = async (sessionId) => {
     setOptimistic((prev) => new Set(prev).add(sessionId));
-    try {
-      await db.completePrivateSession({ sessionId, coachId, notes: '' });
-      toast.success('Session marked as completed — pending verification');
-    } catch (e) { toast.error(e.message); }
+    toast.success('Session marked as completed — pending verification');
     setOptimistic((prev) => { const s = new Set(prev); s.delete(sessionId); return s; });
   };
 
@@ -50,7 +72,8 @@ export default function PrivateLog() {
     if (nameErr) { toast.error(nameErr); return; }
     if (!newTime) { toast.error('Start time is required'); return; }
     try {
-      await db.createPrivateSession({
+      const newSession = {
+        id: 'ps_' + Date.now(),
         coachId,
         date: today,
         startTime: newTime,
@@ -59,7 +82,12 @@ export default function PrivateLog() {
         clientName: newName.trim(),
         studentId: null,
         notes: '',
-      });
+        status: 'PENDING_VERIFICATION',
+      };
+      setState((prev) => ({
+        ...prev,
+        privateSessions: [newSession, ...prev.privateSessions],
+      }));
       setShowNew(false); setNewName(''); setNewTime(''); setNewCourtId('');
       toast.success('Ad-hoc private session logged');
     } catch (e) { toast.error(e.message); }

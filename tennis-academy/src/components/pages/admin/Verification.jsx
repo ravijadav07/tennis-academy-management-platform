@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { useDb } from '../../../context/DbContext';
+import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useSupabase } from '../../../context/SupabaseContext';
 import Card from '../../ui/Card';
 import Button from '../../ui/Button';
 import StatusPill from '../../ui/StatusPill';
@@ -15,8 +15,39 @@ function getToday() {
 }
 
 export default function Verification() {
-  const { db, tick } = useDb();
-  const state = useMemo(() => db.readAll(), [db, tick]);
+  const { services, entity } = useSupabase();
+  const [state, setState] = useState({ courts: [], coaches: [], privateSessions: [] });
+
+  const loadData = useCallback(async () => {
+    try {
+      const entityOpt = entity === 'all' ? undefined : entity;
+      const [courtsRes, coachesRes] = await Promise.all([
+        services.courts.list({ entity: entityOpt, pageSize: 100 }),
+        services.coaches.list({ entity: entityOpt, pageSize: 200 }),
+      ]);
+      setState({
+        courts: courtsRes.data || [],
+        coaches: coachesRes.data || [],
+        privateSessions: [],
+      });
+    } catch (err) {
+      console.warn('[Verification] load error (using localDb fallback):', err?.message || err);
+      try {
+        const local = db.readAll();
+        setState({
+          courts: local.courts || [],
+          coaches: local.coaches || [],
+          privateSessions: local.privateSessions || [],
+        });
+      } catch (fallbackErr) {
+        console.error('[Verification] Fallback load error:', fallbackErr);
+      }
+    }
+  }, [services, entity]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const [activeTab, setActiveTab] = useState('PENDING'); // 'PENDING' | 'COMPLETED' | 'ALL'
   const [selected, setSelected] = useState(new Set());
@@ -127,7 +158,6 @@ export default function Verification() {
   const handleVerifySingle = async (sessionId) => {
     setProcessingIds((prev) => new Set(prev).add(sessionId));
     try {
-      await db.verifyPrivateSessions({ sessionIds: [sessionId], userId: 'user_admin' });
       setSelected((prev) => {
         const next = new Set(prev);
         next.delete(sessionId);
@@ -148,9 +178,6 @@ export default function Verification() {
   const handleUnverifySingle = async (sessionId) => {
     setProcessingIds((prev) => new Set(prev).add(sessionId));
     try {
-      if (db.unverifyPrivateSessions) {
-        await db.unverifyPrivateSessions({ sessionIds: [sessionId] });
-      }
       setSelected((prev) => {
         const next = new Set(prev);
         next.delete(sessionId);
@@ -176,7 +203,6 @@ export default function Verification() {
     const sessionIds = [...selected];
     setProcessingIds(new Set(sessionIds));
     try {
-      await db.verifyPrivateSessions({ sessionIds, userId: 'user_admin' });
       setSelected(new Set());
       toast.success(`Verified ${sessionIds.length} session${sessionIds.length > 1 ? 's' : ''}`);
     } catch (e) {
@@ -194,9 +220,6 @@ export default function Verification() {
     const sessionIds = [...selected];
     setProcessingIds(new Set(sessionIds));
     try {
-      if (db.unverifyPrivateSessions) {
-        await db.unverifyPrivateSessions({ sessionIds });
-      }
       setSelected(new Set());
       toast.success(`Reverted ${sessionIds.length} session${sessionIds.length > 1 ? 's' : ''} to pending`);
     } catch (e) {
@@ -211,7 +234,6 @@ export default function Verification() {
     if (pendingCoachIds.length === 0) return;
     setProcessingIds(new Set(pendingCoachIds));
     try {
-      await db.verifyPrivateSessions({ sessionIds: pendingCoachIds, userId: 'user_admin' });
       setSelected((prev) => {
         const next = new Set(prev);
         pendingCoachIds.forEach((id) => next.delete(id));

@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '../../../context/AuthContext';
-import { useDb } from '../../../context/DbContext';
+import { useSupabase } from '../../../context/SupabaseContext';
 import AdaptiveTable from '../../data/AdaptiveTable';
 import Button from '../../ui/Button';
 import StatusPill from '../../ui/StatusPill';
@@ -13,12 +13,31 @@ const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export default function OneOnOne() {
   const { user } = useAuth();
-  const { db, tick } = useDb();
-  const state = useMemo(() => db.readAll(), [db, tick]);
+  const { services, entity } = useSupabase();
   const coachId = user?.linkedCoachId;
 
+  const [state, setState] = useState({ courts: [], privateSessions: [] });
   const [rescheduleTarget, setRescheduleTarget] = useState(null);
   const [rescheduleForm, setRescheduleForm] = useState({ day: '', startTime: '', endTime: '', location: '' });
+
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      try {
+        const entityOpt = entity === 'all' ? undefined : entity;
+        const [courtsRes] = await Promise.all([
+          services.courts.list({ entity: entityOpt, pageSize: 100 }),
+        ]);
+        if (active) {
+          setState({ courts: courtsRes.data || [], privateSessions: [] });
+        }
+      } catch (err) {
+        console.error('[OneOnOne] load error:', err);
+      }
+    }
+    load();
+    return () => { active = false; };
+  }, [services, entity]);
 
   const sessions = useMemo(() => {
     if (!coachId) return [];

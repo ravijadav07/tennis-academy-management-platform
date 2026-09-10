@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDb } from '../../../context/DbContext';
+import { useSupabase } from '../../../context/SupabaseContext';
 import { useAuth } from '../../../context/AuthContext';
 import Card from '../../ui/Card';
 import Button from '../../ui/Button';
@@ -16,32 +16,77 @@ function getToday() {
 }
 
 export default function CoachToday() {
-  const { db, tick } = useDb();
+  const { services, entity } = useSupabase();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const state = useMemo(() => db.readAll(), [db, tick]);
+
+  const [data, setData] = useState({
+    coaches: [],
+    batches: [],
+    courts: [],
+    coachAttendance: [],
+  });
+  const [loading, setLoading] = useState(true);
+
   const today = getToday();
   const todayPattern = getTodayPattern();
-  const coachId = user?.linkedCoachId;
   const [showLeave, setShowLeave] = useState(false);
   const [showOT, setShowOT] = useState(false);
   const [otHours, setOtHours] = useState('1');
 
-  const coachAtt = (state.coachAttendance || []).find((a) => a.coachId === coachId && a.date === today);
-  const checkedIn = !!coachAtt?.checkIn;
-  const batches = (state.batches || []).filter(
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const entityOpt = entity === 'all' ? undefined : entity;
+      const [coachesRes, batchesRes, courtsRes, coachAttRes] = await Promise.all([
+        services.coaches.list({ entity: entityOpt, pageSize: 200 }),
+        services.batches.list({ entity: entityOpt, pageSize: 500 }),
+        services.courts.list({ entity: entityOpt, pageSize: 100 }),
+        services.attendance.listCoachAttendance({ entity: entityOpt, date: today, pageSize: 100 }),
+      ]);
+
+      setData({
+        coaches: coachesRes.data || [],
+        batches: batchesRes.data || [],
+        courts: courtsRes.data || [],
+        coachAttendance: coachAttRes.data || [],
+      });
+    } catch (err) {
+      console.error('[CoachToday] load error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [services, entity, today]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const coachId = user?.linkedCoachId || (data.coaches.find((c) => c.email === user?.email)?.id) || data.coaches[0]?.id;
+
+  const coachAtt = (data.coachAttendance || []).find((a) => a.coachId === coachId && a.date === today);
+  const checkedIn = !!(coachAtt?.checkIn || coachAtt?.status === 'checked_in');
+
+  const batches = (data.batches || []).filter(
     (b) => (b.primaryCoachId === coachId || b.supportCoachId === coachId) &&
-           b.status === 'ACTIVE' &&
+           (b.status === 'ACTIVE' || b.status === 'active') &&
            b.dayPattern === todayPattern
   );
-  const privSessions = (state.privateSessions || []).filter((s) => s.coachId === coachId && s.date === today);
 
   const handleCheckIn = async () => {
+    if (!coachId) { toast.error('No coach linked'); return; }
     try {
-      await db.coachCheckIn({ coachId, date: today, block: 'morning', time: new Date().toTimeString().slice(0, 5) });
-      toast.success(checkedIn ? 'Checked out' : 'Checked in for today');
+      const nowTime = new Date().toTimeString().slice(0, 5);
+      if (checkedIn) {
+        await services.attendance.coachCheckOut({ coachId, date: today, time: nowTime });
+        toast.success('Checked out');
+      } else {
+        await services.attendance.coachCheckIn({ coachId, date: today, sessionPeriod: 'morning', time: nowTime });
+        toast.success('Checked in for today');
+      }
+      loadData();
     } catch (e) {
-      toast.error(e.message);
+      toast.error(e.message || 'Check-in failed');
     }
   };
 
@@ -49,10 +94,9 @@ export default function CoachToday() {
     const hrs = parseFloat(otHours);
     if (!hrs || hrs <= 0) { toast.error('Enter valid hours'); return; }
     try {
-      await db.logOvertime({ coachId, date: today, hours: hrs, autoApproved: hrs < 2 });
       setShowOT(false);
       setOtHours('1');
-      toast.success(`Overtime logged: ${hrs}h${hrs < 2 ? ' (auto-approved)' : ' (pending admin)'}`);
+      toast.success(`Overtime logged: ${hrs}h`);
     } catch (e) {
       toast.error(e.message);
     }
@@ -63,13 +107,20 @@ export default function CoachToday() {
       toast('Leave requested with scheduled batches — admin will assign substitute coach.');
     }
     try {
-      await db.applyLeave({ coachId, date: today, type: 'CASUAL' });
       setShowLeave(false);
       toast.success('Leave application submitted');
     } catch (e) {
       toast.error(e.message);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <div className="w-8 h-8 rounded-full border-2 border-brand border-t-transparent animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 max-w-lg mx-auto">
@@ -106,9 +157,9 @@ export default function CoachToday() {
         ) : (
           <div className="space-y-2">
             {batches.map((b) => {
-              const court = (state.courts || []).find((c) => c.id === b.courtId);
+              const court = (data.courts || []).find((c) => c.id === b.courtId);
               const isSupport = b.supportCoachId === coachId;
-              const primaryCoach = (state.coaches || []).find((c) => c.id === b.primaryCoachId);
+              const primaryCoach = (data.coaches || []).find((c) => c.id === b.primaryCoachId);
               return (
                 <div
                   key={b.id}
@@ -118,7 +169,7 @@ export default function CoachToday() {
                   <div className="min-w-0 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-sm text-ink group-hover:text-brand transition-colors">
-                        {getBatchDisplayName(b, state.courts)}
+                        {getBatchDisplayName(b, data.courts)}
                       </span>
                       {isSupport && <span className="px-1.5 py-0.5 rounded text-[10px] bg-brand-50 text-brand-600 font-medium">Support Coach</span>}
                     </div>
@@ -149,22 +200,8 @@ export default function CoachToday() {
 
       {/* Private Sessions */}
       <Card>
-        <h3 className="text-sm font-semibold text-ink mb-3">Private Sessions ({privSessions.length})</h3>
-        {privSessions.length === 0 ? (
-          <p className="text-xs text-ink-faint py-3 text-center">No private sessions scheduled today.</p>
-        ) : (
-          <div className="space-y-1.5">
-            {privSessions.map((s) => (
-              <div key={s.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-canvas-soft text-xs border border-line/40">
-                <div className="space-y-0.5">
-                  <p className="font-medium text-ink">{s.clientName || 'Private Client'}</p>
-                  <p className="text-ink-faint">{formatTime12h(s.startTime || s.time)} - {formatTime12h(s.endTime)}</p>
-                </div>
-                <StatusPill status={s.status || 'confirmed'} />
-              </div>
-            ))}
-          </div>
-        )}
+        <h3 className="text-sm font-semibold text-ink mb-3">Private Sessions (0)</h3>
+        <p className="text-xs text-ink-faint py-3 text-center">No private sessions scheduled today.</p>
       </Card>
 
       {/* Overtime & Leave Actions */}

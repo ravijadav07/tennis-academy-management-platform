@@ -1,18 +1,21 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useDb } from '../../../context/DbContext';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSupabase } from '../../../context/SupabaseContext';
 import Card from '../../ui/Card';
 import Button from '../../ui/Button';
 import Modal from '../../ui/Modal';
 import Dropdown from '../../ui/Dropdown';
 import { toast } from 'sonner';
 import { Plus, Pencil, Archive, MapPin, RotateCcw } from 'lucide-react';
+import { db } from '../../../mocks/localDb';
 
 const FIELD = 'w-full h-[38px] px-3 rounded-lg border border-line bg-white text-[13px] text-ink outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand transition-all';
 const LBL = 'block text-[10px] font-semibold text-ink-muted uppercase tracking-[0.04em] mb-1';
 
 export default function CourtMaster() {
-  const { db, tick } = useDb();
-  const state = useMemo(() => db.readAll(), [db, tick]);
+  const { services, entity } = useSupabase();
+  const [courtsList, setCourtsList] = useState([]);
+  const [loading, setLoading] = useState(true);
+
   const [showAdd, setShowAdd] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
@@ -21,33 +24,60 @@ export default function CourtMaster() {
   const [archiveReason, setArchiveReason] = useState('');
   const [archiveId, setArchiveId] = useState('');
 
-  const courts = (state.courts || []).filter((c) => c.status !== 'INACTIVE');
-  const inactive = (state.courts || []).filter((c) => c.status === 'INACTIVE');
+  const loadCourts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const entityOpt = entity === 'all' ? undefined : entity;
+      const res = await services.courts.list({ entity: entityOpt, pageSize: 100 });
+      if (!res.data || res.data.length === 0) {
+        const local = db.readAll();
+        setCourtsList(local.courts || []);
+      } else {
+        setCourtsList(res.data || []);
+      }
+    } catch (err) {
+      console.warn('[CourtMaster] load error, using localDb fallback:', err);
+      const local = db.readAll();
+      setCourtsList(local.courts || []);
+    } finally {
+      setLoading(false);
+    }
+  }, [services, entity]);
+
+  useEffect(() => {
+    loadCourts();
+  }, [loadCourts]);
+
+  const courts = useMemo(() => courtsList.filter((c) => c.status !== 'INACTIVE' && c.status !== 'inactive'), [courtsList]);
+  const inactive = useMemo(() => courtsList.filter((c) => c.status === 'INACTIVE' || c.status === 'inactive'), [courtsList]);
 
   const handleAdd = async () => {
     if (!form.name.trim()) { toast.error('Court name is required'); return; }
     try {
-      await db.upsertCourt({ name: form.name, status: 'ACTIVE' });
+      await services.courts.upsert({ name: form.name, status: 'ACTIVE' });
       toast.success('Court created');
       setShowAdd(false); setForm({ name: '', status: 'ACTIVE' });
+      loadCourts();
     } catch (e) { toast.error(e.message); }
   };
 
   const handleEdit = async () => {
     if (!form.name.trim()) { toast.error('Court name is required'); return; }
     try {
-      await db.upsertCourt({ id: editId, name: form.name, status: form.status });
+      await services.courts.upsert({ id: editId, name: form.name, status: form.status });
       toast.success('Court updated');
       setShowEdit(false);
+      loadCourts();
     } catch (e) { toast.error(e.message); }
   };
 
   const handleArchive = async () => {
     if (!archiveReason.trim()) { toast.error('Reason is required'); return; }
     try {
-      await db.archiveCourt({ courtId: archiveId, reason: archiveReason });
+      await services.courts.upsert({ id: archiveId, status: 'INACTIVE', archivedReason: archiveReason });
       toast.success('Court archived');
       setShowArchive(false); setArchiveReason('');
+      loadCourts();
     } catch (e) { toast.error(e.message); }
   };
 
@@ -61,10 +91,19 @@ export default function CourtMaster() {
 
   const handleRestore = async (court) => {
     try {
-      await db.upsertCourt({ ...court, status: 'ACTIVE', archivedReason: null });
+      await services.courts.upsert({ ...court, status: 'ACTIVE', archivedReason: null });
       toast.success(`"${court.name}" restored`);
+      loadCourts();
     } catch (e) { toast.error(e.message); }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <div className="w-8 h-8 rounded-full border-2 border-brand border-t-transparent animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

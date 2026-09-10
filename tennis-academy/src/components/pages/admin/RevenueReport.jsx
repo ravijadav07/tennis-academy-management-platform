@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { useDb } from '../../../context/DbContext';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSupabase } from '../../../context/SupabaseContext';
 import Card from '../../ui/Card';
 import Button from '../../ui/Button';
 import Dropdown from '../../ui/Dropdown';
@@ -9,10 +9,63 @@ import { Download, IndianRupee, Printer, Mail, AlertCircle, CheckSquare, Square 
 import { preparePaymentReminder } from '../../../utils/notificationEngine';
 import { triggerWorkflow } from '../../../utils/api';
 import { formatDateDDMMYY, getBatchDisplayName } from '../../../utils/formatters';
+import { db } from '../../../mocks/localDb';
 
 export default function RevenueReport() {
-  const { db, tick } = useDb();
-  const state = useMemo(() => db.readAll(), [db, tick]);
+  const { services, entity } = useSupabase();
+  const [state, setState] = useState({
+    packages: [],
+    students: [],
+    enrollments: [],
+    batches: [],
+    courts: [],
+  });
+
+  const loadData = useCallback(async () => {
+    try {
+      const entityOpt = entity === 'all' ? undefined : entity;
+      const [packagesRes, studentsRes, enrollmentsRes, batchesRes, courtsRes] = await Promise.all([
+        services.packages.list({ entity: entityOpt, pageSize: 1000 }),
+        services.students.list({ entity: entityOpt, pageSize: 1000 }),
+        services.enrollments.list({ entity: entityOpt, pageSize: 1000 }),
+        services.batches.list({ entity: entityOpt, pageSize: 500 }),
+        services.courts.list({ entity: entityOpt, pageSize: 100 }),
+      ]);
+      if (!packagesRes.data || packagesRes.data.length === 0) {
+        const local = db.readAll();
+        setState({
+          packages: local.packages || [],
+          students: local.students || [],
+          enrollments: local.enrollments || [],
+          batches: local.batches || [],
+          courts: local.courts || [],
+        });
+      } else {
+        setState({
+          packages: packagesRes.data || [],
+          students: studentsRes.data || [],
+          enrollments: enrollmentsRes.data || [],
+          batches: batchesRes.data || [],
+          courts: courtsRes.data || [],
+        });
+      }
+    } catch (err) {
+      console.warn('[RevenueReport] load error, using localDb fallback:', err);
+      const local = db.readAll();
+      setState({
+        packages: local.packages || [],
+        students: local.students || [],
+        enrollments: local.enrollments || [],
+        batches: local.batches || [],
+        courts: local.courts || [],
+      });
+    }
+  }, [services, entity]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());

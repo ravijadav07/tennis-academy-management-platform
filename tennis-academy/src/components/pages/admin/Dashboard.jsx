@@ -1,42 +1,62 @@
 import { useDashboard } from '../../../hooks/useDashboard';
+import { useSupabase } from '../../../context/SupabaseContext';
 import StatCard from '../../ui/StatCard';
 import Card from '../../ui/Card';
 import StatusPill from '../../ui/StatusPill';
 import CapacityIndicator from '../../ui/CapacityIndicator';
 import { formatTime12h, getBatchDisplayName } from '../../../utils/formatters';
-import { useDb } from '../../../context/DbContext';
 import { useMemo, useState, useEffect } from 'react';
 import { Users, LayoutGrid, AlertTriangle, TrendingUp, Calendar, Clock, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function AdminDashboard() {
-  const { stats, todayByCourt, uncoveredSlots, conflicts, slotAnalysis } = useDashboard();
-  const { db, tick } = useDb();
+  const { stats, todayByCourt, uncoveredSlots, conflicts, slotAnalysis, courts = [], batches = [], coaches = [], enrollments = [], loading } = useDashboard();
+  const { services } = useSupabase();
   const navigate = useNavigate();
-  const state = useMemo(() => db.readAll(), [db, tick]);
   const [unverifiedMonth, setUnverifiedMonth] = useState(false);
 
-  // Check if current month is unverified
+  // Check if current month is unverified via Supabase workflow state
   useEffect(() => {
-    const now = new Date();
-    db.getReportVerification({ month: now.getMonth() + 1, year: now.getFullYear() }).then((v) => {
-      setUnverifiedMonth(!v);
-    });
-  }, [tick]);
+    let active = true;
+    async function checkVerification() {
+      try {
+        const now = new Date();
+        const res = await services.workflow.list({ action: 'report_verification' });
+        const list = res?.data || [];
+        const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const verified = list.some(
+          (item) => item.data?.verified && (item.data?.monthYear === currentKey || (item.data?.month === now.getMonth() + 1 && item.data?.year === now.getFullYear()))
+        );
+        if (active) setUnverifiedMonth(!verified);
+      } catch (err) {
+        if (active) setUnverifiedMonth(false);
+      }
+    }
+    checkVerification();
+    return () => { active = false; };
+  }, [services]);
 
   const [agendaPattern, setAgendaPattern] = useState('TODAY');
 
   const displayByCourt = useMemo(() => {
     if (agendaPattern === 'TODAY') return todayByCourt;
     const courtsMap = {};
-    (state.courts || []).filter(c => c.status !== 'INACTIVE').forEach(c => {
+    (courts || []).filter(c => c.status !== 'INACTIVE' && c.status !== 'inactive').forEach(c => {
       courtsMap[c.id] = { court: c, batches: [] };
     });
-    (state.batches || []).filter(b => b.status === 'ACTIVE' && b.dayPattern === agendaPattern).forEach(b => {
+    (batches || []).filter(b => (b.status === 'ACTIVE' || b.status === 'active') && b.dayPattern === agendaPattern).forEach(b => {
       if (courtsMap[b.courtId]) courtsMap[b.courtId].batches.push(b);
     });
     return Object.values(courtsMap).filter(g => g.batches.length > 0);
-  }, [agendaPattern, todayByCourt, state.courts, state.batches]);
+  }, [agendaPattern, todayByCourt, courts, batches]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <div className="w-8 h-8 rounded-full border-2 border-brand border-t-transparent animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -129,11 +149,11 @@ export default function AdminDashboard() {
           <p className="text-xs text-ink-muted py-4 text-center">No batches scheduled for {agendaPattern === 'TODAY' ? 'today' : agendaPattern}.</p>
         ) : (
           <div className="space-y-4">
-            {displayByCourt.map(({ court, batches }) => (
+            {displayByCourt.map(({ court, batches: courtBatches }) => (
               <div key={court?.id || 'unknown'}>
                 <p className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider mb-2">{court?.name || 'Unknown Court'}</p>
                 <div className="space-y-1">
-                  {batches.map((b) => {
+                  {courtBatches.map((b) => {
                     if (b._type === 'private') {
                       return (
                         <div
@@ -150,8 +170,8 @@ export default function AdminDashboard() {
                         </div>
                       );
                     }
-                    const coach = state.coaches.find((c) => c.id === b.primaryCoachId);
-                    const roster = state.enrollments.filter((e) => e.batchId === b.id && e.status === 'ACTIVE');
+                    const coach = (coaches || []).find((c) => c.id === b.primaryCoachId);
+                    const roster = (enrollments || []).filter((e) => e.batchId === b.id && (e.status === 'ACTIVE' || e.status === 'active'));
                     return (
                       <div
                         key={b.id}
@@ -159,7 +179,7 @@ export default function AdminDashboard() {
                         className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 sm:gap-3 px-3 py-2 rounded-lg bg-canvas-soft hover:bg-canvas-soft/80 cursor-pointer border border-transparent hover:border-brand/20 transition-all text-xs group"
                       >
                         <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-wrap">
-                          <span className="font-semibold text-ink min-w-[70px] group-hover:text-brand transition-colors">{getBatchDisplayName(b, state.courts)}</span>
+                          <span className="font-semibold text-ink min-w-[70px] group-hover:text-brand transition-colors">{getBatchDisplayName(b, courts)}</span>
                           <span className="text-ink-muted shrink-0">{formatTime12h(b.startTime)} - {formatTime12h(b.endTime)}</span>
                           <span className="text-ink-muted truncate">Coach: {coach?.name || '—'}</span>
                           {b.isSemiBatch && <StatusPill status="semi-batch" />}
@@ -174,7 +194,6 @@ export default function AdminDashboard() {
           </div>
         )}
       </Card>
-
 
       <Card>
         <h3 className="text-sm font-semibold text-ink mb-3">Slot Analysis Summary</h3>

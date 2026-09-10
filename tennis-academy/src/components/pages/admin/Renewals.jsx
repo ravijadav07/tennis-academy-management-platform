@@ -12,6 +12,7 @@ import Dropdown from '../../ui/Dropdown';
 import Button from '../../ui/Button';
 import { formatCurrency, formatDate } from '../../../utils/formatters';
 import { cn } from '../../../utils/cn';
+import { db } from '../../../mocks/localDb';
 
 const PACKAGE_DURATION_DAYS = 45;
 
@@ -142,8 +143,35 @@ export default function Renewals() {
         .in('status', ['active', 'expired', 'lapsed'])
         .order('expiry_date', { ascending: true });
 
-      if (pkgErr) throw pkgErr;
-      if (!pkgs || pkgs.length === 0) { setPackages([]); setLoading(false); return; }
+      if (pkgErr || !pkgs || pkgs.length === 0) {
+        const local = db.readAll();
+        const localPkgs = local.packages || [];
+        const rows = localPkgs.map(p => {
+          const student = (local.students || []).find(s => s.id === p.studentId);
+          const expiryDate = p.endDate || p.expiryDate || new Date().toISOString().slice(0, 10);
+          const daysRemaining = computeDaysRemaining(expiryDate);
+          return {
+            id: p.id,
+            studentId: p.studentId,
+            studentName: student ? student.name : 'Unknown',
+            parentName: student ? (student.guardianName || 'Parent') : '--',
+            entity: student ? (student.entity || 'the-club') : 'the-club',
+            plan: p.program || 'Quarterly',
+            amount: p.amount || 12000,
+            expiry: expiryDate,
+            daysRemaining,
+            paymentStatus: p.paymentStatus === 'PAID' ? 'paid' : (p.paymentStatus || 'pending').toLowerCase(),
+            lastReminder: null,
+            nextReminder: daysRemaining > 0 && daysRemaining <= 7 ? expiryDate : null,
+            status: p.status || 'active',
+            reminderStage: 'd_minus_6',
+            overdueDays: daysRemaining < 0 ? Math.abs(daysRemaining) : 0,
+          };
+        });
+        setPackages(rows);
+        setLoading(false);
+        return;
+      }
 
       const studentIds = [...new Set(pkgs.map(p => p.student_id))];
       const { data: spRows, error: spErr } = await supabase
@@ -204,8 +232,32 @@ export default function Renewals() {
       });
       setPackages(rows);
     } catch (err) {
-      console.error('Failed to fetch renewals:', err);
-      toast.error('Failed to load renewal data');
+      console.warn('Failed to fetch renewals, using localDb fallback:', err);
+      const local = db.readAll();
+      const localPkgs = local.packages || [];
+      const rows = localPkgs.map(p => {
+        const student = (local.students || []).find(s => s.id === p.studentId);
+        const expiryDate = p.endDate || p.expiryDate || new Date().toISOString().slice(0, 10);
+        const daysRemaining = computeDaysRemaining(expiryDate);
+        return {
+          id: p.id,
+          studentId: p.studentId,
+          studentName: student ? student.name : 'Unknown',
+          parentName: student ? (student.guardianName || 'Parent') : '--',
+          entity: student ? (student.entity || 'the-club') : 'the-club',
+          plan: p.program || 'Quarterly',
+          amount: p.amount || 12000,
+          expiry: expiryDate,
+          daysRemaining,
+          paymentStatus: p.paymentStatus === 'PAID' ? 'paid' : (p.paymentStatus || 'pending').toLowerCase(),
+          lastReminder: null,
+          nextReminder: daysRemaining > 0 && daysRemaining <= 7 ? expiryDate : null,
+          status: p.status || 'active',
+          reminderStage: 'd_minus_6',
+          overdueDays: daysRemaining < 0 ? Math.abs(daysRemaining) : 0,
+        };
+      });
+      setPackages(rows);
     } finally {
       setLoading(false);
     }

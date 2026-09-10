@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useDb } from '../../../context/DbContext';
+import { useSupabase } from '../../../context/SupabaseContext';
 import { useAuth } from '../../../context/AuthContext';
 import Card from '../../ui/Card';
 import Button from '../../ui/Button';
@@ -27,16 +27,51 @@ function getToday() {
 }
 
 export default function CoachAttendance() {
-  const { db, tick } = useDb();
+  const { services, entity } = useSupabase();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const today = getToday();
   const coachId = user?.linkedCoachId;
 
-  const state = useMemo(() => db.readAll(), [db, tick]);
+  const [state, setState] = useState({
+    batches: [],
+    courts: [],
+    enrollments: [],
+    students: [],
+    attendance: [],
+  });
+  const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(today);
   const isPastDate = selectedDate < today;
+
+  const loadData = useCallback(async () => {
+    try {
+      const entityOpt = entity === 'all' ? undefined : entity;
+      const [batchesRes, courtsRes, enrollmentsRes, studentsRes, attendanceRes] = await Promise.all([
+        services.batches.list({ entity: entityOpt, pageSize: 500 }),
+        services.courts.list({ entity: entityOpt, pageSize: 100 }),
+        services.enrollments.list({ entity: entityOpt, pageSize: 500 }),
+        services.students.list({ entity: entityOpt, pageSize: 1000 }),
+        services.attendance.list({ entity: entityOpt, date: selectedDate, pageSize: 500 }),
+      ]);
+      setState({
+        batches: batchesRes.data || [],
+        courts: courtsRes.data || [],
+        enrollments: enrollmentsRes.data || [],
+        students: studentsRes.data || [],
+        attendance: attendanceRes.data || [],
+      });
+    } catch (err) {
+      console.error('[CoachAttendance] load error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [services, entity, selectedDate]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const todayPattern = getTodayPattern();
   // Coach's assigned batches for today's pattern
@@ -44,7 +79,7 @@ export default function CoachAttendance() {
     if (!coachId) return [];
     return (state.batches || []).filter(
       (b) => (b.primaryCoachId === coachId || b.supportCoachId === coachId) &&
-             b.status === 'ACTIVE' &&
+             (b.status === 'ACTIVE' || b.status === 'active') &&
              b.dayPattern === todayPattern
     );
   }, [state.batches, coachId, todayPattern]);
@@ -57,8 +92,10 @@ export default function CoachAttendance() {
   useEffect(() => {
     if (paramBatchId && paramBatchId !== selectedBatchId) {
       setSelectedBatchId(paramBatchId);
+    } else if (!selectedBatchId && coachBatches.length > 0) {
+      setSelectedBatchId(coachBatches[0].id);
     }
-  }, [paramBatchId]);
+  }, [paramBatchId, coachBatches]);
 
   const batch = (state.batches || []).find((b) => b.id === selectedBatchId);
   const court = (state.courts || []).find((c) => c.id === batch?.courtId);
@@ -70,15 +107,16 @@ export default function CoachAttendance() {
   // Load session remark
   useEffect(() => {
     if (!selectedBatchId || !selectedDate) return;
-    db.getSessionRemark({ batchId: selectedBatchId, date: selectedDate }).then((r) => {
+    services.attendance.getSessionRemark({ batchId: selectedBatchId, date: selectedDate }).then((res) => {
+      const r = res?.data;
       setSessionRemark(r ? r.remark : '');
       setRemarkSaved(!!r);
     });
-  }, [selectedBatchId, selectedDate, tick, db]);
+  }, [selectedBatchId, selectedDate, services]);
 
   const handleSaveRemark = async () => {
     try {
-      await db.saveSessionRemark({ batchId: selectedBatchId, date: selectedDate, remark: sessionRemark });
+      await services.attendance.saveSessionRemark({ batchId: selectedBatchId, date: selectedDate, remark: sessionRemark });
       setRemarkSaved(true);
       toast.success('Session remark saved');
     } catch (e) {
@@ -102,18 +140,13 @@ export default function CoachAttendance() {
       (a) => a.batchId === selectedBatchId && a.date === selectedDate
     );
     return (state.enrollments || [])
-      .filter((e) => e.batchId === selectedBatchId && e.status === 'ACTIVE')
+      .filter((e) => e.batchId === selectedBatchId && (e.status === 'ACTIVE' || e.status === 'active'))
       .map((e) => {
         const student = (state.students || []).find((s) => s.id === e.studentId);
         const att = marked.find((a) => a.studentId === e.studentId);
         const key = `${e.studentId}|${selectedBatchId}|${selectedDate}`;
         const optStatus = optimistic[key];
         const status = optStatus || att?.status || null;
-
-        // Player attendance notes (dated notes from player profile)
-        const notes = (state.playerNotes || [])
-          .filter((n) => n.studentId === e.studentId)
-          .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
         return {
           studentId: e.studentId,
@@ -123,8 +156,8 @@ export default function CoachAttendance() {
           membershipType: student?.membershipType || 'Member',
           attendance: att,
           status,
-          notes,
-          latestNote: notes[0]?.note || student?.remarks || '',
+          notes: [],
+          latestNote: student?.remarks || '',
         };
       });
   }, [state, batch, selectedBatchId, selectedDate, optimistic]);
@@ -162,13 +195,12 @@ export default function CoachAttendance() {
       setPending((prev) => new Set(prev).add(r.studentId));
 
       try {
-        await db.markAttendance({
+        await services.attendance.markAttendance({
+          studentId: r.studentId,
           batchId: selectedBatchId,
           date: selectedDate,
-          entries: [{ studentId: r.studentId, status: nextStatus }],
+          status: nextStatus,
           markedBy: user?.userId || 'user_coach',
-          markedByRole: 'COACH',
-          source: 'COACH_APP',
         });
         toast.success(`${r.name} marked ${nextStatus}`);
         setOptimistic((prev) => {
@@ -195,7 +227,7 @@ export default function CoachAttendance() {
         toast.error(e.message || 'Failed to mark attendance');
       }
     },
-    [isPastDate, selectedBatchId, selectedDate, db, user]
+    [isPastDate, selectedBatchId, selectedDate, services, user]
   );
 
   const handleSubmitCorrection = async () => {
@@ -204,7 +236,7 @@ export default function CoachAttendance() {
       return;
     }
     try {
-      await db.createCorrectionRequest({
+      await services.attendance.createCorrectionRequest({
         attendanceId: correctionTarget.attendance?.id || null,
         studentId: correctionTarget.studentId,
         batchId: selectedBatchId,

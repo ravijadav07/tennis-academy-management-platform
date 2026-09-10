@@ -1,24 +1,56 @@
-import { useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../../context/AuthContext';
-import { useDb } from '../../../context/DbContext';
+import { useSupabase } from '../../../context/SupabaseContext';
 import AdaptiveTable from '../../data/AdaptiveTable';
 import StatusPill from '../../ui/StatusPill';
 import { formatTime12h, getBatchDisplayName } from '../../../utils/formatters';
 
 export default function Schedule() {
   const { user } = useAuth();
-  const { db, tick } = useDb();
-  const state = useMemo(() => db.readAll(), [db, tick]);
+  const { services, entity } = useSupabase();
   const coachId = user?.linkedCoachId;
+
+  const [state, setState] = useState({
+    batches: [],
+    courts: [],
+    enrollments: [],
+    privateSessions: [],
+  });
+
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      try {
+        const entityOpt = entity === 'all' ? undefined : entity;
+        const [batchesRes, courtsRes, enrollmentsRes] = await Promise.all([
+          services.batches.list({ entity: entityOpt, pageSize: 500 }),
+          services.courts.list({ entity: entityOpt, pageSize: 100 }),
+          services.enrollments.list({ entity: entityOpt, pageSize: 500 }),
+        ]);
+        if (active) {
+          setState({
+            batches: batchesRes.data || [],
+            courts: courtsRes.data || [],
+            enrollments: enrollmentsRes.data || [],
+            privateSessions: [],
+          });
+        }
+      } catch (err) {
+        console.error('[Schedule] load error:', err);
+      }
+    }
+    load();
+    return () => { active = false; };
+  }, [services, entity]);
 
   const schedule = useMemo(() => {
     if (!coachId) return [];
 
     const coachBatches = (state.batches || [])
-      .filter((b) => (b.primaryCoachId === coachId || b.supportCoachId === coachId) && b.status === 'ACTIVE')
+      .filter((b) => (b.primaryCoachId === coachId || b.supportCoachId === coachId) && (b.status === 'ACTIVE' || b.status === 'active'))
       .map((b) => {
         const court = (state.courts || []).find((c) => c.id === b.courtId);
-        const roster = (state.enrollments || []).filter((e) => e.batchId === b.id && e.status === 'ACTIVE');
+        const roster = (state.enrollments || []).filter((e) => e.batchId === b.id && (e.status === 'ACTIVE' || e.status === 'active'));
         return {
           id: b.id,
           type: 'group',

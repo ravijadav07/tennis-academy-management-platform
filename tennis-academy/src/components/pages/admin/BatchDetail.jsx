@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useDb } from '../../../context/DbContext';
+import { useSupabase } from '../../../context/SupabaseContext';
 import { getEligibility } from '../../../mocks/rules';
 import Card from '../../ui/Card';
 import StatusPill from '../../ui/StatusPill';
@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { formatTime12h, formatDateDDMMYY } from '../../../utils/formatters';
 import { ArrowLeft, Clock, MapPin, Pencil, Archive } from 'lucide-react';
 import TimePicker12h from '../../ui/TimePicker12h';
+import { db } from '../../../mocks/localDb';
 
 const FIELD = 'w-full h-[38px] px-3 rounded-lg border border-line bg-white text-[13px] text-ink outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand transition-all';
 const LBL = 'block text-[10px] font-semibold text-ink-muted uppercase tracking-[0.04em] mb-1';
@@ -63,20 +64,83 @@ export default function BatchDetail() {
   const { batchId } = useParams();
   const navigate = useNavigate();
   const loc = useLocation();
-  const { db, tick } = useDb();
-  const s = useMemo(() => db.readAll(), [db, tick]);
+  const { services, entity } = useSupabase();
+
+  const [data, setData] = useState({
+    batches: [],
+    courts: [],
+    coaches: [],
+    enrollments: [],
+    students: [],
+    packages: [],
+  });
+  const [loading, setLoading] = useState(true);
+
   const today = new Date().toISOString().split('T')[0];
-  const batch = s.batches.find((b) => b.id === batchId);
+  const parent = (loc.state && loc.state.from) || '/admin/schedule';
+  const prefill = (loc.state && loc.state.prefill) || {};
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const entityOpt = entity === 'all' ? undefined : entity;
+      const [batchesRes, courtsRes, coachesRes, enrollmentsRes, studentsRes, packagesRes] = await Promise.all([
+        services.batches.list({ entity: entityOpt, pageSize: 500 }),
+        services.courts.list({ entity: entityOpt, pageSize: 100 }),
+        services.coaches.list({ entity: entityOpt, pageSize: 200 }),
+        services.enrollments.list({ entity: entityOpt, pageSize: 1000 }),
+        services.students.list({ entity: entityOpt, pageSize: 1000 }),
+        services.packages.list({ entity: entityOpt, pageSize: 1000 }),
+      ]);
+
+      if (!batchesRes.data || batchesRes.data.length === 0) {
+        const local = db.readAll();
+        setData({
+          batches: local.batches || [],
+          courts: local.courts || [],
+          coaches: local.coaches || [],
+          enrollments: local.enrollments || [],
+          students: local.students || [],
+          packages: local.packages || [],
+        });
+      } else {
+        setData({
+          batches: batchesRes.data || [],
+          courts: courtsRes.data || [],
+          coaches: coachesRes.data || [],
+          enrollments: enrollmentsRes.data || [],
+          students: studentsRes.data || [],
+          packages: packagesRes.data || [],
+        });
+      }
+    } catch (err) {
+      console.warn('[BatchDetail] load error, using localDb fallback:', err);
+      const local = db.readAll();
+      setData({
+        batches: local.batches || [],
+        courts: local.courts || [],
+        coaches: local.coaches || [],
+        enrollments: local.enrollments || [],
+        students: local.students || [],
+        packages: local.packages || [],
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [services, entity]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const { batches, courts, coaches, enrollments, students, packages } = data;
+  const batch = batches.find((b) => b.id === batchId);
+
   const [showEdit, setShowEdit] = useState(false);
   const [ef, setEf] = useState({});
   const [showArchive, setShowArchive] = useState(false);
   const [ar, setAr] = useState('');
-  const parent = (loc.state && loc.state.from) || '/admin/schedule';
-  const prefill = (loc.state && loc.state.prefill) || {};
-  const coaches = s.coaches || [];
-  const courts = s.courts || [];
 
-  // Create-batch form state (always declared, only used when batchId === 'new')
   const [nf, setNf] = useState(() => ({
     program: '', ballLevel: '', courtId: prefill.courtId || (courts.length > 0 ? courts[0].id : ''),
     dayPattern: prefill.dayPattern || 'MWF', startTime: '', endTime: '',
@@ -102,7 +166,7 @@ export default function BatchDetail() {
     }
     const autoName = computeBatchName({ ...nf, ballLevel: ballForCreate }, courts);
     try {
-      const newBatch = await db.upsertBatch({
+      const res = await services.batches.upsert({
         ...nf,
         name: autoName,
         ballLevel: ballForCreate,
@@ -112,15 +176,9 @@ export default function BatchDetail() {
         status: 'ACTIVE',
       });
       toast.success('Batch created: ' + autoName);
-      navigate('/admin/batches/' + newBatch.id, { state: { from: parent } });
+      navigate('/admin/batches/' + (res.data?.id || 'new'), { state: { from: parent } });
     } catch (e) {
-      if (e.message === 'COURT_CONFLICT') {
-        toast.error(`Court conflict: another batch occupies this time slot (${e.conflictWith || ''})`);
-      } else if (e.message === 'COACH_CONFLICT') {
-        toast.error(`Coach conflict: ${e.coachName} is already assigned to concurrent batch ${e.conflictWith}`);
-      } else {
-        toast.error(e.message);
-      }
+      toast.error(e.message || 'Failed to create batch');
     }
   };
 
@@ -202,12 +260,20 @@ export default function BatchDetail() {
     );
   }
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <div className="w-8 h-8 rounded-full border-2 border-brand border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
   if (!batch) return <div className="p-4 text-sm text-ink-muted">Batch not found.</div>;
 
-  const roster = s.enrollments.filter((e) => e.batchId === batchId && e.status === 'ACTIVE');
-  const pc = s.coaches.find((c) => c.id === batch.primaryCoachId);
-  const sc = s.coaches.find((c) => c.id === batch.supportCoachId);
-  const court = s.courts.find((c) => c.id === batch.courtId);
+  const roster = enrollments.filter((e) => e.batchId === batchId && (e.status === 'ACTIVE' || e.status === 'active'));
+  const pc = coaches.find((c) => c.id === batch.primaryCoachId);
+  const sc = coaches.find((c) => c.id === batch.supportCoachId);
+  const court = courts.find((c) => c.id === batch.courtId);
   const waitlist = batch.waitlist || [];
 
   const openEdit = () => {
@@ -224,7 +290,7 @@ export default function BatchDetail() {
       if (cap < roster.length && !window.confirm('Capacity lower than roster (' + cap + ' vs ' + roster.length + '). Continue?')) return;
       const ballForEdit = CATEGORIES_WITH_BALL.has(ef.program) ? (ef.ballLevel || null) : null;
       const autoName = computeBatchName({ ...ef, ballLevel: ballForEdit }, courts);
-      await db.upsertBatch({
+      await services.batches.upsert({
         ...batch,
         ...ef,
         name: autoName,
@@ -235,21 +301,20 @@ export default function BatchDetail() {
       });
       toast.success('Batch updated: ' + autoName);
       setShowEdit(false);
+      loadData();
     } catch (e) {
-      if (e.message === 'COURT_CONFLICT') {
-        toast.error(`Court conflict: another batch occupies this time slot (${e.conflictWith || ''})`);
-      } else if (e.message === 'COACH_CONFLICT') {
-        toast.error(`Coach conflict: ${e.coachName} is already assigned to concurrent batch ${e.conflictWith}`);
-      } else {
-        toast.error(e.message);
-      }
+      toast.error(e.message || 'Failed to update batch');
     }
   };
 
   const doArchive = async () => {
     if (!ar.trim()) { toast.error('Reason is required'); return; }
-    try { await db.archiveBatch({ batchId, reason: ar }); toast.success('Batch archived'); setShowArchive(false); navigate(parent); }
-    catch (e) { toast.error(e.message); }
+    try {
+      await services.batches.upsert({ id: batchId, status: 'INACTIVE', archivedReason: ar });
+      toast.success('Batch archived');
+      setShowArchive(false);
+      navigate(parent);
+    } catch (e) { toast.error(e.message || 'Failed to archive batch'); }
   };
 
   return (
@@ -311,8 +376,8 @@ export default function BatchDetail() {
               </thead>
               <tbody className="divide-y divide-line/40">
                 {roster.map((e, idx) => {
-                  const st = s.students.find((x) => x.id === e.studentId);
-                  const pkg = s.packages.find((p) => p.studentId === e.studentId);
+                  const st = students.find((x) => x.id === e.studentId);
+                  const pkg = packages.find((p) => p.studentId === e.studentId);
                   const elig = getEligibility(pkg, today);
                   const blocked = !elig.markable;
                   const isReallocated = e.billingProgram && e.billingProgram !== batch.program;
@@ -331,7 +396,7 @@ export default function BatchDetail() {
                               ? 'bg-rose-100 text-rose-800 border border-rose-300'
                               : 'bg-brand-50 text-brand-700 border border-brand/20'
                           }`}>
-                            {e.billingProgram}
+                            {e.billingProgram || e.program}
                           </span>
                           {isReallocated && (
                             <span className="text-[10px] text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded font-medium border border-purple-200">
