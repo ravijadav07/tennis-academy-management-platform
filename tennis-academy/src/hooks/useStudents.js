@@ -36,19 +36,8 @@ export function useStudents({ query = '', status = 'all', category = '', batch =
         batches: batchesRes.data || [],
       });
     } catch (err) {
-      console.warn('[useStudents] Supabase network/QUIC issue, using localDb fallback:', err?.message || err);
-      try {
-        const local = db.readAll();
-        setData({
-          students: local.students || [],
-          enrollments: local.enrollments || [],
-          packages: local.packages || [],
-          batches: local.batches || [],
-        });
-      } catch (fallbackErr) {
-        console.error('[useStudents] Fallback error:', fallbackErr);
-        setError(err);
-      }
+      console.error('[useStudents] Data fetch error:', err);
+      setError(err);
     } finally {
       setLoading(false);
     }
@@ -66,11 +55,13 @@ export function useStudents({ query = '', status = 'all', category = '', batch =
         if (status !== 'all' && s.status !== status && s.status !== status.toUpperCase()) return false;
         if (query) {
           const q = query.toLowerCase();
-          return (s.name || '').toLowerCase().includes(q) || (s.guardianName || '').toLowerCase().includes(q) || (s.phone || '').includes(q);
+          const studentName = (s.name || s.fullName || s.full_name || s.student_name || '').toLowerCase();
+          return studentName.includes(q) || (s.guardianName || '').toLowerCase().includes(q) || (s.phone || '').includes(q);
         }
         return true;
       })
       .map((s) => {
+        const studentName = s.name || s.fullName || s.full_name || s.student_name || s.studentName || 'Student';
         const enr = enrollments.filter((e) => e.studentId === s.id && (e.status === 'ACTIVE' || e.status === 'active'));
         const allPkgs = packages.filter((p) => p.studentId === s.id);
         const pkg = allPkgs[0];
@@ -78,7 +69,7 @@ export function useStudents({ query = '', status = 'all', category = '', batch =
         const eligibility = pkg ? getEligibility(pkg, today) : { markable: true, reason: '', label: '', blocked: false };
         const programs = [...new Set(enr.map((e) => e.billingProgram || e.program))].filter(Boolean);
         const batchIds = [...new Set(enr.map((e) => e.batchId))].filter(Boolean);
-        return { ...s, enrollments: enr, batch: batchObj, packages: allPkgs, package: pkg, eligibility, programs, batchIds, isAmbiguous: programs.length > 1 };
+        return { ...s, name: studentName, enrollments: enr, batch: batchObj, packages: allPkgs, package: pkg, eligibility, programs, batchIds, isAmbiguous: programs.length > 1 };
       })
       .filter((s) => {
         if (category && !s.programs?.includes(category)) return false;

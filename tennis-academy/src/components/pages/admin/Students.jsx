@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useStudents } from '../../../hooks/useStudents';
-import { db } from '../../../mocks/localDb';
 import { useDebounce } from '../../../hooks/useDebounce';
 import { useSupabase } from '../../../context/SupabaseContext';
 import Card from '../../ui/Card';
@@ -226,6 +225,7 @@ function renderEnrollmentBlock(blk, setBlk, removable, onRemove, batchOptions = 
 }
 
 export default function AdminStudents() {
+  const { services } = useSupabase();
   const [rawQuery, setRawQuery] = useState('');
   const query = useDebounce(rawQuery, 300);
   const [status, setStatus] = useState('all');
@@ -262,8 +262,24 @@ export default function AdminStudents() {
   const [showConvert, setShowConvert] = useState(false);
   const [convertForm, setConvertForm] = useState(newEnrollmentBlock());
 
-  const state = (() => { try { return db.readAll(); } catch { return { batches: [], coaches: [] }; } })();
-  const batchOptions = state.batches?.filter((b) => b.status === 'ACTIVE') || [];
+  const [batchOptions, setBatchOptions] = useState([]);
+  const [courtsList, setCourtsList] = useState([]);
+  const [coachesList, setCoachesList] = useState([]);
+  const [batchesList, setBatchesList] = useState([]);
+
+  useEffect(() => {
+    services.batches.list({ pageSize: 500 }).then((res) => {
+      const all = res.data || [];
+      setBatchesList(all);
+      setBatchOptions(all.filter((b) => b.status === 'ACTIVE' || b.status === 'active'));
+    });
+    services.courts.list({ pageSize: 100 }).then((res) => {
+      setCourtsList(res.data || []);
+    });
+    services.coaches.list({ pageSize: 200 }).then((res) => {
+      setCoachesList(res.data || []);
+    });
+  }, [services]);
 
   const BALL_COLORS = ['Yellow', 'Green', 'Orange', 'Red'];
   const CATEGORIES_WITH_BALL = new Set(['ADV', 'INT']);
@@ -653,7 +669,7 @@ export default function AdminStudents() {
       {/* Filters row */}
       <div className="flex items-center gap-2 flex-wrap">
         <Dropdown className="w-full sm:w-36" value={categoryFilter} onChange={(v) => setCategoryFilter(typeof v === 'object' ? (v.value || '') : v)} placeholder="All Categories" options={[{ value: '', label: 'All' }, ...CATEGORY_OPTIONS]} getOptionLabel={(o) => o.label || 'All'} getOptionValue={(o) => o.value || ''} />
-        <Dropdown className="w-full sm:w-64" value={batchFilter} onChange={(v) => setBatchFilter(typeof v === 'object' ? (v.value || '') : v)} placeholder="All Batches" options={[{ value: '', label: 'All Batches' }, ...batchOptions.map((b) => ({ value: b.id, label: `${getBatchDisplayName(b, state.courts)} (${b.dayPattern})` }))]} getOptionLabel={(o) => o.label || 'All Batches'} getOptionValue={(o) => o.value || ''} />
+        <Dropdown className="w-full sm:w-64" value={batchFilter} onChange={(v) => setBatchFilter(typeof v === 'object' ? (v.value || '') : v)} placeholder="All Batches" options={[{ value: '', label: 'All Batches' }, ...batchOptions.map((b) => ({ value: b.id, label: `${getBatchDisplayName(b, courtsList)} (${b.dayPattern})` }))]} getOptionLabel={(o) => o.label || 'All Batches'} getOptionValue={(o) => o.value || ''} />
         <Dropdown className="w-full sm:w-36" value={membershipFilter} onChange={(v) => setMembershipFilter(typeof v === 'object' ? (v.value || '') : v)} placeholder="All Membership" options={[{ value: '', label: 'All' }, { value: 'Member', label: 'Member' }, { value: 'Non-member', label: 'Non-member' }, { value: 'Guest', label: 'Guest' }]} getOptionLabel={(o) => o.label || 'All'} getOptionValue={(o) => o.value || ''} />
         <Dropdown className="w-full sm:w-36" value={paymentFilter} onChange={(v) => setPaymentFilter(typeof v === 'object' ? (v.value || '') : v)} placeholder="All Payment" options={[{ value: '', label: 'All' }, { value: 'PAID', label: 'Paid' }, { value: 'PENDING', label: 'Pending' }, { value: 'PARTIAL', label: 'Partial' }, { value: 'COMPLIMENTARY', label: 'Complimentary' }]} getOptionLabel={(o) => o.label || 'All'} getOptionValue={(o) => o.value || ''} />
       </div>
@@ -666,9 +682,9 @@ export default function AdminStudents() {
             return (
               <div key={s.id} onClick={() => setSelected(s)}
                 className={`flex items-center gap-3 px-4 py-3 hover:bg-canvas-soft cursor-pointer transition-colors ${blocked && !isInactive ? 'opacity-50' : ''} ${isInactive ? 'opacity-40' : ''}`}>
-                <div className="w-8 h-8 rounded-full bg-brand-50 flex items-center justify-center text-brand-600 text-xs font-bold flex-shrink-0">{s.name.charAt(0)}</div>
+                <div className="w-8 h-8 rounded-full bg-brand-50 flex items-center justify-center text-brand-600 text-xs font-bold flex-shrink-0">{(s.name || s.fullName || s.full_name || s.student_name || 'S').charAt(0)}</div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-ink truncate">{s.name}</p>
+                  <p className="text-sm font-semibold text-ink truncate">{s.name || s.fullName || s.full_name || s.student_name || 'Student'}</p>
                   <p className="text-[11px] text-ink-muted truncate">{s.programs?.join(', ') || 'No program'} · {s.batch?.name || s.batch?.program || 'No batch'}</p>
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap flex-shrink-0">
@@ -710,13 +726,13 @@ export default function AdminStudents() {
               ) : (
                 <div className="space-y-1.5">
                   {selected.enrollments.map((enr) => {
-                    const b = state.batches.find((batch) => batch.id === enr.batchId);
-                    const c = state.courts.find((court) => court.id === b?.courtId);
-                    const coach = state.coaches.find((coach) => coach.id === b?.primaryCoachId);
+                    const b = batchesList.find((batch) => batch.id === enr.batchId);
+                    const c = courtsList.find((court) => court.id === b?.courtId);
+                    const coach = coachesList.find((coach) => coach.id === b?.primaryCoachId);
                     return (
                       <div key={enr.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 rounded-lg bg-canvas-soft text-xs border border-line/40">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-ink">{b ? getBatchDisplayName(b, state.courts) : (enr.billingProgram || 'Batch')}</span>
+                          <span className="font-semibold text-ink">{b ? getBatchDisplayName(b, courtsList) : (enr.billingProgram || 'Batch')}</span>
                           <span className="font-mono text-ink-muted">({b?.dayPattern})</span>
                           {enr.enrollmentType && enr.enrollmentType !== 'Group' && (
                             <span className="px-1.5 py-0.5 rounded text-[10px] bg-brand-50 text-brand-600 font-medium">{enr.enrollmentType}</span>
@@ -736,14 +752,14 @@ export default function AdminStudents() {
 
             {/* 3. Scheduled Private Sessions (Consolidated) */}
             {(() => {
-              const privates = (state.privateSessions || []).filter((ps) => ps.studentId === selected.id || ps.clientName === selected.name);
+              const privates = [];
               if (privates.length === 0) return null;
               return (
                 <div>
                   <h4 className="text-xs font-semibold text-ink-muted mb-1.5">Private Coaching Sessions ({privates.length})</h4>
                   <div className="space-y-1.5 max-h-36 overflow-y-auto">
                     {privates.map((ps) => {
-                      const coach = state.coaches.find((c) => c.id === ps.coachId);
+                      const coach = coachesList.find((c) => c.id === ps.coachId);
                       return (
                         <div key={ps.id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-canvas-soft text-xs border border-line/40">
                           <span className="text-ink font-medium">{formatDateDDMMYY(ps.date)} · {formatTime12h(ps.startTime || ps.time)}</span>
@@ -926,7 +942,7 @@ export default function AdminStudents() {
               </div>
               <div className="space-y-1 mt-2">
                 <label className={labelCls}>Trial Batch</label>
-                <Dropdown value={addForm.enrollments[0].batchId} onChange={(v) => setAddForm((f) => ({ ...f, enrollments: [{ ...f.enrollments[0], batchId: typeof v === 'object' ? (v.value || '') : (v || '') }] }))} placeholder="Select batch..." options={batchOptions.map((b) => ({ value: b.id, label: `${getBatchDisplayName(b, state.courts)} (${b.dayPattern})` }))} getOptionLabel={(o) => o?.label || ''} getOptionValue={(o) => o?.value || ''} />
+                <Dropdown value={addForm.enrollments[0].batchId} onChange={(v) => setAddForm((f) => ({ ...f, enrollments: [{ ...f.enrollments[0], batchId: typeof v === 'object' ? (v.value || '') : (v || '') }] }))} placeholder="Select batch..." options={batchOptions.map((b) => ({ value: b.id, label: `${getBatchDisplayName(b, courtsList)} (${b.dayPattern})` }))} getOptionLabel={(o) => o?.label || ''} getOptionValue={(o) => o?.value || ''} />
               </div>
             </div>
           ) : (
@@ -934,7 +950,7 @@ export default function AdminStudents() {
               <p className="text-[10px] font-semibold text-ink-muted uppercase mb-2">Enrollments</p>
               {addForm.enrollments.map((blk, idx) => (
                 <div key={idx} className="mb-3">
-                  {renderEnrollmentBlock(blk, (newBlk) => { const e = [...addForm.enrollments]; e[idx] = newBlk; setAddForm((f) => ({ ...f, enrollments: e })); }, addForm.enrollments.length > 1, () => { const e = [...addForm.enrollments]; e.splice(idx, 1); setAddForm((f) => ({ ...f, enrollments: e.length > 0 ? e : [newEnrollmentBlock()] })); }, batchOptions, state.coaches, state.courts)}
+                  {renderEnrollmentBlock(blk, (newBlk) => { const e = [...addForm.enrollments]; e[idx] = newBlk; setAddForm((f) => ({ ...f, enrollments: e })); }, addForm.enrollments.length > 1, () => { const e = [...addForm.enrollments]; e.splice(idx, 1); setAddForm((f) => ({ ...f, enrollments: e.length > 0 ? e : [newEnrollmentBlock()] })); }, batchOptions, coachesList, courtsList)}
                 </div>
               ))}
               <Button size="sm" variant="ghost" icon={Plus} onClick={() => setAddForm((f) => ({ ...f, enrollments: [...f.enrollments, newEnrollmentBlock()] }))} className="w-full">+ Add Another Enrollment</Button>
@@ -988,7 +1004,7 @@ export default function AdminStudents() {
       {/* Add Enrollment Modal (for existing students) */}
       <Modal open={showEnroll} onClose={() => setShowEnroll(false)} title="Add Enrollment" size="lg">
         <div className="space-y-4 max-h-[65vh] overflow-y-auto">
-          {renderEnrollmentBlock(enrollForm, setEnrollForm, false, null, batchOptions, state.coaches, state.courts)}
+          {renderEnrollmentBlock(enrollForm, setEnrollForm, false, null, batchOptions, coachesList, courtsList)}
           <div className="flex justify-end gap-2 pt-2"><Button variant="secondary" onClick={() => setShowEnroll(false)}>Cancel</Button><Button onClick={handleAddEnrollment} disabled={!enrollForm.program}>Add Enrollment</Button></div>
         </div>
       </Modal>
@@ -997,7 +1013,7 @@ export default function AdminStudents() {
       <Modal open={showConvert} onClose={() => setShowConvert(false)} title={`Convert "${selected?.name}" to Enrollment`} size="lg">
         <div className="space-y-4 max-h-[65vh] overflow-y-auto">
           <p className="text-xs text-ink-muted">Convert this trial student to a regular enrollment.</p>
-          {renderEnrollmentBlock(convertForm, setConvertForm, false, null, batchOptions, state.coaches, state.courts)}
+          {renderEnrollmentBlock(convertForm, setConvertForm, false, null, batchOptions, coachesList, courtsList)}
           <div className="flex justify-end gap-2 pt-2"><Button variant="secondary" onClick={() => setShowConvert(false)}>Cancel</Button><Button onClick={handleConvert} disabled={!convertForm.program}>Convert to Enrollment</Button></div>
         </div>
       </Modal>

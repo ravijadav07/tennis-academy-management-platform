@@ -31,42 +31,17 @@ export function useSchedule(dayPattern = 'MWF') {
         services.coaches.list({ entity: entityOpt, pageSize: 200 }),
       ]);
 
-      if (!batchesRes.data || batchesRes.data.length === 0) {
-        const local = db.readAll();
-        setData({
-          batches: local.batches || [],
-          courts: local.courts || [],
-          enrollments: local.enrollments || [],
-          packages: local.packages || [],
-          coaches: local.coaches || [],
-          privateSessions: local.privateSessions || [],
-        });
-      } else {
-        setData({
-          batches: batchesRes.data || [],
-          courts: courtsRes.data || [],
-          enrollments: enrollmentsRes.data || [],
-          packages: packagesRes.data || [],
-          coaches: coachesRes.data || [],
-          privateSessions: [],
-        });
-      }
+      setData({
+        batches: batchesRes.data || [],
+        courts: courtsRes.data || [],
+        enrollments: enrollmentsRes.data || [],
+        packages: packagesRes.data || [],
+        coaches: coachesRes.data || [],
+        privateSessions: [],
+      });
     } catch (err) {
-      console.warn('[useSchedule] Supabase network/QUIC issue, using localDb fallback:', err?.message || err);
-      try {
-        const local = db.readAll();
-        setData({
-          batches: local.batches || [],
-          courts: local.courts || [],
-          enrollments: local.enrollments || [],
-          packages: local.packages || [],
-          coaches: local.coaches || [],
-          privateSessions: local.privateSessions || [],
-        });
-      } catch (fallbackErr) {
-        console.error('[useSchedule] Fallback error:', fallbackErr);
-        setError(err);
-      }
+      console.error('[useSchedule] Data fetch error:', err);
+      setError(err);
     } finally {
       setLoading(false);
     }

@@ -85,7 +85,7 @@ export default function OneOnOne() {
       cell: ({ getValue }) => (
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-brand-50 flex items-center justify-center text-brand text-xs font-semibold">
-            {getValue().charAt(0)}
+            {(getValue() || 'S').charAt(0)}
           </div>
           <span className="text-sm font-medium text-ink">{getValue()}</span>
         </div>
@@ -138,7 +138,7 @@ export default function OneOnOne() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-[34px] h-[34px] rounded-full bg-brand-50 flex items-center justify-center text-brand text-xs font-semibold">
-            {session.student.charAt(0)}
+            {(session?.student || 'S').charAt(0)}
           </div>
           <div>
             <p className="text-sm font-semibold text-ink">{session.student}</p>

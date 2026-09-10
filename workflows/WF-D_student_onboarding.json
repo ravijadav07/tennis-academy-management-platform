@@ -6,7 +6,7 @@
   "tags": [],
   "pieces": [
     "@puchoaistudio/tool-webhook",
-    "@puchoaistudio/tool-supabase",
+    "@puchoaistudio/tool-google-sheets",
     "@puchoaistudio/tool-gmail"
   ],
   "template": {
@@ -82,45 +82,44 @@
           "settings": {
             "input": {
               "auth": "",
-              "table_name": "batches",
-              "page": 1,
-              "pageSize": 1,
-              "columns": [
-                "id",
-                "name",
-                "capacity"
-              ],
-              "filters": [
-                {
-                  "column": "id",
-                  "operator": "eq",
-                  "value": "{{step_1['batch_id']}}"
-                }
-              ]
+              "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
+              "sheetId": 139096806,
+              "columnName": "id",
+              "searchValue": "{{step_1['batch_id']}}",
+              "matchCase": false,
+              "startingRow": 1,
+              "numberOfRows": 1,
+              "includeTeamDrives": false
             },
-            "pieceName": "@puchoaistudio/tool-supabase",
-            "actionName": "search_rows",
-            "pieceVersion": "^2.0.1",
+            "pieceName": "@puchoaistudio/tool-google-sheets",
+            "actionName": "find_rows",
+            "pieceVersion": "^2.0.9",
             "propertySettings": {
               "auth": {
                 "type": "MANUAL"
               },
-              "page": {
+              "spreadsheetId": {
                 "type": "MANUAL"
               },
-              "columns": {
+              "sheetId": {
                 "type": "MANUAL"
               },
-              "filters": {
+              "columnName": {
                 "type": "MANUAL"
               },
-              "pageSize": {
+              "searchValue": {
                 "type": "MANUAL"
               },
-              "table_name": {
+              "matchCase": {
                 "type": "MANUAL"
               },
-              "countOption": {
+              "startingRow": {
+                "type": "MANUAL"
+              },
+              "numberOfRows": {
+                "type": "MANUAL"
+              },
+              "includeTeamDrives": {
                 "type": "MANUAL"
               }
             },
@@ -143,41 +142,44 @@
             "settings": {
               "input": {
                 "auth": "",
-                "table_name": "students",
-                "page": 1,
-                "pageSize": 1,
-                "filters": [
-                  {
-                    "column": "batch_id",
-                    "operator": "eq",
-                    "value": "{{step_1['batch_id']}}"
-                  }
-                ],
-                "countOption": "exact"
+                "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
+                "sheetId": 74175770,
+                "columnName": "batch_id",
+                "searchValue": "{{step_1['batch_id']}}",
+                "matchCase": false,
+                "startingRow": 1,
+                "numberOfRows": 1,
+                "includeTeamDrives": false
               },
-              "pieceName": "@puchoaistudio/tool-supabase",
-              "actionName": "search_rows",
-              "pieceVersion": "^2.0.1",
+              "pieceName": "@puchoaistudio/tool-google-sheets",
+              "actionName": "find_rows",
+              "pieceVersion": "^2.0.9",
               "propertySettings": {
                 "auth": {
                   "type": "MANUAL"
                 },
-                "page": {
+                "spreadsheetId": {
                   "type": "MANUAL"
                 },
-                "columns": {
+                "sheetId": {
                   "type": "MANUAL"
                 },
-                "filters": {
+                "columnName": {
                   "type": "MANUAL"
                 },
-                "pageSize": {
+                "searchValue": {
                   "type": "MANUAL"
                 },
-                "table_name": {
+                "matchCase": {
                   "type": "MANUAL"
                 },
-                "countOption": {
+                "startingRow": {
+                  "type": "MANUAL"
+                },
+                "numberOfRows": {
+                  "type": "MANUAL"
+                },
+                "includeTeamDrives": {
                   "type": "MANUAL"
                 }
               },
@@ -200,40 +202,44 @@
               "settings": {
                 "input": {
                   "auth": "",
-                  "table_name": "students",
-                  "page": 1,
-                  "pageSize": 1,
-                  "filters": [
-                    {
-                      "column": "name",
-                      "operator": "eq",
-                      "value": "{{step_1[\"dup_check_name\"]}}"
-                    }
-                  ]
+                  "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
+                  "sheetId": 74175770,
+                  "columnName": "name",
+                  "searchValue": "{{step_1[\"dup_check_name\"]}}",
+                  "matchCase": false,
+                  "startingRow": 1,
+                  "numberOfRows": 1,
+                  "includeTeamDrives": false
                 },
-                "pieceName": "@puchoaistudio/tool-supabase",
-                "actionName": "search_rows",
-                "pieceVersion": "^2.0.1",
+                "pieceName": "@puchoaistudio/tool-google-sheets",
+                "actionName": "find_rows",
+                "pieceVersion": "^2.0.9",
                 "propertySettings": {
                   "auth": {
                     "type": "MANUAL"
                   },
-                  "page": {
+                  "spreadsheetId": {
                     "type": "MANUAL"
                   },
-                  "columns": {
+                  "sheetId": {
                     "type": "MANUAL"
                   },
-                  "filters": {
+                  "columnName": {
                     "type": "MANUAL"
                   },
-                  "pageSize": {
+                  "searchValue": {
                     "type": "MANUAL"
                   },
-                  "table_name": {
+                  "matchCase": {
                     "type": "MANUAL"
                   },
-                  "countOption": {
+                  "startingRow": {
+                    "type": "MANUAL"
+                  },
+                  "numberOfRows": {
+                    "type": "MANUAL"
+                  },
+                  "includeTeamDrives": {
                     "type": "MANUAL"
                   }
                 },
@@ -394,8 +400,9 @@
                     "settings": {
                       "input": {
                         "auth": "",
-                        "table_name": "students",
-                        "row_data": {
+                        "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
+                        "sheetId": 74175770,
+                        "values": {
                           "name": "{{step_1['student_name']}}",
                           "age": "{{step_1['student_age']}}",
                           "level": "{{step_1['student_level']}}",
@@ -405,72 +412,34 @@
                           "status": "active",
                           "join_date": "{{step_1['start_date']}}"
                         },
-                        "return_row": true
+                        "as_string": false,
+                        "first_row_headers": true,
+                        "includeTeamDrives": false
                       },
-                      "pieceName": "@puchoaistudio/tool-supabase",
-                      "actionName": "create_row",
-                      "pieceVersion": "^2.0.1",
+                      "pieceName": "@puchoaistudio/tool-google-sheets",
+                      "actionName": "insert_row",
+                      "pieceVersion": "^2.0.9",
                       "propertySettings": {
                         "auth": {
                           "type": "MANUAL"
                         },
-                        "row_data": {
-                          "type": "MANUAL",
-                          "schema": {
-                            "name": {
-                              "type": "SHORT_TEXT",
-                              "required": false,
-                              "displayName": "name",
-                              "defaultValue": ""
-                            },
-                            "age": {
-                              "type": "SHORT_TEXT",
-                              "required": false,
-                              "displayName": "age",
-                              "defaultValue": ""
-                            },
-                            "level": {
-                              "type": "SHORT_TEXT",
-                              "required": false,
-                              "displayName": "level",
-                              "defaultValue": ""
-                            },
-                            "batch_id": {
-                              "type": "SHORT_TEXT",
-                              "required": false,
-                              "displayName": "batch_id",
-                              "defaultValue": ""
-                            },
-                            "coach_id": {
-                              "type": "SHORT_TEXT",
-                              "required": false,
-                              "displayName": "coach_id",
-                              "defaultValue": ""
-                            },
-                            "entity": {
-                              "type": "SHORT_TEXT",
-                              "required": false,
-                              "displayName": "entity",
-                              "defaultValue": ""
-                            },
-                            "status": {
-                              "type": "SHORT_TEXT",
-                              "required": false,
-                              "displayName": "status",
-                              "defaultValue": ""
-                            },
-                            "join_date": {
-                              "type": "SHORT_TEXT",
-                              "required": false,
-                              "displayName": "join_date",
-                              "defaultValue": ""
-                            }
-                          }
-                        },
-                        "return_row": {
+                        "spreadsheetId": {
                           "type": "MANUAL"
                         },
-                        "table_name": {
+                        "sheetId": {
+                          "type": "MANUAL"
+                        },
+                        "values": {
+                          "type": "MANUAL",
+                          "schema": {}
+                        },
+                        "as_string": {
+                          "type": "MANUAL"
+                        },
+                        "first_row_headers": {
+                          "type": "MANUAL"
+                        },
+                        "includeTeamDrives": {
                           "type": "MANUAL"
                         }
                       },
@@ -493,62 +462,43 @@
                       "settings": {
                         "input": {
                           "auth": "",
-                          "table_name": "parents",
-                          "row_data": {
+                          "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
+                          "sheetId": 1278619599,
+                          "values": {
                             "name": "{{step_1['parent_name']}}",
                             "phone": "{{step_1['parent_phone']}}",
                             "email": "{{step_1['parent_email']}}",
                             "entity": "{{step_1['entity']}}",
                             "account_status": "active"
                           },
-                          "return_row": true
+                          "as_string": false,
+                          "first_row_headers": true,
+                          "includeTeamDrives": false
                         },
-                        "pieceName": "@puchoaistudio/tool-supabase",
-                        "actionName": "create_row",
-                        "pieceVersion": "^2.0.1",
+                        "pieceName": "@puchoaistudio/tool-google-sheets",
+                        "actionName": "insert_row",
+                        "pieceVersion": "^2.0.9",
                         "propertySettings": {
                           "auth": {
                             "type": "MANUAL"
                           },
-                          "row_data": {
-                            "type": "MANUAL",
-                            "schema": {
-                              "name": {
-                                "type": "SHORT_TEXT",
-                                "required": false,
-                                "displayName": "name",
-                                "defaultValue": ""
-                              },
-                              "phone": {
-                                "type": "SHORT_TEXT",
-                                "required": false,
-                                "displayName": "phone",
-                                "defaultValue": ""
-                              },
-                              "email": {
-                                "type": "SHORT_TEXT",
-                                "required": false,
-                                "displayName": "email",
-                                "defaultValue": ""
-                              },
-                              "entity": {
-                                "type": "SHORT_TEXT",
-                                "required": false,
-                                "displayName": "entity",
-                                "defaultValue": ""
-                              },
-                              "account_status": {
-                                "type": "SHORT_TEXT",
-                                "required": false,
-                                "displayName": "account_status",
-                                "defaultValue": ""
-                              }
-                            }
-                          },
-                          "return_row": {
+                          "spreadsheetId": {
                             "type": "MANUAL"
                           },
-                          "table_name": {
+                          "sheetId": {
+                            "type": "MANUAL"
+                          },
+                          "values": {
+                            "type": "MANUAL",
+                            "schema": {}
+                          },
+                          "as_string": {
+                            "type": "MANUAL"
+                          },
+                          "first_row_headers": {
+                            "type": "MANUAL"
+                          },
+                          "includeTeamDrives": {
                             "type": "MANUAL"
                           }
                         },
@@ -571,41 +521,40 @@
                         "settings": {
                           "input": {
                             "auth": "",
-                            "table_name": "student_parents",
-                            "row_data": {
+                            "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
+                            "sheetId": 605693083,
+                            "values": {
                               "student_id": "{{step_2['id']}}",
                               "parent_id": "{{step_3['id']}}"
                             },
-                            "return_row": true
+                            "as_string": false,
+                            "first_row_headers": true,
+                            "includeTeamDrives": false
                           },
-                          "pieceName": "@puchoaistudio/tool-supabase",
-                          "actionName": "create_row",
-                          "pieceVersion": "^2.0.1",
+                          "pieceName": "@puchoaistudio/tool-google-sheets",
+                          "actionName": "insert_row",
+                          "pieceVersion": "^2.0.9",
                           "propertySettings": {
                             "auth": {
                               "type": "MANUAL"
                             },
-                            "row_data": {
-                              "type": "MANUAL",
-                              "schema": {
-                                "student_id": {
-                                  "type": "SHORT_TEXT",
-                                  "required": false,
-                                  "displayName": "student_id",
-                                  "defaultValue": ""
-                                },
-                                "parent_id": {
-                                  "type": "SHORT_TEXT",
-                                  "required": false,
-                                  "displayName": "parent_id",
-                                  "defaultValue": ""
-                                }
-                              }
-                            },
-                            "return_row": {
+                            "spreadsheetId": {
                               "type": "MANUAL"
                             },
-                            "table_name": {
+                            "sheetId": {
+                              "type": "MANUAL"
+                            },
+                            "values": {
+                              "type": "MANUAL",
+                              "schema": {}
+                            },
+                            "as_string": {
+                              "type": "MANUAL"
+                            },
+                            "first_row_headers": {
+                              "type": "MANUAL"
+                            },
+                            "includeTeamDrives": {
                               "type": "MANUAL"
                             }
                           },
@@ -628,8 +577,9 @@
                           "settings": {
                             "input": {
                               "auth": "",
-                              "table_name": "packages",
-                              "row_data": {
+                              "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
+                              "sheetId": 1260552768,
+                              "values": {
                                 "student_id": "{{step_2['id']}}",
                                 "plan_type": "{{step_1['plan_type']}}",
                                 "amount": "{{step_1['amount']}}",
@@ -638,66 +588,34 @@
                                 "status": "active",
                                 "payment_status": "pending"
                               },
-                              "return_row": true
+                              "as_string": false,
+                              "first_row_headers": true,
+                              "includeTeamDrives": false
                             },
-                            "pieceName": "@puchoaistudio/tool-supabase",
-                            "actionName": "create_row",
-                            "pieceVersion": "^2.0.1",
+                            "pieceName": "@puchoaistudio/tool-google-sheets",
+                            "actionName": "insert_row",
+                            "pieceVersion": "^2.0.9",
                             "propertySettings": {
                               "auth": {
                                 "type": "MANUAL"
                               },
-                              "row_data": {
-                                "type": "MANUAL",
-                                "schema": {
-                                  "student_id": {
-                                    "type": "SHORT_TEXT",
-                                    "required": false,
-                                    "displayName": "student_id",
-                                    "defaultValue": ""
-                                  },
-                                  "plan_type": {
-                                    "type": "SHORT_TEXT",
-                                    "required": false,
-                                    "displayName": "plan_type",
-                                    "defaultValue": ""
-                                  },
-                                  "amount": {
-                                    "type": "SHORT_TEXT",
-                                    "required": false,
-                                    "displayName": "amount",
-                                    "defaultValue": ""
-                                  },
-                                  "start_date": {
-                                    "type": "SHORT_TEXT",
-                                    "required": false,
-                                    "displayName": "start_date",
-                                    "defaultValue": ""
-                                  },
-                                  "expiry_date": {
-                                    "type": "SHORT_TEXT",
-                                    "required": false,
-                                    "displayName": "expiry_date",
-                                    "defaultValue": ""
-                                  },
-                                  "status": {
-                                    "type": "SHORT_TEXT",
-                                    "required": false,
-                                    "displayName": "status",
-                                    "defaultValue": ""
-                                  },
-                                  "payment_status": {
-                                    "type": "SHORT_TEXT",
-                                    "required": false,
-                                    "displayName": "payment_status",
-                                    "defaultValue": ""
-                                  }
-                                }
-                              },
-                              "return_row": {
+                              "spreadsheetId": {
                                 "type": "MANUAL"
                               },
-                              "table_name": {
+                              "sheetId": {
+                                "type": "MANUAL"
+                              },
+                              "values": {
+                                "type": "MANUAL",
+                                "schema": {}
+                              },
+                              "as_string": {
+                                "type": "MANUAL"
+                              },
+                              "first_row_headers": {
+                                "type": "MANUAL"
+                              },
+                              "includeTeamDrives": {
                                 "type": "MANUAL"
                               }
                             },
@@ -794,8 +712,9 @@
                               "settings": {
                                 "input": {
                                   "auth": "",
-                                  "table_name": "communications_log",
-                                  "row_data": {
+                                  "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
+                                  "sheetId": 0,
+                                  "values": {
                                     "student_id": "{{step_2['id']}}",
                                     "parent_id": "{{step_3['id']}}",
                                     "type": "welcome",
@@ -803,60 +722,34 @@
                                     "status": "sent",
                                     "date": "{{step_1['start_date']}}"
                                   },
-                                  "return_row": true
+                                  "as_string": false,
+                                  "first_row_headers": true,
+                                  "includeTeamDrives": false
                                 },
-                                "pieceName": "@puchoaistudio/tool-supabase",
-                                "actionName": "create_row",
-                                "pieceVersion": "^2.0.1",
+                                "pieceName": "@puchoaistudio/tool-google-sheets",
+                                "actionName": "insert_row",
+                                "pieceVersion": "^2.0.9",
                                 "propertySettings": {
                                   "auth": {
                                     "type": "MANUAL"
                                   },
-                                  "row_data": {
-                                    "type": "MANUAL",
-                                    "schema": {
-                                      "student_id": {
-                                        "type": "SHORT_TEXT",
-                                        "required": false,
-                                        "displayName": "student_id",
-                                        "defaultValue": ""
-                                      },
-                                      "parent_id": {
-                                        "type": "SHORT_TEXT",
-                                        "required": false,
-                                        "displayName": "parent_id",
-                                        "defaultValue": ""
-                                      },
-                                      "type": {
-                                        "type": "SHORT_TEXT",
-                                        "required": false,
-                                        "displayName": "type",
-                                        "defaultValue": ""
-                                      },
-                                      "channel": {
-                                        "type": "SHORT_TEXT",
-                                        "required": false,
-                                        "displayName": "channel",
-                                        "defaultValue": ""
-                                      },
-                                      "status": {
-                                        "type": "SHORT_TEXT",
-                                        "required": false,
-                                        "displayName": "status",
-                                        "defaultValue": ""
-                                      },
-                                      "date": {
-                                        "type": "SHORT_TEXT",
-                                        "required": false,
-                                        "displayName": "date",
-                                        "defaultValue": ""
-                                      }
-                                    }
-                                  },
-                                  "return_row": {
+                                  "spreadsheetId": {
                                     "type": "MANUAL"
                                   },
-                                  "table_name": {
+                                  "sheetId": {
+                                    "type": "MANUAL"
+                                  },
+                                  "values": {
+                                    "type": "MANUAL",
+                                    "schema": {}
+                                  },
+                                  "as_string": {
+                                    "type": "MANUAL"
+                                  },
+                                  "first_row_headers": {
+                                    "type": "MANUAL"
+                                  },
+                                  "includeTeamDrives": {
                                     "type": "MANUAL"
                                   }
                                 },
@@ -951,8 +844,9 @@
                     "settings": {
                       "input": {
                         "auth": "",
-                        "table_name": "students",
-                        "row_data": {
+                        "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
+                        "sheetId": 74175770,
+                        "values": {
                           "name": "{{step_1['student_name']}}",
                           "age": "{{step_1['student_age']}}",
                           "level": "{{step_1['student_level']}}",
@@ -962,72 +856,34 @@
                           "status": "active",
                           "join_date": "{{step_1['start_date']}}"
                         },
-                        "return_row": true
+                        "as_string": false,
+                        "first_row_headers": true,
+                        "includeTeamDrives": false
                       },
-                      "pieceName": "@puchoaistudio/tool-supabase",
-                      "actionName": "create_row",
-                      "pieceVersion": "^2.0.1",
+                      "pieceName": "@puchoaistudio/tool-google-sheets",
+                      "actionName": "insert_row",
+                      "pieceVersion": "^2.0.9",
                       "propertySettings": {
                         "auth": {
                           "type": "MANUAL"
                         },
-                        "row_data": {
-                          "type": "MANUAL",
-                          "schema": {
-                            "name": {
-                              "type": "SHORT_TEXT",
-                              "required": false,
-                              "displayName": "name",
-                              "defaultValue": ""
-                            },
-                            "age": {
-                              "type": "SHORT_TEXT",
-                              "required": false,
-                              "displayName": "age",
-                              "defaultValue": ""
-                            },
-                            "level": {
-                              "type": "SHORT_TEXT",
-                              "required": false,
-                              "displayName": "level",
-                              "defaultValue": ""
-                            },
-                            "batch_id": {
-                              "type": "SHORT_TEXT",
-                              "required": false,
-                              "displayName": "batch_id",
-                              "defaultValue": ""
-                            },
-                            "coach_id": {
-                              "type": "SHORT_TEXT",
-                              "required": false,
-                              "displayName": "coach_id",
-                              "defaultValue": ""
-                            },
-                            "entity": {
-                              "type": "SHORT_TEXT",
-                              "required": false,
-                              "displayName": "entity",
-                              "defaultValue": ""
-                            },
-                            "status": {
-                              "type": "SHORT_TEXT",
-                              "required": false,
-                              "displayName": "status",
-                              "defaultValue": ""
-                            },
-                            "join_date": {
-                              "type": "SHORT_TEXT",
-                              "required": false,
-                              "displayName": "join_date",
-                              "defaultValue": ""
-                            }
-                          }
-                        },
-                        "return_row": {
+                        "spreadsheetId": {
                           "type": "MANUAL"
                         },
-                        "table_name": {
+                        "sheetId": {
+                          "type": "MANUAL"
+                        },
+                        "values": {
+                          "type": "MANUAL",
+                          "schema": {}
+                        },
+                        "as_string": {
+                          "type": "MANUAL"
+                        },
+                        "first_row_headers": {
+                          "type": "MANUAL"
+                        },
+                        "includeTeamDrives": {
                           "type": "MANUAL"
                         }
                       },
@@ -1050,8 +906,9 @@
                       "settings": {
                         "input": {
                           "auth": "",
-                          "table_name": "packages",
-                          "row_data": {
+                          "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
+                          "sheetId": 1260552768,
+                          "values": {
                             "student_id": "{{step_2np[\"id\"]}}",
                             "plan_type": "{{step_1['plan_type']}}",
                             "amount": "{{step_1['amount']}}",
@@ -1060,66 +917,34 @@
                             "status": "active",
                             "payment_status": "pending"
                           },
-                          "return_row": true
+                          "as_string": false,
+                          "first_row_headers": true,
+                          "includeTeamDrives": false
                         },
-                        "pieceName": "@puchoaistudio/tool-supabase",
-                        "actionName": "create_row",
-                        "pieceVersion": "^2.0.1",
+                        "pieceName": "@puchoaistudio/tool-google-sheets",
+                        "actionName": "insert_row",
+                        "pieceVersion": "^2.0.9",
                         "propertySettings": {
                           "auth": {
                             "type": "MANUAL"
                           },
-                          "row_data": {
-                            "type": "MANUAL",
-                            "schema": {
-                              "student_id": {
-                                "type": "SHORT_TEXT",
-                                "required": false,
-                                "displayName": "student_id",
-                                "defaultValue": ""
-                              },
-                              "plan_type": {
-                                "type": "SHORT_TEXT",
-                                "required": false,
-                                "displayName": "plan_type",
-                                "defaultValue": ""
-                              },
-                              "amount": {
-                                "type": "SHORT_TEXT",
-                                "required": false,
-                                "displayName": "amount",
-                                "defaultValue": ""
-                              },
-                              "start_date": {
-                                "type": "SHORT_TEXT",
-                                "required": false,
-                                "displayName": "start_date",
-                                "defaultValue": ""
-                              },
-                              "expiry_date": {
-                                "type": "SHORT_TEXT",
-                                "required": false,
-                                "displayName": "expiry_date",
-                                "defaultValue": ""
-                              },
-                              "status": {
-                                "type": "SHORT_TEXT",
-                                "required": false,
-                                "displayName": "status",
-                                "defaultValue": ""
-                              },
-                              "payment_status": {
-                                "type": "SHORT_TEXT",
-                                "required": false,
-                                "displayName": "payment_status",
-                                "defaultValue": ""
-                              }
-                            }
-                          },
-                          "return_row": {
+                          "spreadsheetId": {
                             "type": "MANUAL"
                           },
-                          "table_name": {
+                          "sheetId": {
+                            "type": "MANUAL"
+                          },
+                          "values": {
+                            "type": "MANUAL",
+                            "schema": {}
+                          },
+                          "as_string": {
+                            "type": "MANUAL"
+                          },
+                          "first_row_headers": {
+                            "type": "MANUAL"
+                          },
+                          "includeTeamDrives": {
                             "type": "MANUAL"
                           }
                         },
@@ -1142,62 +967,43 @@
                         "settings": {
                           "input": {
                             "auth": "",
-                            "table_name": "communications_log",
-                            "row_data": {
+                            "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
+                            "sheetId": 0,
+                            "values": {
                               "student_id": "{{step_2np[\"id\"]}}",
                               "type": "welcome",
                               "channel": "email",
                               "status": "sent",
                               "date": "{{step_1[\"start_date\"]}}"
                             },
-                            "return_row": false
+                            "as_string": false,
+                            "first_row_headers": true,
+                            "includeTeamDrives": false
                           },
-                          "pieceName": "@puchoaistudio/tool-supabase",
-                          "actionName": "create_row",
-                          "pieceVersion": "^2.0.1",
+                          "pieceName": "@puchoaistudio/tool-google-sheets",
+                          "actionName": "insert_row",
+                          "pieceVersion": "^2.0.9",
                           "propertySettings": {
                             "auth": {
                               "type": "MANUAL"
                             },
-                            "row_data": {
-                              "type": "MANUAL",
-                              "schema": {
-                                "student_id": {
-                                  "type": "SHORT_TEXT",
-                                  "required": false,
-                                  "displayName": "student_id",
-                                  "defaultValue": ""
-                                },
-                                "type": {
-                                  "type": "SHORT_TEXT",
-                                  "required": false,
-                                  "displayName": "type",
-                                  "defaultValue": ""
-                                },
-                                "channel": {
-                                  "type": "SHORT_TEXT",
-                                  "required": false,
-                                  "displayName": "channel",
-                                  "defaultValue": ""
-                                },
-                                "status": {
-                                  "type": "SHORT_TEXT",
-                                  "required": false,
-                                  "displayName": "status",
-                                  "defaultValue": ""
-                                },
-                                "date": {
-                                  "type": "SHORT_TEXT",
-                                  "required": false,
-                                  "displayName": "date",
-                                  "defaultValue": ""
-                                }
-                              }
-                            },
-                            "return_row": {
+                            "spreadsheetId": {
                               "type": "MANUAL"
                             },
-                            "table_name": {
+                            "sheetId": {
+                              "type": "MANUAL"
+                            },
+                            "values": {
+                              "type": "MANUAL",
+                              "schema": {}
+                            },
+                            "as_string": {
+                              "type": "MANUAL"
+                            },
+                            "first_row_headers": {
+                              "type": "MANUAL"
+                            },
+                            "includeTeamDrives": {
                               "type": "MANUAL"
                             }
                           },

@@ -78,8 +78,8 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={Users} label="Active Students" value={stats.activeStudents} />
         <StatCard icon={LayoutGrid} label="Active Batches" value={stats.activeBatches} />
-        <StatCard icon={Calendar} label="Today" value={`${stats.todayAttendance}/${stats.totalAttendanceToday}`} sublabel={`${stats.unmarkedToday} unmarked`} />
-        <StatCard icon={Clock} label="Coach Check-in" value={`${stats.checkedInToday}/${stats.coaches}`} sublabel={`${stats.notCheckedIn} not checked in`} color={stats.notCheckedIn > 0 ? 'warn' : 'ok'} />
+        <StatCard icon={Calendar} label="Today" value={`${stats.todayAttendance}/${stats.totalAttendanceToday}`} />
+        <StatCard icon={Clock} label="Coach Check-in" value={`${stats.checkedInToday}/${stats.coaches}`} color={stats.notCheckedIn > 0 ? 'warn' : 'ok'} />
       </div>
 
       {conflicts.length > 0 && (

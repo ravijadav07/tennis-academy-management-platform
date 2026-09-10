@@ -123,7 +123,7 @@ export default function CoachManagement() {
 
   const openEdit = (c) => {
     setEditId(c.id);
-    setForm({ name: c.name, phone: c.phone || '', designation: c.designation || '', dutyType: c.dutyType || 'FULL_TIME', baseSalary: String(c.baseSalary || 0), rate1on1PerHour: String(c.rate1on1PerHour || 0), rateOvertimePerHour: String(c.rateOvertimePerHour || 0), paidHolidaysPerMonth: String(c.paidHolidaysPerMonth || 0) });
+    setForm({ name: c.name || c.fullName || '', phone: c.phone || '', designation: c.designation || c.specialization || '', dutyType: c.dutyType || 'FULL_TIME', baseSalary: String(c.baseSalary || 0), rate1on1PerHour: String(c.rate1on1PerHour || 0), rateOvertimePerHour: String(c.rateOvertimePerHour || 0), paidHolidaysPerMonth: String(c.paidHolidaysPerMonth || 0) });
     setShowEdit(true);
   };
 
@@ -137,32 +137,45 @@ export default function CoachManagement() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-line shadow-xs">
         <div>
-          <h3 className="text-sm font-semibold text-ink">Coach Management</h3>
+          <h3 className="text-base font-bold text-ink">Coach Management</h3>
           <p className="text-xs text-ink-muted mt-0.5">Add, edit, and manage coach profiles. Coaches appear in the Batch editor coach picker.</p>
         </div>
-        <Button size="sm" icon={Plus} onClick={() => { setForm({ name: '', phone: '', designation: '', dutyType: 'FULL_TIME', baseSalary: '', rate1on1PerHour: '', rateOvertimePerHour: '', paidHolidaysPerMonth: '1' }); setShowAdd(true); }}>Add Coach</Button>
+        <Button size="md" icon={Plus} className="shrink-0 self-start sm:self-auto" onClick={() => { setForm({ name: '', phone: '', designation: '', dutyType: 'FULL_TIME', baseSalary: '', rate1on1PerHour: '', rateOvertimePerHour: '', paidHolidaysPerMonth: '1' }); setShowAdd(true); }}>
+          Add Coach
+        </Button>
       </div>
 
-      <Card>
-        <div className="space-y-1">
+      <Card className="overflow-hidden">
+        <div className="space-y-2">
           {coaches.length === 0 ? (
-            <p className="text-xs text-ink-faint py-4 text-center">No coaches configured.</p>
+            <p className="text-xs text-ink-faint py-6 text-center">No coaches configured.</p>
           ) : (
-            coaches.map((c) => (
-              <div key={c.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-canvas-soft text-xs">
-                <div className="w-8 h-8 rounded-full bg-brand-50 flex items-center justify-center text-brand-600 text-xs font-bold flex-shrink-0">{c.name.charAt(0)}</div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-ink truncate">{c.name}</p>
-                  <p className="text-ink-faint truncate">{c.designation || ''} · {c.dutyType?.replace('_', ' ') || ''}</p>
+            coaches.map((c) => {
+              const coachName = c.name || c.fullName || 'Coach';
+              return (
+                <div key={c.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-canvas-soft text-xs transition-colors hover:bg-canvas-soft/80">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="w-9 h-9 rounded-full bg-brand-50 flex items-center justify-center text-brand-600 text-xs font-bold shrink-0">
+                      {(coachName || 'C').charAt(0)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-ink truncate text-sm">{coachName}</p>
+                      <p className="text-ink-faint truncate text-xs">{c.designation || c.specialization || 'Coach'} · {String(c.dutyType || '').replace('_', ' ')}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 sm:gap-3 flex-wrap shrink-0 justify-between sm:justify-end">
+                    <span className="font-semibold text-ink">₹{(c.baseSalary || 0).toLocaleString('en-IN')}<span className="text-[10px] text-ink-faint font-normal">/mo</span></span>
+                    <StatusPill status={c.status === 'ACTIVE' || c.status === 'active' ? 'active' : 'inactive'} />
+                    <div className="flex items-center gap-1">
+                      <Button size="sm" variant="ghost" icon={Pencil} onClick={() => openEdit(c)}>Edit</Button>
+                      <Button size="sm" variant="ghost" icon={Archive} onClick={() => { setArchiveId(c.id); setArchiveReason(''); setShowArchive(true); }}>Archive</Button>
+                    </div>
+                  </div>
                 </div>
-                <span className="text-ink-muted">₹{(c.baseSalary || 0).toLocaleString('en-IN')}</span>
-                <StatusPill status={c.status === 'ACTIVE' || c.status === 'active' ? 'active' : 'inactive'} />
-                <Button size="sm" variant="ghost" icon={Pencil} onClick={() => openEdit(c)}>Edit</Button>
-                <Button size="sm" variant="ghost" icon={Archive} onClick={() => { setArchiveId(c.id); setArchiveReason(''); setShowArchive(true); }}>Archive</Button>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </Card>
@@ -170,14 +183,19 @@ export default function CoachManagement() {
       {inactiveCoaches.length > 0 && (
         <Card>
           <h3 className="text-xs font-semibold text-ink-muted mb-2">Archived Coaches</h3>
-          <div className="space-y-1">
-            {inactiveCoaches.map((c) => (
-              <div key={c.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-canvas-soft/50 text-xs opacity-60">
-                <span className="font-semibold text-ink flex-1">{c.name}</span>
-                <span className="text-ink-faint">{c.designation}</span>
-                <Button size="sm" variant="ghost" icon={RotateCcw} onClick={() => handleRestore(c)} className="!h-7 !px-2 !text-[10px]">Restore</Button>
-              </div>
-            ))}
+          <div className="space-y-2">
+            {inactiveCoaches.map((c) => {
+              const coachName = c.name || c.fullName || 'Coach';
+              return (
+                <div key={c.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-lg bg-canvas-soft/50 text-xs opacity-75">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className="font-semibold text-ink truncate">{coachName}</span>
+                    <span className="text-ink-faint truncate">({c.designation || c.specialization || 'Coach'})</span>
+                  </div>
+                  <Button size="sm" variant="ghost" icon={RotateCcw} onClick={() => handleRestore(c)} className="!h-7 !px-2.5 !text-[11px] self-end sm:self-auto">Restore</Button>
+                </div>
+              );
+            })}
           </div>
         </Card>
       )}

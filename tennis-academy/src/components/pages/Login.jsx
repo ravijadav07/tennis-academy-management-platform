@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import Input from '../ui/Input';
@@ -51,12 +51,31 @@ const Login = () => {
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
     const allUsers = [...seedUsers.admins, ...seedUsers.coaches];
 
-    // Load seed users on mount
+    // Load real system users & coaches on mount
     useEffect(() => {
-        import('../../mocks/seedData').then(({ default: SEED }) => {
-            setSeedUsers({
-                admins: SEED.users.filter(u => u.role === 'ADMIN' || u.role === 'OPS_HEAD'),
-                coaches: SEED.users.filter(u => u.role === 'COACH'),
+        import('../../utils/googleSheets').then(({ fetchTableData }) => {
+            fetchTableData('coaches').then((coaches) => {
+                const coachUsers = (coaches || []).map((c) => ({
+                    id: c.id,
+                    name: c.name || c.fullName || 'Coach',
+                    role: 'COACH',
+                    linkedCoachId: c.id,
+                }));
+                setSeedUsers({
+                    admins: [
+                        { id: 'user_admin', name: 'Arnav Jain', role: 'ADMIN' },
+                        { id: 'user_ops', name: 'Ops Head', role: 'OPS_HEAD' },
+                    ],
+                    coaches: coachUsers,
+                });
+            }).catch(() => {
+                setSeedUsers({
+                    admins: [
+                        { id: 'user_admin', name: 'Arnav Jain', role: 'ADMIN' },
+                        { id: 'user_ops', name: 'Ops Head', role: 'OPS_HEAD' },
+                    ],
+                    coaches: [],
+                });
             });
         });
     }, []);

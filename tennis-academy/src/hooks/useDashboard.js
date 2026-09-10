@@ -61,26 +61,8 @@ export function useDashboard() {
         schedule: schedList,
       });
     } catch (err) {
-      console.warn('[useDashboard] Supabase network/QUIC issue, using localDb fallback:', err?.message || err);
-      try {
-        const local = db.readAll();
-        const schedList = local.schedule || [];
-        const privates = local.privateSessions || schedList.filter((s) => s.sessionType === 'private' || s.sessionType === '1-on-1' || s.studentName);
-        setData({
-          batches: local.batches || [],
-          courts: local.courts || [],
-          coaches: local.coaches || [],
-          enrollments: local.enrollments || [],
-          students: local.students || [],
-          attendance: local.attendance || [],
-          coachAttendance: local.coachAttendance || [],
-          privateSessions: privates,
-          schedule: schedList,
-        });
-      } catch (fallbackErr) {
-        console.error('[useDashboard] Local fallback error:', fallbackErr);
-        setError(err);
-      }
+      console.error('[useDashboard] Data fetch error:', err);
+      setError(err);
     } finally {
       setLoading(false);
     }

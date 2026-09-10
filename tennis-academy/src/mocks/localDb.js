@@ -34,16 +34,9 @@ function readAll() {
       return data;
     }
   } catch (e) {
-    console.warn('[ata] local store unreadable, reseeding', e);
+    console.warn('[ata] local store unreadable', e);
   }
-  const fresh = clone(SEED);
-  if (fresh.students) {
-    fresh.students.forEach((st) => {
-      if (!st.guardianEmail && st.name) {
-        st.guardianEmail = `parent.${st.name.toLowerCase().replace(/[^a-z0-9]/g, '.')}@gmail.com`;
-      }
-    });
-  }
+  const fresh = { academies: [], attendance: [], batches: [], coach_leaves: [], coaches: [], courts: [], enrollments: [], one_on_one_sessions: [], packages: [], parents: [], payments: [], progress_reports: [], schedule: [], students: [] };
   writeAll(fresh);
   return fresh;
 }

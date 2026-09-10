@@ -24,11 +24,22 @@
           "authFields": {}
         },
         "propertySettings": {
-          "authType": { "type": "MANUAL" },
-          "authFields": { "type": "MANUAL", "schema": {} },
-          "liveMarkdown": { "type": "MANUAL" },
-          "syncMarkdown": { "type": "MANUAL" },
-          "testMarkdown": { "type": "MANUAL" }
+          "authType": {
+            "type": "MANUAL"
+          },
+          "authFields": {
+            "type": "MANUAL",
+            "schema": {}
+          },
+          "liveMarkdown": {
+            "type": "MANUAL"
+          },
+          "syncMarkdown": {
+            "type": "MANUAL"
+          },
+          "testMarkdown": {
+            "type": "MANUAL"
+          }
         },
         "sampleData": {}
       },
@@ -47,12 +58,18 @@
             "packageJson": "{}"
           },
           "propertySettings": {
-            "payload": { "type": "MANUAL" }
+            "payload": {
+              "type": "MANUAL"
+            }
           },
           "sampleData": {},
           "errorHandlingOptions": {
-            "retryOnFailure": { "value": false },
-            "continueOnFailure": { "value": false }
+            "retryOnFailure": {
+              "value": false
+            },
+            "continueOnFailure": {
+              "value": false
+            }
           }
         },
         "nextAction": {
@@ -66,16 +83,30 @@
               {
                 "branchName": "Store Data",
                 "branchType": "CONDITION",
-                "conditions": [[
-                  { "operator": "TEXT_EXACTLY_MATCHES", "firstValue": "{{step_1['action']}}", "secondValue": "put", "caseSensitive": false }
-                ]]
+                "conditions": [
+                  [
+                    {
+                      "operator": "TEXT_EXACTLY_MATCHES",
+                      "firstValue": "{{step_1['action']}}",
+                      "secondValue": "put",
+                      "caseSensitive": false
+                    }
+                  ]
+                ]
               },
               {
                 "branchName": "Retrieve Data",
                 "branchType": "CONDITION",
-                "conditions": [[
-                  { "operator": "TEXT_EXACTLY_MATCHES", "firstValue": "{{step_1['action']}}", "secondValue": "get", "caseSensitive": false }
-                ]]
+                "conditions": [
+                  [
+                    {
+                      "operator": "TEXT_EXACTLY_MATCHES",
+                      "firstValue": "{{step_1['action']}}",
+                      "secondValue": "get",
+                      "caseSensitive": false
+                    }
+                  ]
+                ]
               },
               {
                 "branchName": "Otherwise",
@@ -102,15 +133,27 @@
                 "actionName": "put",
                 "pieceVersion": "^2.0.0",
                 "propertySettings": {
-                  "auth": { "type": "MANUAL" },
-                  "key": { "type": "MANUAL" },
-                  "value": { "type": "MANUAL" },
-                  "store_scope": { "type": "MANUAL" }
+                  "auth": {
+                    "type": "MANUAL"
+                  },
+                  "key": {
+                    "type": "MANUAL"
+                  },
+                  "value": {
+                    "type": "MANUAL"
+                  },
+                  "store_scope": {
+                    "type": "MANUAL"
+                  }
                 },
                 "sampleData": {},
                 "errorHandlingOptions": {
-                  "retryOnFailure": { "value": false },
-                  "continueOnFailure": { "value": false }
+                  "retryOnFailure": {
+                    "value": false
+                  },
+                  "continueOnFailure": {
+                    "value": false
+                  }
                 }
               },
               "nextAction": {
@@ -141,18 +184,39 @@
                     "fields": {
                       "type": "MANUAL",
                       "schema": {
-                        "body": { "type": "JSON", "required": true, "displayName": "JSON Body" },
-                        "status": { "type": "NUMBER", "required": false, "displayName": "Status", "defaultValue": 200 },
-                        "headers": { "type": "OBJECT", "required": false, "displayName": "Headers" }
+                        "body": {
+                          "type": "JSON",
+                          "required": true,
+                          "displayName": "JSON Body"
+                        },
+                        "status": {
+                          "type": "NUMBER",
+                          "required": false,
+                          "displayName": "Status",
+                          "defaultValue": 200
+                        },
+                        "headers": {
+                          "type": "OBJECT",
+                          "required": false,
+                          "displayName": "Headers"
+                        }
                       }
                     },
-                    "respond": { "type": "MANUAL" },
-                    "responseType": { "type": "MANUAL" }
+                    "respond": {
+                      "type": "MANUAL"
+                    },
+                    "responseType": {
+                      "type": "MANUAL"
+                    }
                   },
                   "sampleData": {},
                   "errorHandlingOptions": {
-                    "retryOnFailure": { "value": false },
-                    "continueOnFailure": { "value": false }
+                    "retryOnFailure": {
+                      "value": false
+                    },
+                    "continueOnFailure": {
+                      "value": false
+                    }
                   }
                 }
               }
@@ -173,15 +237,27 @@
                 "actionName": "get",
                 "pieceVersion": "^2.0.0",
                 "propertySettings": {
-                  "auth": { "type": "MANUAL" },
-                  "key": { "type": "MANUAL" },
-                  "defaultValue": { "type": "MANUAL" },
-                  "store_scope": { "type": "MANUAL" }
+                  "auth": {
+                    "type": "MANUAL"
+                  },
+                  "key": {
+                    "type": "MANUAL"
+                  },
+                  "defaultValue": {
+                    "type": "MANUAL"
+                  },
+                  "store_scope": {
+                    "type": "MANUAL"
+                  }
                 },
                 "sampleData": {},
                 "errorHandlingOptions": {
-                  "retryOnFailure": { "value": false },
-                  "continueOnFailure": { "value": false }
+                  "retryOnFailure": {
+                    "value": false
+                  },
+                  "continueOnFailure": {
+                    "value": false
+                  }
                 }
               },
               "nextAction": {
@@ -212,18 +288,39 @@
                     "fields": {
                       "type": "MANUAL",
                       "schema": {
-                        "body": { "type": "JSON", "required": true, "displayName": "JSON Body" },
-                        "status": { "type": "NUMBER", "required": false, "displayName": "Status", "defaultValue": 200 },
-                        "headers": { "type": "OBJECT", "required": false, "displayName": "Headers" }
+                        "body": {
+                          "type": "JSON",
+                          "required": true,
+                          "displayName": "JSON Body"
+                        },
+                        "status": {
+                          "type": "NUMBER",
+                          "required": false,
+                          "displayName": "Status",
+                          "defaultValue": 200
+                        },
+                        "headers": {
+                          "type": "OBJECT",
+                          "required": false,
+                          "displayName": "Headers"
+                        }
                       }
                     },
-                    "respond": { "type": "MANUAL" },
-                    "responseType": { "type": "MANUAL" }
+                    "respond": {
+                      "type": "MANUAL"
+                    },
+                    "responseType": {
+                      "type": "MANUAL"
+                    }
                   },
                   "sampleData": {},
                   "errorHandlingOptions": {
-                    "retryOnFailure": { "value": false },
-                    "continueOnFailure": { "value": false }
+                    "retryOnFailure": {
+                      "value": false
+                    },
+                    "continueOnFailure": {
+                      "value": false
+                    }
                   }
                 }
               }
@@ -255,18 +352,39 @@
                   "fields": {
                     "type": "MANUAL",
                     "schema": {
-                      "body": { "type": "JSON", "required": true, "displayName": "JSON Body" },
-                      "status": { "type": "NUMBER", "required": false, "displayName": "Status", "defaultValue": 200 },
-                      "headers": { "type": "OBJECT", "required": false, "displayName": "Headers" }
+                      "body": {
+                        "type": "JSON",
+                        "required": true,
+                        "displayName": "JSON Body"
+                      },
+                      "status": {
+                        "type": "NUMBER",
+                        "required": false,
+                        "displayName": "Status",
+                        "defaultValue": 200
+                      },
+                      "headers": {
+                        "type": "OBJECT",
+                        "required": false,
+                        "displayName": "Headers"
+                      }
                     }
                   },
-                  "respond": { "type": "MANUAL" },
-                  "responseType": { "type": "MANUAL" }
+                  "respond": {
+                    "type": "MANUAL"
+                  },
+                  "responseType": {
+                    "type": "MANUAL"
+                  }
                 },
                 "sampleData": {},
                 "errorHandlingOptions": {
-                  "retryOnFailure": { "value": false },
-                  "continueOnFailure": { "value": false }
+                  "retryOnFailure": {
+                    "value": false
+                  },
+                  "continueOnFailure": {
+                    "value": false
+                  }
                 }
               }
             }

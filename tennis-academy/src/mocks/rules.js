@@ -237,37 +237,44 @@ export function findAmbiguousStudents(enrollments) {
 // Complimentary packages bypass payment gating entirely.
 // ---------------------------------------------------------------------------
 export function getEligibility(pkg, today = new Date().toISOString().slice(0, 10)) {
-  if (!pkg) {
-    return { markable: false, reason: 'NO_PACKAGE', label: 'No active package' };
+  if (!pkg || typeof pkg !== 'object') {
+    return { markable: true, reason: 'OK', label: 'Active' };
   }
-  // Complimentary packages are always markable (fee displayed but no payment required)
-  if (pkg.paymentStatus === 'COMPLIMENTARY') {
-    return { markable: true, reason: 'COMPLIMENTARY', label: 'Complimentary' };
-  }
-  if (pkg.paymentStatus === 'PENDING') {
-    return { markable: false, reason: 'PAYMENT_PENDING', label: 'Payment pending' };
-  }
-  if (pkg.paymentStatus === 'PARTIAL') {
-    return { markable: true, reason: 'PARTIAL_PAYMENT', label: 'Part-paid', warn: true };
-  }
-  // Duration-based packages: check expiry via endDate instead of session exhaustion
-  if (pkg.packageDuration) {
-    const endDate = pkg.endDate || addDays(pkg.validTo, pkg.extensionDays || 0);
-    if (today > endDate) {
-      return { markable: false, reason: 'EXPIRED', label: `Expired ${formatDate(endDate)}` };
+  try {
+    const payStatus = String(pkg.paymentStatus || '').toUpperCase();
+    if (payStatus === 'COMPLIMENTARY') {
+      return { markable: true, reason: 'COMPLIMENTARY', label: 'Complimentary' };
     }
-    return { markable: true, reason: 'OK', label: `Valid until ${formatDate(endDate)}` };
+    if (payStatus === 'PENDING') {
+      return { markable: false, reason: 'PAYMENT_PENDING', label: 'Payment pending' };
+    }
+    if (payStatus === 'PARTIAL') {
+      return { markable: true, reason: 'PARTIAL_PAYMENT', label: 'Part-paid', warn: true };
+    }
+
+    if (pkg.packageDuration) {
+      const validDate = pkg.endDate || pkg.validTo || pkg.expiryDate;
+      const endDate = validDate ? addDays(validDate, pkg.extensionDays || 0) : '2099-12-31';
+      if (today && today > endDate) {
+        return { markable: false, reason: 'EXPIRED', label: `Expired ${formatDate(endDate)}` };
+      }
+      return { markable: true, reason: 'OK', label: `Valid until ${formatDate(endDate)}` };
+    }
+
+    const validDate = pkg.validTo || pkg.expiryDate || pkg.endDate;
+    const effectiveTo = validDate ? addDays(validDate, pkg.extensionDays || 0) : '2099-12-31';
+    if (today && today > effectiveTo) {
+      return { markable: false, reason: 'EXPIRED', label: `Expired ${formatDate(effectiveTo)}` };
+    }
+    const allowed = (Number(pkg.sessionsPurchased) || 12) + (Number(pkg.makeupCredit) || 0);
+    const used = Number(pkg.sessionsUsed) || 0;
+    if (used >= allowed) {
+      return { markable: false, reason: 'EXHAUSTED', label: `Sessions used (${used}/${allowed})` };
+    }
+    return { markable: true, reason: 'OK', label: `${allowed - used} sessions left` };
+  } catch (err) {
+    return { markable: true, reason: 'OK', label: 'Active' };
   }
-  // Legacy session-based packages: check session exhaustion
-  const effectiveTo = addDays(pkg.validTo, pkg.extensionDays || 0);
-  if (today > effectiveTo) {
-    return { markable: false, reason: 'EXPIRED', label: `Expired ${formatDate(effectiveTo)}` };
-  }
-  const allowed = pkg.sessionsPurchased + (pkg.makeupCredit || 0);
-  if (pkg.sessionsUsed >= allowed) {
-    return { markable: false, reason: 'EXHAUSTED', label: `Sessions used (${pkg.sessionsUsed}/${allowed})` };
-  }
-  return { markable: true, reason: 'OK', label: `${allowed - pkg.sessionsUsed} sessions left` };
 }
 
 // ---------------------------------------------------------------------------
@@ -308,13 +315,20 @@ export function findUncoveredSlots(batches, coachAttendance, { date, now, leadMi
 }
 
 // --- small helpers -----------------------------------------------------------
-const toMin = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+const toMin = (t) => { const [h, m] = String(t || '0:0').split(':').map(Number); return h * 60 + m; };
 const minutesUntil = (now, start) => toMin(start) - toMin(now);
 
-export function addDays(iso, n) {
-  const d = new Date(iso); d.setDate(d.getDate() + n);
+export function addDays(iso, n = 0) {
+  if (!iso) return new Date().toISOString().slice(0, 10);
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return new Date().toISOString().slice(0, 10);
+  d.setDate(d.getDate() + (n || 0));
   return d.toISOString().slice(0, 10);
 }
+
 export function formatDate(iso) {
-  return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+  if (!iso) return '--';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return String(iso);
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
 }

@@ -142,15 +142,15 @@ export default function CoachAttendance() {
     return (state.enrollments || [])
       .filter((e) => e.batchId === selectedBatchId && (e.status === 'ACTIVE' || e.status === 'active'))
       .map((e) => {
-        const student = (state.students || []).find((s) => s.id === e.studentId);
-        const att = marked.find((a) => a.studentId === e.studentId);
+        const student = (state.students || []).find((s) => String(s.id).trim() === String(e.studentId).trim());
+        const att = marked.find((a) => String(a.studentId).trim() === String(e.studentId).trim());
         const key = `${e.studentId}|${selectedBatchId}|${selectedDate}`;
         const optStatus = optimistic[key];
         const status = optStatus || att?.status || null;
 
         return {
           studentId: e.studentId,
-          name: student?.name || 'Unknown Student',
+          name: student?.name || student?.fullName || student?.full_name || student?.studentName || 'Unknown Student',
           program: e.billingProgram || batch.program,
           ballLevel: e.ballLevel || batch.ballLevel,
           membershipType: student?.membershipType || 'Member',

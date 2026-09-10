@@ -37,20 +37,8 @@ export function useAttendance(batchId, date) {
         packages: packagesRes.data || [],
       });
     } catch (err) {
-      console.warn('[useAttendance] Supabase network/QUIC issue, using localDb fallback:', err?.message || err);
-      try {
-        const local = db.readAll();
-        setData({
-          batches: local.batches || [],
-          attendance: local.attendance || [],
-          enrollments: local.enrollments || [],
-          students: local.students || [],
-          packages: local.packages || [],
-        });
-      } catch (fallbackErr) {
-        console.error('[useAttendance] Fallback error:', fallbackErr);
-        setError(err);
-      }
+      console.error('[useAttendance] Data fetch error:', err);
+      setError(err);
     } finally {
       setLoading(false);
     }

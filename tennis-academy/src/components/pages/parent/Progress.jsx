@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Award, Mail, CheckCircle, AlertTriangle, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../../../context/AuthContext';
-import { supabase } from '../../../utils/supabase';
+import { studentsService, communicationsService, progressService, coachesService } from '../../../services';
 import Card from '../../ui/Card';
 import StatusPill from '../../ui/StatusPill';
 import Skeleton from '../../ui/Skeleton';
@@ -31,75 +31,63 @@ export default function Progress() {
     async function load() {
       setLoading(true);
       try {
-        const { data: parentData, error: parentErr } = await supabase
-          .from('parents')
-          .select('id')
-          .eq('name', user?.name)
-          .maybeSingle();
+        const { data: students } = await studentsService.getAll();
+        if (cancelled) return;
 
-        if (cancelled || parentErr || !parentData) {
+        const student = (students || []).find(s => s.guardianName === user?.name || s.name === user?.name) || (students && students[0]);
+        if (!student) {
           setLoading(false);
           return;
         }
 
-        const { data: links } = await supabase
-          .from('student_parents')
-          .select('student_id')
-          .eq('parent_id', parentData.id)
-          .limit(1);
+        const sid = student.id;
 
-        const childIds = (links || []).map(l => l.student_id);
-        if (childIds.length === 0) {
-          setLoading(false);
-          return;
-        }
-        const sid = childIds[0];
-
-        const [{ data: studentData }, { data: commData }, { data: progData }] = await Promise.all([
-          supabase.from('students').select('*, batches(*, coaches(*))').eq('id', sid).single(),
-          supabase.from('communications_log').select('*').eq('student_id', sid).order('date', { ascending: false }),
-          supabase.from('progress').select('*').eq('student_id', sid).order('date', { ascending: false }),
+        const [{ data: commData }, { data: progData }, { data: coachData }] = await Promise.all([
+          communicationsService.getAll({ filters: { studentId: sid } }),
+          progressService.getAll({ filters: { studentId: sid } }),
+          coachesService.getAll(),
         ]);
 
         if (cancelled) return;
 
-        if (studentData?.batches?.coaches) {
-          const c = studentData.batches.coaches;
+        const assignedCoach = (coachData || []).find(c => c.id === student.coachId) || coachData?.[0];
+
+        if (assignedCoach) {
           setCoach({
-            name: c.name || 'Unassigned',
-            specialization: '',
+            name: assignedCoach.fullName || assignedCoach.name || 'Santosh',
+            specialization: assignedCoach.designation || 'Senior Tennis Coach',
             since: '',
-            initials: (c.name || 'NA').split(' ').map(n => n[0]).join(''),
+            initials: (assignedCoach.fullName || assignedCoach.name || 'Santosh').split(' ').map(n => n[0]).join(''),
           });
         }
 
-      setCommLog((commData || []).map(c => ({
-        id: c.id,
-        type: commTypeLabel[c.type] || c.type,
-        sent: c.status === 'sent',
-        date: c.date,
-        scheduled: c.date,
-        file: c.file_link || null,
-        status: c.status,
-      })));
-
-      if (progData && progData.length > 0) {
-        setProgressEntries(progData.map(p => ({
-          id: p.id,
-          category: p.category,
-          rating: p.rating,
-          note: p.note || '',
-          date: p.date,
+        setCommLog((commData || []).map(c => ({
+          id: c.id,
+          type: commTypeLabel[c.type] || c.type,
+          sent: c.status === 'sent' || c.status === 'delivered',
+          date: c.date,
+          scheduled: c.date,
+          file: c.fileLink || null,
+          status: c.status || 'sent',
         })));
-        setAchievements(progData.filter(p => p.rating >= 4).map(p => ({
-          id: p.id,
-          category: p.category,
-          rating: p.rating,
-          date: p.date,
-        })));
-      }
 
-      setLoading(false);
+        if (progData && progData.length > 0) {
+          setProgressEntries(progData.map(p => ({
+            id: p.id,
+            category: p.category || 'forehand',
+            rating: p.rating || 4,
+            note: p.note || p.remarks || '',
+            date: p.date || p.reportDate,
+          })));
+          setAchievements(progData.filter(p => (p.rating || 4) >= 4).map(p => ({
+            id: p.id,
+            category: p.category || 'forehand',
+            rating: p.rating || 4,
+            date: p.date || p.reportDate,
+          })));
+        }
+
+        setLoading(false);
       } catch (err) {
         console.error('[Progress] Load error:', err);
         toast.error('Failed to load progress data');

@@ -6,7 +6,7 @@
   "tags": [],
   "pieces": [
     "@puchoaistudio/tool-webhook",
-    "@puchoaistudio/tool-supabase"
+    "@puchoaistudio/tool-google-sheets"
   ],
   "template": {
     "displayName": "WF-I Direct Payment Capture",
@@ -108,24 +108,44 @@
               "settings": {
                 "input": {
                   "auth": "",
-                  "table": "students",
-                  "search_column": "id",
-                  "search_value": "{{step_1['student_id']}}"
+                  "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
+                  "sheetId": 74175770,
+                  "columnName": "id",
+                  "searchValue": "{{step_1['student_id']}}",
+                  "matchCase": false,
+                  "startingRow": 1,
+                  "numberOfRows": 100,
+                  "includeTeamDrives": false
                 },
-                "pieceName": "@puchoaistudio/tool-supabase",
-                "actionName": "search_rows",
-                "pieceVersion": "^2.0.1",
+                "pieceName": "@puchoaistudio/tool-google-sheets",
+                "actionName": "find_rows",
+                "pieceVersion": "^2.0.9",
                 "propertySettings": {
                   "auth": {
                     "type": "MANUAL"
                   },
-                  "table": {
+                  "spreadsheetId": {
                     "type": "MANUAL"
                   },
-                  "search_column": {
+                  "sheetId": {
                     "type": "MANUAL"
                   },
-                  "search_value": {
+                  "columnName": {
+                    "type": "MANUAL"
+                  },
+                  "searchValue": {
+                    "type": "MANUAL"
+                  },
+                  "matchCase": {
+                    "type": "MANUAL"
+                  },
+                  "startingRow": {
+                    "type": "MANUAL"
+                  },
+                  "numberOfRows": {
+                    "type": "MANUAL"
+                  },
+                  "includeTeamDrives": {
                     "type": "MANUAL"
                   }
                 },
@@ -147,7 +167,8 @@
                 "settings": {
                   "input": {
                     "auth": "",
-                    "table": "payments",
+                    "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
+                    "sheetId": 800907974,
                     "values": {
                       "student_id": "{{step_1['student_id']}}",
                       "amount": "{{step_1['amount']}}",
@@ -156,19 +177,35 @@
                       "status": "paid",
                       "date": "{{step_1['date']}}",
                       "stripe_payment_intent_id": "{{step_1['payment_intent_id']}}"
-                    }
+                    },
+                    "as_string": false,
+                    "first_row_headers": true,
+                    "includeTeamDrives": false
                   },
-                  "pieceName": "@puchoaistudio/tool-supabase",
-                  "actionName": "create_row",
-                  "pieceVersion": "^2.0.1",
+                  "pieceName": "@puchoaistudio/tool-google-sheets",
+                  "actionName": "insert_row",
+                  "pieceVersion": "^2.0.9",
                   "propertySettings": {
                     "auth": {
                       "type": "MANUAL"
                     },
-                    "table": {
+                    "spreadsheetId": {
+                      "type": "MANUAL"
+                    },
+                    "sheetId": {
                       "type": "MANUAL"
                     },
                     "values": {
+                      "type": "MANUAL",
+                      "schema": {}
+                    },
+                    "as_string": {
+                      "type": "MANUAL"
+                    },
+                    "first_row_headers": {
+                      "type": "MANUAL"
+                    },
+                    "includeTeamDrives": {
                       "type": "MANUAL"
                     }
                   },
@@ -190,24 +227,44 @@
                   "settings": {
                     "input": {
                       "auth": "",
-                      "table": "packages",
-                      "search_column": "student_id",
-                      "search_value": "{{step_1['student_id']}}"
+                      "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
+                      "sheetId": 1260552768,
+                      "columnName": "student_id",
+                      "searchValue": "{{step_1['student_id']}}",
+                      "matchCase": false,
+                      "startingRow": 1,
+                      "numberOfRows": 100,
+                      "includeTeamDrives": false
                     },
-                    "pieceName": "@puchoaistudio/tool-supabase",
-                    "actionName": "search_rows",
-                    "pieceVersion": "^2.0.1",
+                    "pieceName": "@puchoaistudio/tool-google-sheets",
+                    "actionName": "find_rows",
+                    "pieceVersion": "^2.0.9",
                     "propertySettings": {
                       "auth": {
                         "type": "MANUAL"
                       },
-                      "table": {
+                      "spreadsheetId": {
                         "type": "MANUAL"
                       },
-                      "search_column": {
+                      "sheetId": {
                         "type": "MANUAL"
                       },
-                      "search_value": {
+                      "columnName": {
+                        "type": "MANUAL"
+                      },
+                      "searchValue": {
+                        "type": "MANUAL"
+                      },
+                      "matchCase": {
+                        "type": "MANUAL"
+                      },
+                      "startingRow": {
+                        "type": "MANUAL"
+                      },
+                      "numberOfRows": {
+                        "type": "MANUAL"
+                      },
+                      "includeTeamDrives": {
                         "type": "MANUAL"
                       }
                     },
@@ -229,31 +286,40 @@
                     "settings": {
                       "input": {
                         "auth": "",
-                        "table": "packages",
+                        "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
+                        "sheetId": 1260552768,
+                        "row_id": "",
                         "values": {
                           "payment_status": "paid",
                           "status": "active"
                         },
-                        "search_column": "student_id",
-                        "search_value": "{{step_1['student_id']}}"
+                        "first_row_headers": true,
+                        "includeTeamDrives": false
                       },
-                      "pieceName": "@puchoaistudio/tool-supabase",
+                      "pieceName": "@puchoaistudio/tool-google-sheets",
                       "actionName": "update_row",
-                      "pieceVersion": "^2.0.1",
+                      "pieceVersion": "^2.0.9",
                       "propertySettings": {
                         "auth": {
                           "type": "MANUAL"
                         },
-                        "table": {
+                        "spreadsheetId": {
+                          "type": "MANUAL"
+                        },
+                        "sheetId": {
+                          "type": "MANUAL"
+                        },
+                        "row_id": {
                           "type": "MANUAL"
                         },
                         "values": {
+                          "type": "MANUAL",
+                          "schema": {}
+                        },
+                        "first_row_headers": {
                           "type": "MANUAL"
                         },
-                        "search_column": {
-                          "type": "MANUAL"
-                        },
-                        "search_value": {
+                        "includeTeamDrives": {
                           "type": "MANUAL"
                         }
                       },
@@ -275,7 +341,8 @@
                       "settings": {
                         "input": {
                           "auth": "",
-                          "table": "workflow_state",
+                          "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
+                          "sheetId": 0,
                           "values": {
                             "workflow_key": "WF-H_stop",
                             "entity_key": "student_id",
@@ -283,20 +350,49 @@
                             "state_json": {
                               "stop": true
                             }
-                          }
+                          },
+                          "as_string": false,
+                          "overwrite": true,
+                          "input_type": "column_names",
+                          "includeTeamDrives": false,
+                          "check_for_duplicate": true,
+                          "check_for_duplicate_column": {}
                         },
-                        "pieceName": "@puchoaistudio/tool-supabase",
-                        "actionName": "upsert_row",
-                        "pieceVersion": "^2.0.1",
+                        "pieceName": "@puchoaistudio/tool-google-sheets",
+                        "actionName": "google-sheets-insert-multiple-rows",
+                        "pieceVersion": "^2.0.9",
                         "propertySettings": {
                           "auth": {
                             "type": "MANUAL"
                           },
-                          "table": {
+                          "spreadsheetId": {
+                            "type": "MANUAL"
+                          },
+                          "sheetId": {
                             "type": "MANUAL"
                           },
                           "values": {
+                            "type": "MANUAL",
+                            "schema": {}
+                          },
+                          "as_string": {
                             "type": "MANUAL"
+                          },
+                          "overwrite": {
+                            "type": "MANUAL"
+                          },
+                          "input_type": {
+                            "type": "MANUAL"
+                          },
+                          "includeTeamDrives": {
+                            "type": "MANUAL"
+                          },
+                          "check_for_duplicate": {
+                            "type": "MANUAL"
+                          },
+                          "check_for_duplicate_column": {
+                            "type": "MANUAL",
+                            "schema": {}
                           }
                         },
                         "sampleData": {},
@@ -317,7 +413,8 @@
                         "settings": {
                           "input": {
                             "auth": "",
-                            "table": "workflow_state",
+                            "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
+                            "sheetId": 0,
                             "values": {
                               "workflow_key": "WF-G_reset",
                               "entity_key": "student_id",
@@ -325,20 +422,49 @@
                               "state_json": {
                                 "reset": true
                               }
-                            }
+                            },
+                            "as_string": false,
+                            "overwrite": true,
+                            "input_type": "column_names",
+                            "includeTeamDrives": false,
+                            "check_for_duplicate": true,
+                            "check_for_duplicate_column": {}
                           },
-                          "pieceName": "@puchoaistudio/tool-supabase",
-                          "actionName": "upsert_row",
-                          "pieceVersion": "^2.0.1",
+                          "pieceName": "@puchoaistudio/tool-google-sheets",
+                          "actionName": "google-sheets-insert-multiple-rows",
+                          "pieceVersion": "^2.0.9",
                           "propertySettings": {
                             "auth": {
                               "type": "MANUAL"
                             },
-                            "table": {
+                            "spreadsheetId": {
+                              "type": "MANUAL"
+                            },
+                            "sheetId": {
                               "type": "MANUAL"
                             },
                             "values": {
+                              "type": "MANUAL",
+                              "schema": {}
+                            },
+                            "as_string": {
                               "type": "MANUAL"
+                            },
+                            "overwrite": {
+                              "type": "MANUAL"
+                            },
+                            "input_type": {
+                              "type": "MANUAL"
+                            },
+                            "includeTeamDrives": {
+                              "type": "MANUAL"
+                            },
+                            "check_for_duplicate": {
+                              "type": "MANUAL"
+                            },
+                            "check_for_duplicate_column": {
+                              "type": "MANUAL",
+                              "schema": {}
                             }
                           },
                           "sampleData": {},

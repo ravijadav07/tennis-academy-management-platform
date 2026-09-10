@@ -42,6 +42,9 @@ export function toCamelKeys(obj) {
   for (const [key, value] of Object.entries(obj)) {
     result[toCamelCase(key)] = value;
   }
+  if (!result.name && (result.fullName || result.full_name || result.studentName || result.clientName)) {
+    result.name = result.fullName || result.full_name || result.studentName || result.clientName;
+  }
   return result;
 }
 

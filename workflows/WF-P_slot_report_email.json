@@ -2,11 +2,11 @@
   "created": 1756800000000,
   "updated": 1757000000000,
   "name": "WF-P Slot Report Email",
-  "description": "Queries Supabase for batches, enrollments, and attendance data to generate Slot Analysis report. Gated behind verification check \u2014 queries report_verifications table. Sends formatted report via Gmail with CSV content. Returns 403 if not verified.",
+  "description": "Queries Supabase for batches, enrollments, and attendance data to generate Slot Analysis report. Gated behind verification check — queries report_verifications table. Sends formatted report via Gmail with CSV content. Returns 403 if not verified.",
   "tags": [],
   "pieces": [
     "@puchoaistudio/tool-webhook",
-    "@puchoaistudio/tool-supabase",
+    "@puchoaistudio/tool-google-sheets",
     "@puchoaistudio/tool-gmail"
   ],
   "template": {
@@ -53,45 +53,44 @@
         "settings": {
           "input": {
             "auth": "",
-            "table_name": "report_verifications",
-            "page": 1,
-            "pageSize": 500,
-            "filters": [
-              {
-                "column": "month",
-                "operator": "eq",
-                "value": "{{trigger['body']['month']}}"
-              },
-              {
-                "column": "year",
-                "operator": "eq",
-                "value": "{{trigger['body']['year']}}"
-              }
-            ]
+            "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
+            "sheetId": 1052898027,
+            "columnName": "month",
+            "searchValue": "{{trigger['body']['month']}}",
+            "matchCase": false,
+            "startingRow": 1,
+            "numberOfRows": 500,
+            "includeTeamDrives": false
           },
-          "pieceName": "@puchoaistudio/tool-supabase",
-          "actionName": "search_rows",
-          "pieceVersion": "^2.0.1",
+          "pieceName": "@puchoaistudio/tool-google-sheets",
+          "actionName": "find_rows",
+          "pieceVersion": "^2.0.9",
           "propertySettings": {
             "auth": {
               "type": "MANUAL"
             },
-            "page": {
+            "spreadsheetId": {
               "type": "MANUAL"
             },
-            "columns": {
+            "sheetId": {
               "type": "MANUAL"
             },
-            "filters": {
+            "columnName": {
               "type": "MANUAL"
             },
-            "pageSize": {
+            "searchValue": {
               "type": "MANUAL"
             },
-            "table_name": {
+            "matchCase": {
               "type": "MANUAL"
             },
-            "countOption": {
+            "startingRow": {
+              "type": "MANUAL"
+            },
+            "numberOfRows": {
+              "type": "MANUAL"
+            },
+            "includeTeamDrives": {
               "type": "MANUAL"
             }
           },
@@ -144,40 +143,44 @@
               "settings": {
                 "input": {
                   "auth": "",
-                  "table_name": "batches",
-                  "page": 1,
-                  "pageSize": 500,
-                  "filters": [
-                    {
-                      "column": "status",
-                      "operator": "eq",
-                      "value": "active"
-                    }
-                  ]
+                  "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
+                  "sheetId": 139096806,
+                  "columnName": "status",
+                  "searchValue": "active",
+                  "matchCase": false,
+                  "startingRow": 1,
+                  "numberOfRows": 500,
+                  "includeTeamDrives": false
                 },
-                "pieceName": "@puchoaistudio/tool-supabase",
-                "actionName": "search_rows",
-                "pieceVersion": "^2.0.1",
+                "pieceName": "@puchoaistudio/tool-google-sheets",
+                "actionName": "find_rows",
+                "pieceVersion": "^2.0.9",
                 "propertySettings": {
                   "auth": {
                     "type": "MANUAL"
                   },
-                  "page": {
+                  "spreadsheetId": {
                     "type": "MANUAL"
                   },
-                  "columns": {
+                  "sheetId": {
                     "type": "MANUAL"
                   },
-                  "filters": {
+                  "columnName": {
                     "type": "MANUAL"
                   },
-                  "pageSize": {
+                  "searchValue": {
                     "type": "MANUAL"
                   },
-                  "table_name": {
+                  "matchCase": {
                     "type": "MANUAL"
                   },
-                  "countOption": {
+                  "startingRow": {
+                    "type": "MANUAL"
+                  },
+                  "numberOfRows": {
+                    "type": "MANUAL"
+                  },
+                  "includeTeamDrives": {
                     "type": "MANUAL"
                   }
                 },
@@ -200,40 +203,44 @@
                 "settings": {
                   "input": {
                     "auth": "",
-                    "table_name": "enrollments",
-                    "page": 1,
-                    "pageSize": 500,
-                    "filters": [
-                      {
-                        "column": "status",
-                        "operator": "eq",
-                        "value": "active"
-                      }
-                    ]
+                    "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
+                    "sheetId": 605693083,
+                    "columnName": "status",
+                    "searchValue": "active",
+                    "matchCase": false,
+                    "startingRow": 1,
+                    "numberOfRows": 500,
+                    "includeTeamDrives": false
                   },
-                  "pieceName": "@puchoaistudio/tool-supabase",
-                  "actionName": "search_rows",
-                  "pieceVersion": "^2.0.1",
+                  "pieceName": "@puchoaistudio/tool-google-sheets",
+                  "actionName": "find_rows",
+                  "pieceVersion": "^2.0.9",
                   "propertySettings": {
                     "auth": {
                       "type": "MANUAL"
                     },
-                    "page": {
+                    "spreadsheetId": {
                       "type": "MANUAL"
                     },
-                    "columns": {
+                    "sheetId": {
                       "type": "MANUAL"
                     },
-                    "filters": {
+                    "columnName": {
                       "type": "MANUAL"
                     },
-                    "pageSize": {
+                    "searchValue": {
                       "type": "MANUAL"
                     },
-                    "table_name": {
+                    "matchCase": {
                       "type": "MANUAL"
                     },
-                    "countOption": {
+                    "startingRow": {
+                      "type": "MANUAL"
+                    },
+                    "numberOfRows": {
+                      "type": "MANUAL"
+                    },
+                    "includeTeamDrives": {
                       "type": "MANUAL"
                     }
                   },
@@ -256,34 +263,36 @@
                   "settings": {
                     "input": {
                       "auth": "",
-                      "table_name": "attendance",
-                      "page": 1,
-                      "pageSize": 500,
-                      "filters": []
+                      "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
+                      "sheetId": 772014212,
+                      "memKey": "row_number",
+                      "startRow": 1,
+                      "groupSize": 1,
+                      "includeTeamDrives": false
                     },
-                    "pieceName": "@puchoaistudio/tool-supabase",
-                    "actionName": "search_rows",
-                    "pieceVersion": "^2.0.1",
+                    "pieceName": "@puchoaistudio/tool-google-sheets",
+                    "actionName": "get_all_rows",
+                    "pieceVersion": "^2.0.9",
                     "propertySettings": {
                       "auth": {
                         "type": "MANUAL"
                       },
-                      "page": {
+                      "spreadsheetId": {
                         "type": "MANUAL"
                       },
-                      "columns": {
+                      "sheetId": {
                         "type": "MANUAL"
                       },
-                      "filters": {
+                      "memKey": {
                         "type": "MANUAL"
                       },
-                      "pageSize": {
+                      "startRow": {
                         "type": "MANUAL"
                       },
-                      "table_name": {
+                      "groupSize": {
                         "type": "MANUAL"
                       },
-                      "countOption": {
+                      "includeTeamDrives": {
                         "type": "MANUAL"
                       }
                     },
@@ -422,30 +431,42 @@
                         "settings": {
                           "input": {
                             "auth": "",
-                            "table_name": "communications_log",
-                            "row_data": {
+                            "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
+                            "sheetId": 0,
+                            "values": {
                               "type": "slot_report",
                               "channel": "email",
                               "status": "sent",
                               "date": "{{trigger['body']['monthName']}} {{trigger['body']['year']}}"
                             },
-                            "return_row": false
+                            "as_string": false,
+                            "first_row_headers": true,
+                            "includeTeamDrives": false
                           },
-                          "pieceName": "@puchoaistudio/tool-supabase",
-                          "actionName": "create_row",
-                          "pieceVersion": "^2.0.1",
+                          "pieceName": "@puchoaistudio/tool-google-sheets",
+                          "actionName": "insert_row",
+                          "pieceVersion": "^2.0.9",
                           "propertySettings": {
                             "auth": {
                               "type": "MANUAL"
                             },
-                            "row_data": {
+                            "spreadsheetId": {
+                              "type": "MANUAL"
+                            },
+                            "sheetId": {
+                              "type": "MANUAL"
+                            },
+                            "values": {
                               "type": "MANUAL",
                               "schema": {}
                             },
-                            "return_row": {
+                            "as_string": {
                               "type": "MANUAL"
                             },
-                            "table_name": {
+                            "first_row_headers": {
+                              "type": "MANUAL"
+                            },
+                            "includeTeamDrives": {
                               "type": "MANUAL"
                             }
                           },

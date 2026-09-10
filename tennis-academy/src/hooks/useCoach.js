@@ -28,17 +28,9 @@ export function useCoachDay(coachId, date) {
           setData({ coach: coachObj, batches: bList, privateSessions: [], coachAtt: att });
         }
       } catch (err) {
-        console.warn('[useCoachDay] Supabase network/QUIC issue, using localDb fallback:', err?.message || err);
+        console.warn('[useCoachDay] Data fetch error:', err?.message || err);
         if (active) {
-          try {
-            const local = db.readAll();
-            const coachObj = (local.coaches || []).find((c) => c.id === coachId);
-            const bList = (local.batches || []).filter((b) => b.primaryCoachId === coachId || b.supportCoachId === coachId);
-            const att = (local.coachAttendance || []).find((a) => a.coachId === coachId && a.date === date);
-            setData({ coach: coachObj, batches: bList, privateSessions: local.privateSessions || [], coachAtt: att });
-          } catch (fallbackErr) {
-            console.error('[useCoachDay] Fallback error:', fallbackErr);
-          }
+          setData({ coach: null, batches: [], privateSessions: [], coachAtt: null });
         }
       } finally {
         if (active) setLoading(false);
@@ -70,18 +62,12 @@ export function usePayrollData({ month, coachId } = {}) {
         const entityOpt = entity === 'all' ? undefined : entity;
         const res = await services.coaches.list({ entity: entityOpt, pageSize: 200 });
         if (active) {
-          if (!res.data || res.data.length === 0) {
-            const local = db.readAll();
-            setCoaches(local.coaches || []);
-          } else {
-            setCoaches(res.data || []);
-          }
+          setCoaches(res.data || []);
         }
       } catch (err) {
-        console.warn('[usePayrollData] error, using localDb fallback:', err);
+        console.warn('[usePayrollData] error:', err);
         if (active) {
-          const local = db.readAll();
-          setCoaches(local.coaches || []);
+          setCoaches([]);
         }
       }
     }

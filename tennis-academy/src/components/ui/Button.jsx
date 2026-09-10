@@ -1,6 +1,6 @@
 import { cn } from '../../utils/cn';
 
-const base = 'inline-flex items-center justify-center gap-2 rounded-lg text-xs font-semibold transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed';
+const base = 'inline-flex items-center justify-center gap-2 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed';
 
 const styles = {
   primary: 'text-white',
@@ -19,7 +19,7 @@ export default function Button({ children, variant = 'primary', icon: Icon, clas
   const style = variant === 'primary' ? primaryStyle : undefined;
   return (
     <button className={cn(base, sizes[size], styles[variant], className)} style={style} {...p}>
-      {Icon && <Icon className="w-4 h-4" />}{children}
+      {Icon && <Icon className="w-4 h-4 shrink-0" />}{children}
     </button>
   );
 }

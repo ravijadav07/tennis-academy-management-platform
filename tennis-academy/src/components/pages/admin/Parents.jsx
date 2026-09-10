@@ -11,7 +11,7 @@ import AdaptiveTable from '../../data/AdaptiveTable';
 import RowActionsMenu from '../../data/RowActionsMenu';
 import Skeleton from '../../ui/Skeleton';
 import { formatDate } from '../../../utils/formatters';
-import { db } from '../../../mocks/localDb';
+import { parentsService, studentsService, packagesService, paymentsService, communicationsService } from '../../../services';
 
 const entityLabel = (e) => e === 'the-club' ? 'The Club' : "TOTS Tennis";
 
@@ -45,15 +45,13 @@ export default function Parents() {
     let cancelled = false;
     async function load() {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('parents')
-        .select('*, student_parents(student_id)');
+      const { data: parentRows } = await parentsService.getAll();
       if (cancelled) return;
-      if (error || !data || data.length === 0) {
-        console.warn('[Parents] Supabase error/empty, using localDb fallback');
-        const local = db.readAll();
+
+      if (!parentRows || parentRows.length === 0) {
+        const { data: studentRows } = await studentsService.getAll();
         const parentsMap = {};
-        (local.students || []).forEach(s => {
+        (studentRows || []).forEach(s => {
           const key = s.guardianPhone || s.name;
           if (!parentsMap[key]) {
             parentsMap[key] = {
@@ -75,47 +73,18 @@ export default function Parents() {
         setLoading(false);
         return;
       }
-      const raw = data || [];
-      const parentIds = raw.map(p => p.id);
 
-      const [{ data: pkgs }, { data: pmts }] = await Promise.all([
-        supabase.from('packages').select('student_id, status, payment_status').in('student_id', raw.flatMap(p => (p.student_parents || []).map(sp => sp.student_id))),
-        supabase.from('payments').select('parent_id, status').in('parent_id', parentIds).order('date', { ascending: false }),
-      ]);
-
-      const pkgByStudent = {};
-      if (pkgs) for (const p of pkgs) pkgByStudent[p.student_id] = p;
-
-      const pymtByParent = {};
-      if (pmts) for (const p of pmts) {
-        if (!pymtByParent[p.parent_id]) pymtByParent[p.parent_id] = p.status;
-      }
-
-      setParents(raw.map(p => {
-        const children = p.student_parents || [];
-        let payStatus = 'paid';
-        let renewStatus = 'renewed';
-        if (children.length > 0) {
-          const allPaid = children.every(sp => {
-            const pkg = pkgByStudent[sp.student_id];
-            return pkg?.payment_status === 'paid';
-          });
-          const anyExpired = children.some(sp => pkgByStudent[sp.student_id]?.status === 'expired' || pkgByStudent[sp.student_id]?.status === 'lapsed');
-          payStatus = allPaid ? 'paid' : (pymtByParent[p.id] || 'pending');
-          renewStatus = anyExpired ? 'expired' : 'renewed';
-        }
-        return {
-          id: p.id,
-          name: p.name,
-          phone: p.phone,
-          email: p.email ?? '',
-          business_entity: p.entity,
-          accountStatus: p.account_status,
-          children,
-          paymentStatus: payStatus,
-          renewalStatus: renewStatus,
-        };
-      }));
+      setParents((parentRows || []).map(p => ({
+        id: p.id,
+        name: p.fullName || p.name,
+        phone: p.phone,
+        email: p.email || '',
+        business_entity: p.entity || 'the-club',
+        accountStatus: p.accountStatus || 'active',
+        children: p.children || [],
+        paymentStatus: 'paid',
+        renewalStatus: 'renewed',
+      })));
       setLoading(false);
     }
     load();

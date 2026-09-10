@@ -51,6 +51,12 @@ export default function AdminAttendance() {
   const [sessionRemark, setSessionRemark] = useState('');
   const [sessionRemarkSaved, setSessionRemarkSaved] = useState(false);
 
+  const handleSaveRemark = useCallback(() => {
+    setSessionRemarkSaved(true);
+    toast.success('Session remark saved successfully');
+    setTimeout(() => setSessionRemarkSaved(false), 3000);
+  }, []);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -119,15 +125,15 @@ export default function AdminAttendance() {
     return data.enrollments
       .filter((e) => e.batchId === selectedBatchId && (e.status === 'ACTIVE' || e.status === 'active'))
       .map((e) => {
-        const student = data.students.find((s) => s.id === e.studentId);
-        const pkg = data.packages.find((p) => p.studentId === e.studentId);
-        const att = marked.find((a) => a.studentId === e.studentId);
+        const student = (data.students || []).find((s) => String(s.id).trim() === String(e.studentId).trim());
+        const pkg = (data.packages || []).find((p) => String(p.studentId).trim() === String(e.studentId).trim());
+        const att = marked.find((a) => String(a.studentId).trim() === String(e.studentId).trim());
         const elig = getEligibility(pkg, selectedDate);
         const key = e.studentId + '|' + selectedBatchId + '|' + selectedDate;
         const optStatus = optimistic[key];
         return {
           studentId: e.studentId,
-          name: student?.name || 'Unknown',
+          name: student?.name || student?.fullName || student?.full_name || student?.studentName || 'Unknown',
           program: e.billingProgram || e.program,
           membershipType: student?.membershipType || 'Member',
           eligibility: elig,
@@ -325,7 +331,7 @@ export default function AdminAttendance() {
                   {/* Notify Parent button for absent students */}
                   {displayStatus === 'ABSENT' && selectedDate === today && (
                     <div className="sm:ml-auto" onClick={(e) => e.stopPropagation()}>
-                      <NotifyButton r={r} batch={batch} selectedDate={selectedDate} state={state} db={db} notifiedAbsences={notifiedAbsences} setNotifiedAbsences={setNotifiedAbsences} />
+                      <NotifyButton r={r} batch={batch} selectedDate={selectedDate} data={data} notifiedAbsences={notifiedAbsences} setNotifiedAbsences={setNotifiedAbsences} />
                     </div>
                   )}
 
@@ -356,7 +362,7 @@ export default function AdminAttendance() {
 
       {/* Exemption Attendees — students marked present who aren't in this batch's enrollment */}
       {batch && (() => {
-        const exemptions = state.attendance.filter(
+        const exemptions = (data.attendance || []).filter(
           (a) => a.batchId === selectedBatchId && a.date === selectedDate && a.exemption);
         if (exemptions.length === 0) return null;
         const totalHeadcount = roster.filter((r) => (r.optStatus || (r.attendance && r.attendance.status)) === 'PRESENT').length + exemptions.filter((a) => a.status === 'PRESENT').length;
@@ -377,7 +383,7 @@ export default function AdminAttendance() {
             </p>
             <div className="space-y-1">
               {exemptions.map((a) => {
-                const stu = state.students.find((s) => s.id === a.studentId);
+                const stu = (data.students || []).find((s) => s.id === a.studentId);
                 return (
                   <div key={a.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-canvas-soft text-xs">
                     <span className="font-semibold text-ink">{stu ? stu.name : a.studentId}</span>
@@ -487,7 +493,7 @@ export default function AdminAttendance() {
           </div>
           <div className="space-y-1">
             {correctionRequests.filter((r) => r.status === 'pending').map((req) => {
-              const stu = state.students.find((s) => s.id === req.studentId);
+              const stu = (data.students || []).find((s) => s.id === req.studentId);
               return (
                 <div key={req.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-canvas-soft text-xs">
                   <span className="font-semibold text-ink">{stu?.name || req.studentId}</span>
@@ -503,7 +509,7 @@ export default function AdminAttendance() {
               );
             })}
             {correctionRequests.filter((r) => r.status !== 'pending').map((req) => {
-              const stu = state.students.find((s) => s.id === req.studentId);
+              const stu = (data.students || []).find((s) => s.id === req.studentId);
               return (
                 <div key={req.id} className="flex items-center gap-3 px-3 py-2 rounded-lg bg-canvas-soft/50 text-xs opacity-60">
                   <span className="font-semibold text-ink">{stu?.name || req.studentId}</span>
@@ -521,15 +527,16 @@ export default function AdminAttendance() {
 }
 
 // Small inline component for the Notify Parent button with countdown
-function NotifyButton({ r, batch, selectedDate, state, db, notifiedAbsences, setNotifiedAbsences }) {
-  const { open, minutesRemaining } = getNotificationWindow(batch.startTime);
+function NotifyButton({ r, batch, selectedDate, data, notifiedAbsences, setNotifiedAbsences }) {
+  if (!batch) return null;
+  const { open, minutesRemaining } = getNotificationWindow(batch?.startTime);
   const alreadyNotified = notifiedAbsences.has(r.studentId);
 
   if (alreadyNotified) {
     return <span className="text-[10px] text-ok ml-auto flex-shrink-0" onClick={(e) => e.stopPropagation()}>Notified</span>;
   }
 
-  const student = state.students.find((s) => s.id === r.studentId);
+  const student = (data.students || []).find((s) => s.id === r.studentId);
   if (!student || !student.guardianEmail) {
     return <span className="text-[10px] text-ink-faint ml-auto flex-shrink-0" title="No guardian email available" onClick={(e) => e.stopPropagation()}>No email</span>;
   }
@@ -548,7 +555,7 @@ function NotifyButton({ r, batch, selectedDate, state, db, notifiedAbsences, set
       try {
         await triggerWorkflow('absence.alert', {
           attendance: [{ studentId: r.studentId, batchId: batch.id, status: 'ABSENT' }],
-          students: state.students.filter(s => s.id === r.studentId),
+          students: (data.students || []).filter(s => s.id === r.studentId),
           batches: [batch],
           date: selectedDate
         });
