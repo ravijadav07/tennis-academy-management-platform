@@ -1,0 +1,4 @@
+"id","academy_id","full_name","phone","email","specialization","is_head_coach","status","joined_date"
+"coach-1","11111111-1111-1111-1111-111111111111","Rajesh Sharma","+919876543210","head.coach@tennisacademy.com","High Performance","true","Active","2025-01-01"
+"coach-2","11111111-1111-1111-1111-111111111111","Suresh Patel","+919876543211","suresh@tennisacademy.com","Intermediate & Youth","false","Active","2025-03-15"
+"coach-3","11111111-1111-1111-1111-111111111111","Priya Mehta","+919876543212","priya@tennisacademy.com","Beginners & Fitness","false","Active","2025-06-01"

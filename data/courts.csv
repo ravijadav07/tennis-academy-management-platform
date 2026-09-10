@@ -1,0 +1,4 @@
+"id","academy_id","name","surface","is_indoor","status","created_at"
+"court-1","11111111-1111-1111-1111-111111111111","Court 1 (Clay)","Clay","false","Active","2026-01-01T00:00:00Z"
+"court-2","11111111-1111-1111-1111-111111111111","Court 2 (Hard)","Hard","false","Active","2026-01-01T00:00:00Z"
+"court-3","11111111-1111-1111-1111-111111111111","Court 3 (Synthetic)","Synthetic","true","Active","2026-01-01T00:00:00Z"

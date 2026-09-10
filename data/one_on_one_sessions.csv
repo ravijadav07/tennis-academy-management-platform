@@ -1,0 +1,2 @@
+"id","coach_id","student_id","court_id","session_date","start_time","end_time","fee","status"
+"ooo-1","coach-1","student-1","court-1","2026-09-12","08:00","09:00","1200","Scheduled"
