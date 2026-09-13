@@ -22,7 +22,15 @@ function filterItem(item, query) {
   return false;
 }
 
-export default function CardListView({ data, renderCard, emptyMessage = 'No items found', searchPlaceholder = 'Search...', className = '' }) {
+export default function CardListView({
+  data,
+  renderCard,
+  emptyMessage = 'No items found',
+  emptyTitle,
+  emptyDescription,
+  searchPlaceholder = 'Search...',
+  className = '',
+}) {
   const [visibleCount, setVisibleCount] = useState(INITIAL_COUNT);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -33,7 +41,11 @@ export default function CardListView({ data, renderCard, emptyMessage = 'No item
   if (!data || data.length === 0) {
     return (
       <Card className="py-12 text-center">
-        <EmptyState icon={Inbox} title={emptyMessage} description="Try adjusting your search or filters." />
+        <EmptyState
+          icon={Inbox}
+          title={emptyTitle || emptyMessage}
+          description={emptyDescription || 'No items available to display.'}
+        />
       </Card>
     );
   }

@@ -28,6 +28,7 @@ import {
   workflowService,
   certificatesService,
   dashboardService,
+  usersService,
 } from '../services/index.js';
 
 const SupabaseContext = createContext(null);
@@ -38,55 +39,20 @@ export function SupabaseProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Initialize: check existing session
+  // Initialize: set loading false
   useEffect(() => {
-    let mounted = true;
-
-    async function init() {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (mounted) {
-          setUser(session?.user || null);
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error('[SupabaseProvider] init error:', err);
-        if (mounted) {
-          setError(err);
-          setLoading(false);
-        }
-      }
-    }
-
-    init();
-
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        if (mounted) {
-          setUser(session?.user || null);
-        }
-      }
-    );
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
+    setLoading(false);
   }, []);
 
   // ── Auth methods ──────────────────────────────────────────────────────────
 
-  const signIn = useCallback(async ({ email, password }) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    setUser(data.user);
-    return data;
+  const signIn = useCallback(async ({ email }) => {
+    const sessionUser = { email, role: 'admin' };
+    setUser(sessionUser);
+    return { user: sessionUser };
   }, []);
 
   const signOut = useCallback(async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
     setUser(null);
   }, []);
 
@@ -109,6 +75,7 @@ export function SupabaseProvider({ children }) {
     workflow: workflowService,
     certificates: certificatesService,
     dashboard: dashboardService,
+    users: usersService,
   }), []);
 
   // ── Convenience methods ───────────────────────────────────────────────────

@@ -1,28 +1,20 @@
-import { createClient } from '@supabase/supabase-js';
+// Pure data transformer and entity filtering utilities for Google Sheets / runtime data store
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey || supabaseAnonKey === 'your-anon-key-here') {
-  console.warn(
-    '[supabase] Missing or placeholder VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY — Supabase queries will fail gracefully'
-  );
-}
-
-export const supabase = createClient(
-  supabaseUrl || 'http://localhost',
-  supabaseAnonKey || 'placeholder',
-  {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-    },
-    db: {
-      schema: 'public',
-    },
-  }
-);
+// Stub fallback to prevent runtime crashes if legacy code references supabase
+export const supabase = {
+  auth: {
+    getSession: async () => ({ data: { session: null }, error: null }),
+    onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+    signInWithPassword: async () => ({ data: { user: null }, error: null }),
+    signOut: async () => ({ error: null }),
+  },
+  from: () => ({
+    select: () => ({
+      eq: () => ({ single: async () => ({ data: null, error: null }), order: async () => ({ data: [], error: null }) }),
+      order: () => ({ data: [], error: null }),
+    }),
+  }),
+};
 
 // ── Helper: convert snake_case to camelCase ─────────────────────────────────
 export function toCamelCase(str) {
@@ -44,6 +36,18 @@ export function toCamelKeys(obj) {
   }
   if (!result.name && (result.fullName || result.full_name || result.studentName || result.clientName)) {
     result.name = result.fullName || result.full_name || result.studentName || result.clientName;
+  }
+  if ((!result.capacity || result.capacity === 0) && (result.maxCapacity || result.max_capacity)) {
+    result.capacity = Number(result.maxCapacity || result.max_capacity || 0);
+  }
+  if ((!result.maxCapacity || result.maxCapacity === 0) && (result.capacity || result.capacity === 0)) {
+    result.maxCapacity = Number(result.capacity || 0);
+  }
+  if (!result.dayPattern && (result.daysOfWeek || result.days_of_week)) {
+    result.dayPattern = result.daysOfWeek || result.days_of_week;
+  }
+  if (!result.daysOfWeek && (result.dayPattern || result.day_pattern)) {
+    result.daysOfWeek = result.dayPattern || result.day_pattern;
   }
   return result;
 }

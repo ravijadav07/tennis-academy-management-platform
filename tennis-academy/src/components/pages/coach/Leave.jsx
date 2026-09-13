@@ -10,6 +10,7 @@ import StatCard from '../../ui/StatCard';
 import Button from '../../ui/Button';
 import StatusPill from '../../ui/StatusPill';
 import Modal from '../../ui/Modal';
+import { generateIncrementalId } from '../../../utils/idGenerator';
 
 const LEAVE_QUOTA = 24;
 
@@ -59,8 +60,11 @@ export default function Leave() {
       return;
     }
     try {
+      const leaveId = generateIncrementalId('lea', leaveRequestsList, { startFrom: 101 });
+      const academyId = import.meta.env.VITE_ACADEMY_ID;
+
       const newLeave = {
-        id: 'leave_' + Date.now(),
+        id: leaveId,
         coachId,
         type: form.type.toUpperCase(),
         startDate: form.startDate,
@@ -72,11 +76,22 @@ export default function Leave() {
       setLeaveRequestsList((prev) => [newLeave, ...prev]);
 
       triggerWorkflow('leave.apply', {
+        leaveId,
+        leave_id: leaveId,
         coachId,
+        coach_id: coachId,
+        academyId,
+        academy_id: academyId,
+        coachName: coach?.name || '',
+        coachEmail: coach?.email || '',
+        coachPhone: coach?.phone || '',
         type: form.type.toUpperCase(),
+        leaveType: form.type.toUpperCase(),
         startDate: form.startDate,
         endDate: form.endDate,
         reason: form.reason,
+        status: 'PENDING',
+        appliedDate: new Date().toISOString().split('T')[0],
       }).catch((wErr) => console.warn('[api] leave.apply workflow skip:', wErr));
       toast.success('Leave request submitted successfully');
       setModalOpen(false);
@@ -175,7 +190,8 @@ export default function Leave() {
         columns={columns}
         renderCard={renderCard}
         searchPlaceholder="Search leave requests..."
-        emptyMessage="No leave requests"
+        emptyTitle="No leaves taken so far"
+        emptyDescription="You haven't requested or taken any leave so far. Click 'Apply Leave' above if you need to submit a request."
       />
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Apply Leave">

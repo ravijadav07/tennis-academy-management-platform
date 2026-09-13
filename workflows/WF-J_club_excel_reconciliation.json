@@ -6,7 +6,8 @@
   "tags": [],
   "pieces": [
     "@puchoaistudio/tool-webhook",
-    "@puchoaistudio/tool-google-sheets"
+    "@puchoaistudio/tool-google-sheets",
+    "@puchoaistudio/tool-date-helper"
   ],
   "template": {
     "displayName": "WF-J Club Excel Reconciliation",

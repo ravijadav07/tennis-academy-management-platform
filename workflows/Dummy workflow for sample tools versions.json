@@ -1,0 +1,468 @@
+﻿{
+  "created": "1789306509151",
+  "updated": "1789306509151",
+  "name": "Dummy workflow for sample tools versions",
+  "description": "",
+  "tags": [],
+  "pieces": [
+    "@puchoaistudio/tool-schedule",
+    "@puchoaistudio/tool-google-sheets",
+    "@puchoaistudio/tool-date-helper"
+  ],
+  "template": {
+    "displayName": "Dummy workflow for sample tools versions",
+    "trigger": {
+      "name": "trigger",
+      "valid": true,
+      "displayName": "Every Day",
+      "type": "TOOL_TRIGGER",
+      "settings": {
+        "pieceName": "@puchoaistudio/tool-schedule",
+        "pieceVersion": "^2.0.0",
+        "input": {
+          "timezone": "UTC",
+          "hour_of_the_day": 0,
+          "run_on_weekends": false
+        },
+        "sampleData": {},
+        "propertySettings": {
+          "timezone": {
+            "type": "MANUAL"
+          },
+          "hour_of_the_day": {
+            "type": "MANUAL"
+          },
+          "run_on_weekends": {
+            "type": "MANUAL"
+          }
+        },
+        "triggerName": "every_day"
+      },
+      "nextAction": {
+        "name": "step_1",
+        "skip": false,
+        "type": "PIECE",
+        "valid": false,
+        "settings": {
+          "input": {
+            "values": {},
+            "as_string": false,
+            "first_row_headers": true,
+            "includeTeamDrives": false
+          },
+          "pieceName": "@puchoaistudio/tool-google-sheets",
+          "actionName": "insert_row",
+          "sampleData": {},
+          "pieceVersion": "^2.0.9",
+          "propertySettings": {
+            "auth": {
+              "type": "MANUAL"
+            },
+            "values": {
+              "type": "MANUAL",
+              "schema": {}
+            },
+            "sheetId": {
+              "type": "MANUAL"
+            },
+            "as_string": {
+              "type": "MANUAL"
+            },
+            "spreadsheetId": {
+              "type": "MANUAL"
+            },
+            "first_row_headers": {
+              "type": "MANUAL"
+            },
+            "includeTeamDrives": {
+              "type": "MANUAL"
+            }
+          },
+          "errorHandlingOptions": {
+            "retryOnFailure": {
+              "value": false
+            },
+            "continueOnFailure": {
+              "value": false
+            }
+          }
+        },
+        "nextAction": {
+          "name": "step_2",
+          "skip": false,
+          "type": "PIECE",
+          "valid": false,
+          "settings": {
+            "input": {
+              "matchCase": false,
+              "numberOfRows": 1,
+              "includeTeamDrives": false
+            },
+            "pieceName": "@puchoaistudio/tool-google-sheets",
+            "actionName": "find_rows",
+            "sampleData": {},
+            "pieceVersion": "^2.0.9",
+            "propertySettings": {
+              "auth": {
+                "type": "MANUAL"
+              },
+              "sheetId": {
+                "type": "MANUAL"
+              },
+              "matchCase": {
+                "type": "MANUAL"
+              },
+              "columnName": {
+                "type": "MANUAL"
+              },
+              "searchValue": {
+                "type": "MANUAL"
+              },
+              "startingRow": {
+                "type": "MANUAL"
+              },
+              "numberOfRows": {
+                "type": "MANUAL"
+              },
+              "spreadsheetId": {
+                "type": "MANUAL"
+              },
+              "includeTeamDrives": {
+                "type": "MANUAL"
+              }
+            },
+            "errorHandlingOptions": {
+              "retryOnFailure": {
+                "value": false
+              },
+              "continueOnFailure": {
+                "value": false
+              }
+            }
+          },
+          "nextAction": {
+            "name": "step_3",
+            "skip": false,
+            "type": "PIECE",
+            "valid": false,
+            "settings": {
+              "input": {
+                "values": {},
+                "first_row_headers": true,
+                "includeTeamDrives": false
+              },
+              "pieceName": "@puchoaistudio/tool-google-sheets",
+              "actionName": "update_row",
+              "sampleData": {},
+              "pieceVersion": "^2.0.9",
+              "propertySettings": {
+                "auth": {
+                  "type": "MANUAL"
+                },
+                "row_id": {
+                  "type": "MANUAL"
+                },
+                "values": {
+                  "type": "MANUAL",
+                  "schema": {}
+                },
+                "sheetId": {
+                  "type": "MANUAL"
+                },
+                "spreadsheetId": {
+                  "type": "MANUAL"
+                },
+                "first_row_headers": {
+                  "type": "MANUAL"
+                },
+                "includeTeamDrives": {
+                  "type": "MANUAL"
+                }
+              },
+              "errorHandlingOptions": {
+                "retryOnFailure": {
+                  "value": false
+                },
+                "continueOnFailure": {
+                  "value": false
+                }
+              }
+            },
+            "nextAction": {
+              "name": "step_4",
+              "skip": false,
+              "type": "PIECE",
+              "valid": false,
+              "settings": {
+                "input": {
+                  "includeTeamDrives": false
+                },
+                "pieceName": "@puchoaistudio/tool-google-sheets",
+                "actionName": "delete_row",
+                "sampleData": {},
+                "pieceVersion": "^2.0.9",
+                "propertySettings": {
+                  "auth": {
+                    "type": "MANUAL"
+                  },
+                  "rowId": {
+                    "type": "MANUAL"
+                  },
+                  "sheetId": {
+                    "type": "MANUAL"
+                  },
+                  "spreadsheetId": {
+                    "type": "MANUAL"
+                  },
+                  "includeTeamDrives": {
+                    "type": "MANUAL"
+                  }
+                },
+                "errorHandlingOptions": {
+                  "retryOnFailure": {
+                    "value": false
+                  },
+                  "continueOnFailure": {
+                    "value": false
+                  }
+                }
+              },
+              "nextAction": {
+                "name": "step_5",
+                "skip": false,
+                "type": "PIECE",
+                "valid": false,
+                "settings": {
+                  "input": {
+                    "memKey": "row_number",
+                    "startRow": 1,
+                    "groupSize": 1,
+                    "includeTeamDrives": false
+                  },
+                  "pieceName": "@puchoaistudio/tool-google-sheets",
+                  "actionName": "get_all_rows",
+                  "sampleData": {},
+                  "pieceVersion": "^2.0.9",
+                  "propertySettings": {
+                    "auth": {
+                      "type": "MANUAL"
+                    },
+                    "memKey": {
+                      "type": "MANUAL"
+                    },
+                    "sheetId": {
+                      "type": "MANUAL"
+                    },
+                    "markdown": {
+                      "type": "MANUAL"
+                    },
+                    "startRow": {
+                      "type": "MANUAL"
+                    },
+                    "groupSize": {
+                      "type": "MANUAL"
+                    },
+                    "spreadsheetId": {
+                      "type": "MANUAL"
+                    },
+                    "includeTeamDrives": {
+                      "type": "MANUAL"
+                    }
+                  },
+                  "errorHandlingOptions": {
+                    "retryOnFailure": {
+                      "value": false
+                    },
+                    "continueOnFailure": {
+                      "value": false
+                    }
+                  }
+                },
+                "nextAction": {
+                  "name": "step_6",
+                  "skip": false,
+                  "type": "PIECE",
+                  "valid": false,
+                  "settings": {
+                    "input": {
+                      "values": {},
+                      "as_string": false,
+                      "overwrite": false,
+                      "input_type": "column_names",
+                      "includeTeamDrives": false,
+                      "check_for_duplicate": false,
+                      "check_for_duplicate_column": {}
+                    },
+                    "pieceName": "@puchoaistudio/tool-google-sheets",
+                    "actionName": "google-sheets-insert-multiple-rows",
+                    "sampleData": {},
+                    "pieceVersion": "^2.0.9",
+                    "propertySettings": {
+                      "auth": {
+                        "type": "MANUAL"
+                      },
+                      "values": {
+                        "type": "MANUAL",
+                        "schema": {}
+                      },
+                      "sheetId": {
+                        "type": "MANUAL"
+                      },
+                      "as_string": {
+                        "type": "MANUAL"
+                      },
+                      "overwrite": {
+                        "type": "MANUAL"
+                      },
+                      "input_type": {
+                        "type": "MANUAL"
+                      },
+                      "spreadsheetId": {
+                        "type": "MANUAL"
+                      },
+                      "includeTeamDrives": {
+                        "type": "MANUAL"
+                      },
+                      "check_for_duplicate": {
+                        "type": "MANUAL"
+                      },
+                      "check_for_duplicate_column": {
+                        "type": "MANUAL",
+                        "schema": {}
+                      }
+                    },
+                    "errorHandlingOptions": {
+                      "retryOnFailure": {
+                        "value": false
+                      },
+                      "continueOnFailure": {
+                        "value": false
+                      }
+                    }
+                  },
+                  "nextAction": {
+                    "name": "step_7",
+                    "skip": false,
+                    "type": "PIECE",
+                    "valid": true,
+                    "settings": {
+                      "input": {
+                        "timeZone": "Asia/Kolkata",
+                        "timeFormat": "YYYY-MM-DD HH:mm:ss"
+                      },
+                      "pieceName": "@puchoaistudio/tool-date-helper",
+                      "actionName": "get_current_date",
+                      "sampleData": {},
+                      "pieceVersion": "^2.0.0",
+                      "propertySettings": {
+                        "timeZone": {
+                          "type": "MANUAL"
+                        },
+                        "timeFormat": {
+                          "type": "MANUAL"
+                        }
+                      },
+                      "errorHandlingOptions": {
+                        "retryOnFailure": {
+                          "value": false
+                        },
+                        "continueOnFailure": {
+                          "value": false
+                        }
+                      }
+                    },
+                    "nextAction": {
+                      "name": "step_8",
+                      "skip": false,
+                      "type": "CODE",
+                      "valid": true,
+                      "settings": {
+                        "input": {},
+                        "sampleData": {},
+                        "sourceCode": {
+                          "code": "export const code = async (inputs) => {\n  return true;\n};",
+                          "packageJson": "{}"
+                        },
+                        "errorHandlingOptions": {
+                          "retryOnFailure": {
+                            "value": false
+                          },
+                          "continueOnFailure": {
+                            "value": false
+                          }
+                        }
+                      },
+                      "nextAction": {
+                        "name": "step_9",
+                        "skip": false,
+                        "type": "ROUTER",
+                        "valid": false,
+                        "children": [
+                          null,
+                          null,
+                          null
+                        ],
+                        "settings": {
+                          "branches": [
+                            {
+                              "branchName": "Branch 1",
+                              "branchType": "CONDITION",
+                              "conditions": [
+                                [
+                                  {
+                                    "operator": "TEXT_EXACTLY_MATCHES",
+                                    "firstValue": "",
+                                    "secondValue": "",
+                                    "caseSensitive": false
+                                  }
+                                ]
+                              ]
+                            },
+                            {
+                              "branchName": "Branch 2",
+                              "branchType": "CONDITION",
+                              "conditions": [
+                                [
+                                  {
+                                    "operator": "TEXT_CONTAINS",
+                                    "firstValue": "",
+                                    "secondValue": "",
+                                    "caseSensitive": false
+                                  }
+                                ]
+                              ]
+                            },
+                            {
+                              "branchName": "Otherwise",
+                              "branchType": "FALLBACK"
+                            }
+                          ],
+                          "sampleData": {},
+                          "executionType": "EXECUTE_FIRST_MATCH"
+                        },
+                        "displayName": "Router"
+                      },
+                      "displayName": "Code"
+                    },
+                    "displayName": "Get Current Date"
+                  },
+                  "displayName": "Insert Multiple Rows"
+                },
+                "displayName": "Get All Spreadsheet Rows"
+              },
+              "displayName": "Delete Row"
+            },
+            "displayName": "Update Row"
+          },
+          "displayName": "Find Rows"
+        },
+        "displayName": "Insert Row"
+      }
+    },
+    "valid": false,
+    "agentIds": [],
+    "connectionIds": [],
+    "schemaVersion": "7"
+  },
+  "blogUrl": ""
+}

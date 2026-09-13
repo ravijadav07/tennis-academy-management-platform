@@ -4,7 +4,6 @@
  * Columns: id, student_id, entity, category, rating, note, date, created_at, updated_at
  */
 import { BaseService } from './BaseService.js';
-import { supabase, toCamelKeys } from '../utils/supabase.js';
 
 class ProgressService extends BaseService {
   constructor() {
@@ -25,13 +24,7 @@ class ProgressService extends BaseService {
    * Get progress for a specific student.
    */
   async getByStudent(studentId) {
-    const { data, error } = await supabase
-      .from('progress')
-      .select('*')
-      .eq('student_id', studentId)
-      .order('date', { ascending: false });
-
-    return { data: toCamelKeys(data || []), error };
+    return this.list({ studentId, pageSize: 200 });
   }
 
   /**

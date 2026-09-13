@@ -5,7 +5,6 @@
  *          invoice_id, created_at, updated_at
  */
 import { BaseService } from './BaseService.js';
-import { supabase, toCamelKeys } from '../utils/supabase.js';
 
 class PaymentsService extends BaseService {
   constructor() {
@@ -27,35 +26,26 @@ class PaymentsService extends BaseService {
    * Get payments for a specific student.
    */
   async getByStudent(studentId) {
-    const { data, error } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('student_id', studentId)
-      .order('date', { ascending: false });
-
-    return { data: toCamelKeys(data || []), error };
+    return this.list({ studentId, pageSize: 200 });
   }
 
   /**
    * Record a new payment.
    */
   async recordPayment({ studentId, entity, amount, date, gateway, type, status, invoiceId }) {
-    const { data, error } = await supabase
-      .from('payments')
-      .insert({
-        student_id: studentId,
-        entity,
-        amount,
-        date,
-        gateway,
-        type,
-        status,
-        invoice_id: invoiceId,
-      })
-      .select()
-      .single();
-
-    return { data: toCamelKeys(data), error };
+    const payment = {
+      studentId,
+      student_id: studentId,
+      entity,
+      amount,
+      date,
+      gateway,
+      type,
+      status,
+      invoiceId,
+      invoice_id: invoiceId,
+    };
+    return this.upsert(payment);
   }
 
   /**

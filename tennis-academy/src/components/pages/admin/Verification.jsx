@@ -31,17 +31,7 @@ export default function Verification() {
         privateSessions: [],
       });
     } catch (err) {
-      console.warn('[Verification] load error (using localDb fallback):', err?.message || err);
-      try {
-        const local = db.readAll();
-        setState({
-          courts: local.courts || [],
-          coaches: local.coaches || [],
-          privateSessions: local.privateSessions || [],
-        });
-      } catch (fallbackErr) {
-        console.error('[Verification] Fallback load error:', fallbackErr);
-      }
+      console.error('[Verification] Google Sheets load error:', err?.message || err);
     }
   }, [services, entity]);
 

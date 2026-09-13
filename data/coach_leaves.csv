@@ -1,3 +1,3 @@
-"id","coach_id","leave_type","start_date","end_date","reason","status","approved_by","created_at"
-"lea-1","coach-2","casual","2026-09-15","2026-09-17","Personal Work","Approved","coach-1","2026-09-10T00:00:00Z"
-"lea-2","coach-4","sick","2026-09-20","2026-09-21","Fever","Approved","coach-1","2026-09-19T00:00:00Z"
+"id","coach_id","leave_type","start_date","end_date","reason","status","approved_by","created_at","applied_date"
+"lea-1","coach-2","casual","2026-09-15","2026-09-17","Personal Work","Approved","coach-1","2026-09-10T00:00:00Z",""
+"lea-2","coach-4","sick","2026-09-20","2026-09-21","Fever","Approved","coach-1","2026-09-19T00:00:00Z",""

@@ -8,7 +8,8 @@
     "@puchoaistudio/tool-schedule",
     "@puchoaistudio/tool-google-sheets",
     "@puchoaistudio/tool-store",
-    "@puchoaistudio/tool-gmail"
+    "@puchoaistudio/tool-gmail",
+    "@puchoaistudio/tool-date-helper"
   ],
   "template": {
     "displayName": "WF-G Package Validity & Expiry Engine",
@@ -371,9 +372,9 @@
                           "receiver": [
                             "{{step_3c[0]['email']}}"
                           ],
-                          "subject": "Package Expired - Arnav Jain Tennis Academy",
-                          "body": "Dear Parent,\n\nYour child's tennis package at Arnav Jain Tennis Academy has expired (Day 45). Please renew at your earliest convenience to continue training.\n\nContact us for renewal options.\n\n- Arnav Jain Tennis Academy",
-                          "body_type": "text",
+                          "subject": "Package Expired - TOTS Tennis Academy",
+                          "body": "<div style=\"max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; overflow: hidden;\"><div style=\"background-color: #0f172a; padding: 24px; text-align: center;\"><h2 style=\"color: #38bdf8; margin: 0; font-size: 22px; font-weight: 700;\">TOTS Tennis Academy</h2><p style=\"color: #94a3b8; margin: 4px 0 0 0; font-size: 13px;\">Package Expiry Notice</p></div><div style=\"padding: 24px;\"><p style=\"font-size: 15px; margin-top: 0;\">Dear Parent,</p><p style=\"font-size: 14px; color: #475569;\">Your child's tennis package at TOTS Tennis Academy has reached its validity limit (Day 45) and is now marked as expired.</p><div style=\"background-color: #fff1f2; border: 1px solid #fecdd3; border-radius: 8px; padding: 16px; margin: 20px 0; color: #9f1239; font-size: 13px;\"><strong>Action Needed:</strong> Please renew your training package at your earliest convenience to continue training sessions without interruption.</div><p style=\"font-size: 14px; color: #475569;\">Please contact the academy office or access your portal to renew.</p></div><div style=\"background-color: #f1f5f9; padding: 16px 24px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0;\"><p style=\"margin: 0;\">© TOTS Tennis Academy. All rights reserved.</p></div></div>",
+                          "body_type": "html",
                           "cc": [],
                           "bcc": [],
                           "reply_to": [],
@@ -720,9 +721,9 @@
                           "receiver": [
                             "{{step_4c[0]['email']}}"
                           ],
-                          "subject": "Package Expiring Soon - Arnav Jain Tennis Academy",
-                          "body": "Dear Parent,\n\nYour child's tennis package at Arnav Jain Tennis Academy will expire in approximately 6 days. Please renew soon to ensure uninterrupted training!\n\n- Arnav Jain Tennis Academy",
-                          "body_type": "text",
+                          "subject": "Package Expiring Soon - TOTS Tennis Academy",
+                          "body": "<div style=\"max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; overflow: hidden;\"><div style=\"background-color: #0f172a; padding: 24px; text-align: center;\"><h2 style=\"color: #38bdf8; margin: 0; font-size: 22px; font-weight: 700;\">TOTS Tennis Academy</h2><p style=\"color: #94a3b8; margin: 4px 0 0 0; font-size: 13px;\">Renewal Reminder</p></div><div style=\"padding: 24px;\"><p style=\"font-size: 15px; margin-top: 0;\">Dear Parent,</p><p style=\"font-size: 14px; color: #475569;\">This is a friendly reminder that your child's tennis training package at TOTS Tennis Academy will expire in approximately <strong>6 days</strong>.</p><div style=\"background-color: #fefce8; border: 1px solid #fef08a; border-radius: 8px; padding: 16px; margin: 20px 0; color: #854d0e; font-size: 13px;\"><strong>Reminder:</strong> Renew early to maintain continuous roster placement and session availability.</div><p style=\"font-size: 14px; color: #475569;\">Contact our administration or renew directly via your parent portal.</p></div><div style=\"background-color: #f1f5f9; padding: 16px 24px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0;\"><p style=\"margin: 0;\">© TOTS Tennis Academy. All rights reserved.</p></div></div>",
+                          "body_type": "html",
                           "cc": [],
                           "bcc": [],
                           "reply_to": [],
@@ -1032,9 +1033,9 @@
                           "receiver": [
                             "{{step_5c[0]['email']}}"
                           ],
-                          "subject": "Your Child Hasn't Attended Recently - Arnav Jain Tennis Academy",
-                          "body": "Dear Parent,\n\nWe noticed your child has not attended any sessions recently despite having an active package (Day 20+ with 0 sessions consumed).\n\nPlease check their schedule and encourage them to resume training. Unused sessions may expire with the package.\n\nFor any questions or to reschedule, please contact us.\n\n- Arnav Jain Tennis Academy",
-                          "body_type": "text",
+                          "subject": "Your Child Hasn't Attended Recently - TOTS Tennis Academy",
+                          "body": "<div style=\"max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; overflow: hidden;\"><div style=\"background-color: #0f172a; padding: 24px; text-align: center;\"><h2 style=\"color: #38bdf8; margin: 0; font-size: 22px; font-weight: 700;\">TOTS Tennis Academy</h2><p style=\"color: #94a3b8; margin: 4px 0 0 0; font-size: 13px;\">Dormancy & Inactivity Notice</p></div><div style=\"padding: 24px;\"><p style=\"font-size: 15px; margin-top: 0;\">Dear Parent,</p><p style=\"font-size: 14px; color: #475569;\">We noticed that your child has not attended any sessions recently despite having an active package registered with TOTS Tennis Academy.</p><div style=\"background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 20px 0; font-size: 13px; color: #334155;\">Please check their schedule and encourage them to resume training. Unused sessions remain subject to package validity periods.</div><p style=\"font-size: 14px; color: #475569;\">If you need assistance or wish to pause/reschedule, please get in touch with academy management.</p></div><div style=\"background-color: #f1f5f9; padding: 16px 24px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0;\"><p style=\"margin: 0;\">© TOTS Tennis Academy. All rights reserved.</p></div></div>",
+                          "body_type": "html",
                           "cc": [],
                           "bcc": [],
                           "reply_to": [],

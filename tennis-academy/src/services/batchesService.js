@@ -8,7 +8,6 @@
  *          created_at, updated_at
  */
 import { BaseService } from './BaseService.js';
-import { supabase, toCamelKeys, entityFilter } from '../utils/supabase.js';
 
 class BatchesService extends BaseService {
   constructor() {
@@ -27,34 +26,17 @@ class BatchesService extends BaseService {
   }
 
   /**
-   * Get batch by ID with enrollments + students + packages.
+   * Get batch by ID.
    */
   async getById(id) {
-    const { data, error } = await supabase
-      .from('batches')
-      .select('*, enrollments(*, students(*, packages(*)))')
-      .eq('id', id)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      console.error('[supabase] getById(batches):', error.message);
-    }
-
-    return { data: toCamelKeys(data), error: null };
+    return super.getById(id);
   }
 
   /**
    * List batches by day pattern (MWF / TTS).
-   * Matches localDb.listBatches({ dayPattern }).
    */
   async listByDayPattern(dayPattern) {
-    const { data, error } = await supabase
-      .from('batches')
-      .select('*')
-      .eq('day_pattern', dayPattern)
-      .order('start_time', { ascending: true });
-
-    return { data: toCamelKeys(data || []), error };
+    return this.list({ dayPattern, pageSize: 200 });
   }
 
   /**

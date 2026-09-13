@@ -1,5 +1,4 @@
 import { fetchTableData, saveTableData } from '../utils/googleSheets.js';
-import { supabase, handleSupabaseError } from '../utils/supabase.js';
 
 export class BaseService {
   constructor(tableName) {
@@ -23,7 +22,8 @@ export class BaseService {
         const camelCol = col.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
         rows = rows.filter(r => {
           const itemVal = r[col] !== undefined ? r[col] : r[camelCol];
-          return String(itemVal) === String(val);
+          if (itemVal === undefined || itemVal === null) return false;
+          return String(itemVal).toLowerCase() === String(val).toLowerCase();
         });
       }
     }

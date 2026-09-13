@@ -8,12 +8,18 @@
 // even though localStorage is synchronous.
 // ---------------------------------------------------------------------------
 import SEED from './seedData';
+import { generateIncrementalId } from '../utils/idGenerator';
 
 const KEY = 'ata.db.v5';
 const LATENCY = 120;                       // fake network delay, keeps loading states honest
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const clone = (v) => JSON.parse(JSON.stringify(v));
-const uid = (p) => `${p}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+const uid = (p, list = []) => {
+  const padZeroes = p === 'pkg' || p === 'en' ? 3 : 0;
+  const startFrom = p === 'pkg' || p === 'en' ? 1 : 101;
+  const separator = p === 'parent' ? '-' : '_';
+  return generateIncrementalId(p, list, { padZeroes, startFrom, separator });
+};
 
 // --- storage primitives ------------------------------------------------------
 function readAll() {
@@ -91,7 +97,7 @@ export const db = {
       if (!s.courts) s.courts = [];
       const i = s.courts.findIndex((c) => c.id === court.id);
       const before = i >= 0 ? s.courts[i] : null;
-      const row = { ...court, id: court.id || uid('court') };
+      const row = { ...court, id: court.id || uid('court', s.courts) };
       if (i >= 0) s.courts[i] = row; else s.courts.push(row);
       audit(s, before ? 'UPDATE' : 'CREATE', 'court', row.id, before, row);
       return row;
@@ -259,7 +265,7 @@ export const db = {
     return mutate((s) => {
       const i = s.students.findIndex((x) => x.id === student.id);
       const before = i >= 0 ? s.students[i] : null;
-      const row = { ...student, id: student.id || uid('st') };
+      const row = { ...student, id: student.id || uid('st', s.students) };
       if (i >= 0) s.students[i] = row; else s.students.push(row);
       audit(s, before ? 'UPDATE' : 'CREATE', 'student', row.id, before, row);
       return row;
@@ -361,7 +367,7 @@ export const db = {
 
       const i = s.batches.findIndex((b) => b.id === batch.id);
       const before = i >= 0 ? s.batches[i] : null;
-      const row = { ...batch, id: batch.id || uid('b') };
+      const row = { ...batch, id: batch.id || uid('b', s.batches) };
       if (i >= 0) s.batches[i] = row; else s.batches.push(row);
       audit(s, before ? 'UPDATE' : 'CREATE', 'batch', row.id, before, row);
       return row;
@@ -391,7 +397,7 @@ export const db = {
       if (!s.coaches) s.coaches = [];
       const i = s.coaches.findIndex((c) => c.id === coach.id);
       const before = i >= 0 ? s.coaches[i] : null;
-      const row = { ...coach, id: coach.id || uid('coach') };
+      const row = { ...coach, id: coach.id || uid('coach', s.coaches) };
       if (i >= 0) s.coaches[i] = row; else s.coaches.push(row);
       audit(s, before ? 'UPDATE' : 'CREATE', 'coach', row.id, before, row);
       return row;
@@ -424,7 +430,7 @@ export const db = {
     await sleep(LATENCY);
     return mutate((s) => {
       const i = s.enrollments.findIndex((e) => e.id === enrollment.id);
-      const row = { ...enrollment, id: enrollment.id || uid('en') };
+      const row = { ...enrollment, id: enrollment.id || uid('en', s.enrollments) };
       if (i >= 0) s.enrollments[i] = row; else s.enrollments.push(row);
       audit(s, i >= 0 ? 'UPDATE' : 'CREATE', 'enrollment', row.id, i >= 0 ? s.enrollments[i] : null, row);
       return row;
@@ -436,7 +442,7 @@ export const db = {
     return mutate((s) => {
       const i = s.packages.findIndex((p) => p.id === pkg.id);
       const before = i >= 0 ? s.packages[i] : null;
-      const row = { ...pkg, id: pkg.id || uid('pkg') };
+      const row = { ...pkg, id: pkg.id || uid('pkg', s.packages) };
       if (i >= 0) s.packages[i] = row; else s.packages.push(row);
       audit(s, before ? 'UPDATE' : 'CREATE', 'package', row.id, before, row);
       return row;

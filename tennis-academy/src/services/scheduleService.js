@@ -5,7 +5,7 @@
  *          session_period, confirmation, marked_by, student_name, created_at, updated_at
  */
 import { BaseService } from './BaseService.js';
-import { supabase, toCamelKeys, entityFilter } from '../utils/supabase.js';
+import { fetchTableData } from '../utils/googleSheets.js';
 
 class ScheduleService extends BaseService {
   constructor() {
@@ -28,19 +28,12 @@ class ScheduleService extends BaseService {
    * Get schedule for a specific date range.
    */
   async getByDateRange(entity, startDate, endDate) {
-    const { data, error } = await supabase
-      .from('schedule')
-      .select('*')
-      .gte('date', startDate)
-      .lte('date', endDate)
-      .order('date', { ascending: true })
-      .order('time', { ascending: true });
-
-    const filtered = entity && entity !== 'all'
-      ? (data || []).filter(r => r.entity === entity)
-      : data || [];
-
-    return { data: toCamelKeys(filtered), error };
+    const all = await fetchTableData('schedule');
+    let filtered = all.filter(r => r.date >= startDate && r.date <= endDate);
+    if (entity && entity !== 'all') {
+      filtered = filtered.filter(r => r.entity === entity);
+    }
+    return { data: filtered, error: null };
   }
 
   /**
@@ -55,13 +48,7 @@ class ScheduleService extends BaseService {
    * Get schedule items by batch.
    */
   async getByBatch(batchId) {
-    const { data, error } = await supabase
-      .from('schedule')
-      .select('*')
-      .eq('batch_id', batchId)
-      .order('date', { ascending: true });
-
-    return { data: toCamelKeys(data || []), error };
+    return this.list({ batchId, pageSize: 500 });
   }
 
   /**

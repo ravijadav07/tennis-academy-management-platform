@@ -21,7 +21,7 @@ import { db } from '../../../mocks/localDb';
 function timeAgo(ms) { const sec = Math.floor((Date.now() - ms) / 1000); if (sec < 5) return 'just now'; if (sec < 60) return sec + 's ago'; if (sec < 3600) return Math.floor(sec / 60) + 'm ago'; return Math.floor(sec / 3600) + 'h ago'; }
 
 const CATEGORIES = ['ADV', 'INT', 'ADULT', 'GREEN', 'ORANGE', 'RED', 'JDP', 'HPP', 'WEEKEND', 'FITNESS'];
-const PATTERNS = ['MWF', 'TTS'];
+const PATTERNS = ['MWF', 'TTS', 'SAT_SUN'];
 
 export default function Reports() {
   const { services, entity } = useSupabase();
@@ -46,37 +46,16 @@ export default function Reports() {
         services.attendance.list({ entity: entityOpt, pageSize: 1000 }),
         services.coaches.list({ entity: entityOpt, pageSize: 200 }),
       ]);
-      if (!batchesRes.data || batchesRes.data.length === 0) {
-        const local = db.readAll();
-        setState({
-          batches: local.batches || [],
-          courts: local.courts || [],
-          enrollments: local.enrollments || [],
-          students: local.students || [],
-          attendance: local.attendance || [],
-          coaches: local.coaches || [],
-        });
-      } else {
-        setState({
-          batches: batchesRes.data || [],
-          courts: courtsRes.data || [],
-          enrollments: enrollmentsRes.data || [],
-          students: studentsRes.data || [],
-          attendance: attendanceRes.data || [],
-          coaches: coachesRes.data || [],
-        });
-      }
-    } catch (err) {
-      console.warn('[Reports] load error, using localDb fallback:', err);
-      const local = db.readAll();
       setState({
-        batches: local.batches || [],
-        courts: local.courts || [],
-        enrollments: local.enrollments || [],
-        students: local.students || [],
-        attendance: local.attendance || [],
-        coaches: local.coaches || [],
+        batches: batchesRes.data || [],
+        courts: courtsRes.data || [],
+        enrollments: enrollmentsRes.data || [],
+        students: studentsRes.data || [],
+        attendance: attendanceRes.data || [],
+        coaches: coachesRes.data || [],
       });
+    } catch (err) {
+      console.error('[Reports] Google Sheets load error:', err);
     }
   }, [services, entity]);
 
@@ -142,17 +121,54 @@ export default function Reports() {
     try {
       await triggerWorkflow('report.send', {
         month: monthName,
+        monthName: monthName,
         year: currentYear,
         recipients: recipients.emails,
+        batches_json: batches,
+        enrollments_json: enrollments,
+        attendance_json: attendance,
       });
     } catch (e) {
       console.log('[api] report.send webhook fallback:', e.message);
     }
-    const subj = emailTemplate.subject.replace('{month}', monthName).replace('{year}', currentYear);
-    const body = emailTemplate.body
+
+    const ac = analysis.academy || {};
+    const reportSummaryText = [
+      `TOTS TENNIS ACADEMY — SLOT ANALYSIS REPORT (${monthName.toUpperCase()} ${currentYear})`,
+      `Status: VERIFIED & LOCKED`,
+      `Verified By: ${(verification.verifiedBy || '').replace('user_', '') || 'Admin'} on ${new Date(verification.verifiedAt).toLocaleDateString('en-IN')}`,
+      ``,
+      `==========================================`,
+      `ACADEMY OVERVIEW`,
+      `==========================================`,
+      `Total Capacity : ${ac.total || 0} slots`,
+      `Booked Slots   : ${ac.booked || 0} booked`,
+      `Open Slots     : ${ac.open || 0} open`,
+      `Occupancy Rate : ${ac.occupancyPct || 0}%`,
+      ``,
+      `TIME SEGMENT BREAKDOWN:`,
+      `• MWF     : ${ac.mwf?.booked || 0} / ${ac.mwf?.total || 0} slots booked (${ac.mwf?.open || 0} open)`,
+      `• TTS     : ${ac.tts?.booked || 0} / ${ac.tts?.total || 0} slots booked (${ac.tts?.open || 0} open)`,
+      `• Sat-Sun : ${ac.weekend?.booked || 0} / ${ac.weekend?.total || 0} slots booked (${ac.weekend?.open || 0} open)`,
+      ``,
+      `PROGRAM BREAKDOWN:`,
+      ...CATEGORIES.map((cat) => {
+        const p = analysis.matrix?.[cat]?.total || {};
+        return `• ${cat.padEnd(8)}: ${p.booked || 0}/${p.total || 0} slots (${p.occupancyPct || 0}% occupied, ${p.open || 0} open)`;
+      }),
+      ``,
+      `Full batch breakdown report CSV attached via backend dispatch engine.`,
+    ].join('\n');
+
+    const subj = emailTemplate.subject
+      ? emailTemplate.subject.replace('{month}', monthName).replace('{year}', currentYear)
+      : `Slot Analysis Report - ${monthName} ${currentYear}`;
+
+    const body = `${reportSummaryText}\n\n${emailTemplate.body || ''}`
       .replace('{month}', monthName).replace('{year}', currentYear)
-      .replace('{booked}', analysis.academy.booked).replace('{total}', analysis.academy.total)
-      .replace('{occupancy}', analysis.academy.occupancyPct + '%');
+      .replace('{booked}', ac.booked || 0).replace('{total}', ac.total || 0)
+      .replace('{occupancy}', (ac.occupancyPct || 0) + '%');
+
     const mail = recipients.emails.join(',');
     const mailto = `mailto:${mail}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`;
 
@@ -197,7 +213,11 @@ export default function Reports() {
 
   // Filtered batches
   const filteredBatches = useMemo(() => {
-    let b = batches.filter((b) => (b.status || '').toLowerCase() === 'active');
+    let b = batches.filter((b) => (b.status || '').toLowerCase() === 'active').map((rawB) => ({
+      ...rawB,
+      capacity: Number(rawB.capacity || rawB.maxCapacity || rawB.max_capacity || 0),
+      dayPattern: rawB.dayPattern || rawB.daysOfWeek || rawB.days_of_week || '',
+    }));
     if (filterPattern) b = b.filter((b) => b.dayPattern === filterPattern);
     if (filterCategory) b = b.filter((b) => b.program === filterCategory);
     if (filterCourt) b = b.filter((b) => b.courtId === filterCourt);

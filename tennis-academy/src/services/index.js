@@ -17,6 +17,7 @@ export { progressService } from './progressService.js';
 export { communicationsService } from './communicationsService.js';
 export { workflowService } from './workflowService.js';
 export { certificatesService } from './certificatesService.js';
+export { usersService } from './usersService.js';
 
 import { studentsService } from './studentsService.js';
 import { coachesService } from './coachesService.js';

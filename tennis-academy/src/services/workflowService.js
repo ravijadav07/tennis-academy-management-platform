@@ -4,7 +4,6 @@
  * Columns: id, entity, action, status, data (jsonb), created_at, updated_at
  */
 import { BaseService } from './BaseService.js';
-import { supabase, toCamelKeys } from '../utils/supabase.js';
 
 class WorkflowService extends BaseService {
   constructor() {

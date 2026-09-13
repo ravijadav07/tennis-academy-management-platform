@@ -31,34 +31,15 @@ export default function RevenueReport() {
         services.batches.list({ entity: entityOpt, pageSize: 500 }),
         services.courts.list({ entity: entityOpt, pageSize: 100 }),
       ]);
-      if (!packagesRes.data || packagesRes.data.length === 0) {
-        const local = db.readAll();
-        setState({
-          packages: local.packages || [],
-          students: local.students || [],
-          enrollments: local.enrollments || [],
-          batches: local.batches || [],
-          courts: local.courts || [],
-        });
-      } else {
-        setState({
-          packages: packagesRes.data || [],
-          students: studentsRes.data || [],
-          enrollments: enrollmentsRes.data || [],
-          batches: batchesRes.data || [],
-          courts: courtsRes.data || [],
-        });
-      }
-    } catch (err) {
-      console.warn('[RevenueReport] load error, using localDb fallback:', err);
-      const local = db.readAll();
       setState({
-        packages: local.packages || [],
-        students: local.students || [],
-        enrollments: local.enrollments || [],
-        batches: local.batches || [],
-        courts: local.courts || [],
+        packages: packagesRes.data || [],
+        students: studentsRes.data || [],
+        enrollments: enrollmentsRes.data || [],
+        batches: batchesRes.data || [],
+        courts: courtsRes.data || [],
       });
+    } catch (err) {
+      console.error('[RevenueReport] Google Sheets load error:', err);
     }
   }, [services, entity]);
 

@@ -5,7 +5,6 @@
  *          created_at, updated_at
  */
 import { BaseService } from './BaseService.js';
-import { supabase, toCamelKeys } from '../utils/supabase.js';
 
 class CertificatesService extends BaseService {
   constructor() {
@@ -25,13 +24,7 @@ class CertificatesService extends BaseService {
    * Get certificates for a student.
    */
   async getByStudent(studentId) {
-    const { data, error } = await supabase
-      .from('certificates')
-      .select('*')
-      .eq('student_id', studentId)
-      .order('issued_date', { ascending: false });
-
-    return { data: toCamelKeys(data || []), error };
+    return this.list({ studentId, pageSize: 200 });
   }
 
   /**

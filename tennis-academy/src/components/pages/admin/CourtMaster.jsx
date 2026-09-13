@@ -29,16 +29,9 @@ export default function CourtMaster() {
     try {
       const entityOpt = entity === 'all' ? undefined : entity;
       const res = await services.courts.list({ entity: entityOpt, pageSize: 100 });
-      if (!res.data || res.data.length === 0) {
-        const local = db.readAll();
-        setCourtsList(local.courts || []);
-      } else {
-        setCourtsList(res.data || []);
-      }
+      setCourtsList(res.data || []);
     } catch (err) {
-      console.warn('[CourtMaster] load error, using localDb fallback:', err);
-      const local = db.readAll();
-      setCourtsList(local.courts || []);
+      console.error('[CourtMaster] Google Sheets load error:', err);
     } finally {
       setLoading(false);
     }

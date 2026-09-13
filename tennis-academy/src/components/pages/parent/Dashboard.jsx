@@ -37,37 +37,16 @@ export default function ParentDashboard() {
         ]);
 
         if (active) {
-          if (!studentsRes.data || studentsRes.data.length === 0) {
-            const local = db.readAll();
-            setData({
-              students: local.students || [],
-              packages: local.packages || [],
-              enrollments: local.enrollments || [],
-              batches: local.batches || [],
-              attendance: local.attendance || [],
-            });
-          } else {
-            setData({
-              students: studentsRes.data || [],
-              packages: packagesRes.data || [],
-              enrollments: enrollmentsRes.data || [],
-              batches: batchesRes.data || [],
-              attendance: attendanceRes.data || [],
-            });
-          }
-        }
-      } catch (err) {
-        console.warn('[ParentDashboard] load error, using localDb fallback:', err);
-        if (active) {
-          const local = db.readAll();
           setData({
-            students: local.students || [],
-            packages: local.packages || [],
-            enrollments: local.enrollments || [],
-            batches: local.batches || [],
-            attendance: local.attendance || [],
+            students: studentsRes.data || [],
+            packages: packagesRes.data || [],
+            enrollments: enrollmentsRes.data || [],
+            batches: batchesRes.data || [],
+            attendance: attendanceRes.data || [],
           });
         }
+      } catch (err) {
+        console.error('[ParentDashboard] Google Sheets load error:', err);
       } finally {
         if (active) setLoading(false);
       }
@@ -77,17 +56,22 @@ export default function ParentDashboard() {
   }, [services, entity]);
 
   const children = useMemo(() => {
-    if (!phone) return data.students; // fallback to all students if testing or previewing
-    const matched = data.students.filter((s) => s.guardianPhone === phone || s.phone === phone);
-    return matched.length > 0 ? matched : data.students;
-  }, [data.students, phone]);
+    const cleanPhone = (phone || '').replace(/\D/g, '');
+    const userChildIds = user?.childrenIds || [];
+    const matched = data.students.filter((s) => {
+      if (userChildIds.includes(s.id)) return true;
+      const gPhone = (s.guardianPhone || s.guardian_phone || s.phone || '').replace(/\D/g, '');
+      return Boolean(cleanPhone && gPhone && (gPhone.includes(cleanPhone) || cleanPhone.includes(gPhone)));
+    });
+    return matched;
+  }, [data.students, phone, user]);
 
   const child = children[selectedChildIdx] || children[0];
-  const pkg = useMemo(() => (child ? data.packages.find((p) => p.studentId === child.id) : null), [data.packages, child]);
-  const enrollment = useMemo(() => (child ? data.enrollments.find((e) => e.studentId === child.id && (e.status === 'ACTIVE' || e.status === 'active')) : null), [data.enrollments, child]);
-  const batch = useMemo(() => (enrollment ? data.batches.find((b) => b.id === enrollment.batchId) : null), [data.batches, enrollment]);
-  const childAttendance = useMemo(() => (child ? data.attendance.filter((a) => a.studentId === child.id) : []), [data.attendance, child]);
-  const presentCount = useMemo(() => childAttendance.filter((a) => a.status === 'PRESENT' || a.status === 'present').length, [childAttendance]);
+  const pkg = useMemo(() => (child ? data.packages.find((p) => (p.studentId || p.student_id) === child.id) : null), [data.packages, child]);
+  const enrollment = useMemo(() => (child ? data.enrollments.find((e) => (e.studentId || e.student_id) === child.id && (e.status || '').toLowerCase() === 'active') : null), [data.enrollments, child]);
+  const batch = useMemo(() => (enrollment ? data.batches.find((b) => b.id === (enrollment.batchId || enrollment.batch_id)) : null), [data.batches, enrollment]);
+  const childAttendance = useMemo(() => (child ? data.attendance.filter((a) => (a.studentId || a.student_id) === child.id) : []), [data.attendance, child]);
+  const presentCount = useMemo(() => childAttendance.filter((a) => (a.status || '').toLowerCase() === 'present').length, [childAttendance]);
   const attendanceRate = childAttendance.length > 0 ? Math.round((presentCount / childAttendance.length) * 100) : 0;
 
   if (loading) {

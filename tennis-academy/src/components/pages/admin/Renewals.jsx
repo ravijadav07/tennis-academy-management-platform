@@ -131,137 +131,54 @@ export default function Renewals() {
   const [packages, setPackages] = useState([]);
   const [remindersByPkg, setRemindersByPkg] = useState({});
   const [loading, setLoading] = useState(true);
+  const [entity, setEntity] = useState('all');
 
   setSelectedRenewal = _setSelectedRenewal;
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: pkgs, error: pkgErr } = await supabase
-        .from('packages')
-        .select('id, student_id, plan_type, amount, start_date, expiry_date, status, payment_status, reminder_stage, last_reminder_at, overdue_days, students(name, entity)')
-        .in('status', ['active', 'expired', 'lapsed'])
-        .order('expiry_date', { ascending: true });
+      const entityOpt = entity === 'all' ? undefined : entity;
+      const [packagesRes, studentsRes, parentsRes] = await Promise.all([
+        services.packages.list({ entity: entityOpt, pageSize: 1000 }),
+        services.students.list({ entity: entityOpt, pageSize: 1000 }),
+        services.parents.list({ entity: entityOpt, pageSize: 1000 }),
+      ]);
 
-      if (pkgErr || !pkgs || pkgs.length === 0) {
-        const local = db.readAll();
-        const localPkgs = local.packages || [];
-        const rows = localPkgs.map(p => {
-          const student = (local.students || []).find(s => s.id === p.studentId);
-          const expiryDate = p.endDate || p.expiryDate || new Date().toISOString().slice(0, 10);
-          const daysRemaining = computeDaysRemaining(expiryDate);
-          return {
-            id: p.id,
-            studentId: p.studentId,
-            studentName: student ? student.name : 'Unknown',
-            parentName: student ? (student.guardianName || 'Parent') : '--',
-            entity: student ? (student.entity || 'the-club') : 'the-club',
-            plan: p.program || 'Quarterly',
-            amount: p.amount || 12000,
-            expiry: expiryDate,
-            daysRemaining,
-            paymentStatus: p.paymentStatus === 'PAID' ? 'paid' : (p.paymentStatus || 'pending').toLowerCase(),
-            lastReminder: null,
-            nextReminder: daysRemaining > 0 && daysRemaining <= 7 ? expiryDate : null,
-            status: p.status || 'active',
-            reminderStage: 'd_minus_6',
-            overdueDays: daysRemaining < 0 ? Math.abs(daysRemaining) : 0,
-          };
-        });
-        setPackages(rows);
-        setLoading(false);
-        return;
-      }
-
-      const studentIds = [...new Set(pkgs.map(p => p.student_id))];
-      const { data: spRows, error: spErr } = await supabase
-        .from('student_parents')
-        .select('student_id, parents(id, name)')
-        .in('student_id', studentIds);
-
-      if (spErr) throw spErr;
-      const parentMap = {};
-      if (spRows) {
-        for (const sp of spRows) {
-          if (sp.parents && !parentMap[sp.student_id]) {
-            parentMap[sp.student_id] = sp.parents.name;
-          }
-        }
-      }
-
-      const pkgIds = pkgs.map(p => p.id);
-      const { data: reminders, error: remErr } = await supabase
-        .from('reminders')
-        .select('package_id, stage, channel, status, sent_at')
-        .in('package_id', pkgIds)
-        .order('sent_at', { ascending: false });
-
-      if (remErr) throw remErr;
-      const remMap = {};
-      if (reminders) {
-        for (const r of reminders) {
-          if (!remMap[r.package_id]) remMap[r.package_id] = [];
-          remMap[r.package_id].push(r);
-        }
-      }
-      setRemindersByPkg(remMap);
+      const pkgs = packagesRes.data || [];
+      const stus = studentsRes.data || [];
+      const prts = parentsRes.data || [];
 
       const rows = pkgs.map(p => {
-        const student = p.students;
-        const daysRemaining = computeDaysRemaining(p.expiry_date);
-        const reminderList = remMap[p.id] || [];
-        const lastReminder = reminderList.length > 0 ? reminderList[0].sent_at : null;
-        const nextReminder = daysRemaining > 0 && daysRemaining <= 7 ? p.expiry_date : null;
-        return {
-          id: p.id,
-          studentId: p.student_id,
-          studentName: student ? student.name : 'Unknown',
-          parentName: parentMap[p.student_id] || '--',
-          entity: student ? student.entity : 'the-club',
-          plan: p.plan_type,
-          amount: p.amount,
-          expiry: p.expiry_date,
-          daysRemaining,
-          paymentStatus: p.payment_status,
-          lastReminder,
-          nextReminder,
-          status: p.status,
-          reminderStage: p.reminder_stage,
-          overdueDays: p.overdue_days,
-        };
-      });
-      setPackages(rows);
-    } catch (err) {
-      console.warn('Failed to fetch renewals, using localDb fallback:', err);
-      const local = db.readAll();
-      const localPkgs = local.packages || [];
-      const rows = localPkgs.map(p => {
-        const student = (local.students || []).find(s => s.id === p.studentId);
-        const expiryDate = p.endDate || p.expiryDate || new Date().toISOString().slice(0, 10);
+        const student = stus.find(s => String(s.id).trim() === String(p.studentId).trim());
+        const parent = prts.find(pr => String(pr.id).trim() === String(student?.parentId).trim());
+        const expiryDate = p.endDate || p.expiryDate || p.expiry_date || new Date().toISOString().slice(0, 10);
         const daysRemaining = computeDaysRemaining(expiryDate);
         return {
           id: p.id,
           studentId: p.studentId,
-          studentName: student ? student.name : 'Unknown',
-          parentName: student ? (student.guardianName || 'Parent') : '--',
+          studentName: student ? (student.name || student.fullName || student.full_name || 'Unknown') : 'Unknown',
+          parentName: parent ? (parent.name || parent.fullName || parent.full_name || '--') : (student?.guardianName || '--'),
           entity: student ? (student.entity || 'the-club') : 'the-club',
-          plan: p.program || 'Quarterly',
-          amount: p.amount || 12000,
+          plan: p.program || p.planType || 'Quarterly',
+          amount: p.amount || 0,
           expiry: expiryDate,
           daysRemaining,
-          paymentStatus: p.paymentStatus === 'PAID' ? 'paid' : (p.paymentStatus || 'pending').toLowerCase(),
+          paymentStatus: (p.paymentStatus || 'pending').toLowerCase(),
           lastReminder: null,
           nextReminder: daysRemaining > 0 && daysRemaining <= 7 ? expiryDate : null,
           status: p.status || 'active',
-          reminderStage: 'd_minus_6',
+          reminderStage: p.reminderStage || 'd_minus_6',
           overdueDays: daysRemaining < 0 ? Math.abs(daysRemaining) : 0,
         };
       });
       setPackages(rows);
+    } catch (err) {
+      console.error('[Renewals] Google Sheets load error:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [services, entity]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

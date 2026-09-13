@@ -84,24 +84,7 @@ export default function AdminAttendance() {
         setSelectedBatchId(bList[0].id);
       }
     } catch (err) {
-      console.warn('[AdminAttendance] Supabase load issue, using localDb fallback:', err?.message || err);
-      try {
-        const local = db.readAll();
-        const bList = local.batches || [];
-        setData({
-          batches: bList,
-          courts: local.courts || [],
-          students: local.students || [],
-          enrollments: local.enrollments || [],
-          packages: local.packages || [],
-          attendance: local.attendance || [],
-        });
-        if (!selectedBatchId && bList.length > 0) {
-          setSelectedBatchId(bList[0].id);
-        }
-      } catch (fallbackErr) {
-        console.error('[AdminAttendance] Fallback error:', fallbackErr);
-      }
+      console.error('[AdminAttendance] Google Sheets load error:', err?.message || err);
     } finally {
       setLoading(false);
     }
@@ -121,21 +104,22 @@ export default function AdminAttendance() {
 
   const roster = useMemo(() => {
     if (!batch) return [];
-    const marked = data.attendance.filter((a) => a.batchId === selectedBatchId && a.date === selectedDate);
+    const marked = data.attendance.filter((a) => (a.batchId || a.batch_id) === selectedBatchId && a.date === selectedDate);
     return data.enrollments
-      .filter((e) => e.batchId === selectedBatchId && (e.status === 'ACTIVE' || e.status === 'active'))
+      .filter((e) => (e.batchId || e.batch_id) === selectedBatchId && (e.status || '').toLowerCase() === 'active')
       .map((e) => {
-        const student = (data.students || []).find((s) => String(s.id).trim() === String(e.studentId).trim());
-        const pkg = (data.packages || []).find((p) => String(p.studentId).trim() === String(e.studentId).trim());
-        const att = marked.find((a) => String(a.studentId).trim() === String(e.studentId).trim());
+        const sId = e.studentId || e.student_id;
+        const student = (data.students || []).find((s) => String(s.id).trim() === String(sId).trim());
+        const pkg = (data.packages || []).find((p) => String(p.studentId || p.student_id).trim() === String(sId).trim());
+        const att = marked.find((a) => String(a.studentId || a.student_id).trim() === String(sId).trim());
         const elig = getEligibility(pkg, selectedDate);
-        const key = e.studentId + '|' + selectedBatchId + '|' + selectedDate;
+        const key = sId + '|' + selectedBatchId + '|' + selectedDate;
         const optStatus = optimistic[key];
         return {
-          studentId: e.studentId,
-          name: student?.name || student?.fullName || student?.full_name || student?.studentName || 'Unknown',
-          program: e.billingProgram || e.program,
-          membershipType: student?.membershipType || 'Member',
+          studentId: sId,
+          name: student ? (student.name || student.fullName || student.full_name || student.studentName || 'Student') : 'Unknown',
+          program: e.billingProgram || e.billing_program || e.program || 'General',
+          membershipType: student?.membershipType || student?.membership_type || 'Member',
           eligibility: elig,
           package: pkg,
           attendance: att,
@@ -146,7 +130,7 @@ export default function AdminAttendance() {
       });
   }, [data, batch, selectedBatchId, selectedDate, optimistic]);
 
-  const otherStudents = useMemo(() => data.students.filter((s) => (s.status === 'ACTIVE' || s.status === 'active') && !roster.some((r) => r.studentId === s.id)), [data.students, roster]);
+  const otherStudents = useMemo(() => data.students.filter((s) => (s.status || '').toLowerCase() === 'active' && !roster.some((r) => String(r.studentId) === String(s.id))), [data.students, roster]);
 
   const markAll = async (status) => {
     const entries = roster.filter((r) => !r.blocked).map((r) => ({ studentId: r.studentId, status }));
@@ -204,7 +188,8 @@ export default function AdminAttendance() {
     const stu = otherStudents.find((s) => s.id === addStudentId);
     try {
       await db.markExemption({ batchId: selectedBatchId, date: selectedDate, studentId: addStudentId, status: 'PRESENT', markedByRole: 'ADMIN' });
-      toast.success((stu ? stu.name : 'Student') + ' added to attendance (out-of-schedule)');
+      const stuName = stu ? (stu.name || stu.fullName || stu.full_name || stu.student_name || stu.studentName || 'Student') : 'Student';
+      toast.success(stuName + ' added to attendance (out-of-schedule)');
       setShowAddStudent(false); setAddStudentId(''); setAddMode('existing');
     } catch (e) { toast.error(e.message); }
   };
@@ -430,7 +415,10 @@ export default function AdminAttendance() {
                   value={addStudentId}
                   onChange={(v) => setAddStudentId(typeof v === 'object' ? (v.value || v) : v)}
                   placeholder="Select student..."
-                  options={otherStudents.map((s) => ({ value: s.id, label: s.name + (s.isGuest ? ' (Guest)' : '') }))}
+                  options={otherStudents.map((s) => ({
+                    value: s.id,
+                    label: (s.name || s.fullName || s.full_name || s.student_name || s.studentName || 'Student') + (s.isGuest ? ' (Guest)' : '')
+                  }))}
                   getOptionLabel={(o) => (o && o.label) || ''}
                   getOptionValue={(o) => (o && o.value) || ''}
                 />
@@ -553,11 +541,25 @@ function NotifyButton({ r, batch, selectedDate, data, notifiedAbsences, setNotif
     <button onClick={async (e) => {
       e.stopPropagation();
       try {
+        const targetStudent = (data.students || []).find(s => s.id === r.studentId) || {};
         await triggerWorkflow('absence.alert', {
+          studentId: r.studentId,
+          studentName: r.name || targetStudent.name || '',
+          name: r.name || targetStudent.name || '',
+          guardianName: targetStudent.guardianName || '',
+          guardianEmail: targetStudent.guardianEmail || '',
+          guardianPhone: targetStudent.guardianPhone || '',
+          batchId: batch.id,
+          batchName: (batch.program || batch.name || '') + ' ' + (batch.dayPattern || ''),
+          program: batch.program || '',
+          dayPattern: batch.dayPattern || '',
+          startTime: batch.startTime || '',
+          endTime: batch.endTime || '',
+          date: selectedDate,
+          attendanceStatus: 'ABSENT',
           attendance: [{ studentId: r.studentId, batchId: batch.id, status: 'ABSENT' }],
-          students: (data.students || []).filter(s => s.id === r.studentId),
+          students: [targetStudent],
           batches: [batch],
-          date: selectedDate
         });
         toast.success('Absence notification sent via workflow for ' + r.name);
       } catch (wfErr) {

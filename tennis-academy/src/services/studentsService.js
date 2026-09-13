@@ -1,13 +1,10 @@
 /**
  * Students service — CRUD + enrollment + package enrichment.
  * Table: students
- * Columns: id, name, age, age_group, level, entity, status, parent_id,
- *          join_date, attendance, package_type, package_expiry, photo_url, aadhar_url,
- *          guardian_name, guardian_phone, guardian_email, guardian_relationship,
- *          alternate_phone, membership_type, remarks, created_at, updated_at
+ * Uses Google Sheets database storage (via BaseService / fetchTableData).
  */
 import { BaseService } from './BaseService.js';
-import { supabase, toCamelKeys, entityFilter } from '../utils/supabase.js';
+import { fetchTableData } from '../utils/googleSheets.js';
 
 class StudentsService extends BaseService {
   constructor() {
@@ -31,69 +28,66 @@ class StudentsService extends BaseService {
    * @param {string} id
    */
   async getById(id) {
-    const { data, error } = await supabase
-      .from('students')
-      .select('*, enrollments(*), packages(*)')
-      .eq('id', id)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      console.error('[supabase] getById(students):', error.message);
+    try {
+      const res = await super.getById(id);
+      if (res.data) {
+        const [enrollments, packages] = await Promise.all([
+          fetchTableData('enrollments'),
+          fetchTableData('packages')
+        ]);
+        const sId = String(id).trim();
+        const studentEnrollments = enrollments.filter(e => String(e.studentId || e.student_id || '').trim() === sId);
+        const studentPackages = packages.filter(p => String(p.studentId || p.student_id || '').trim() === sId);
+        return { data: { ...res.data, enrollments: studentEnrollments, packages: studentPackages }, error: null };
+      }
+      return { data: null, error: null };
+    } catch (e) {
+      return { data: null, error: e };
     }
-
-    return { data: toCamelKeys(data), error: null };
   }
 
   /**
    * Check for duplicate student by name + guardian phone.
    */
   async checkDuplicate(name, guardianPhone) {
-    const { data, error } = await supabase
-      .from('students')
-      .select('id, name')
-      .eq('name', name)
-      .eq('guardian_phone', guardianPhone);
-
-    return { data: toCamelKeys(data || []), error };
+    try {
+      const all = await fetchTableData('students');
+      const qName = String(name || '').trim().toLowerCase();
+      const qPhone = String(guardianPhone || '').trim();
+      const found = all.filter(s => {
+        const sName = String(s.name || s.fullName || s.full_name || '').trim().toLowerCase();
+        const sPhone = String(s.guardianPhone || s.guardian_phone || s.phone || '').trim();
+        return sName === qName && sPhone === qPhone;
+      });
+      return { data: found, error: null };
+    } catch (e) {
+      return { data: [], error: e };
+    }
   }
 
   /**
    * Get advanced players for a specific entity.
    */
   async getAdvancedPlayers(entity) {
-    const { data, error } = await supabase
-      .from('students')
-      .select('*')
-      .eq('entity', entity || 'the-club')
-      .eq('level', 'Advanced');
-
-    return { data: toCamelKeys(data || []), error };
+    try {
+      const all = await fetchTableData('students');
+      const filtered = all.filter(s => {
+        const matchEntity = !entity || entity === 'all' || s.entity === entity;
+        return matchEntity && String(s.level || s.skillLevel || '').toLowerCase() === 'advanced';
+      });
+      return { data: filtered, error: null };
+    } catch (e) {
+      return { data: [], error: e };
+    }
   }
 
   /**
-   * List students with pagination and filtering (matches localDb.listStudents).
+   * List students with pagination and filtering.
    */
   async paginatedList({ entity, query, status, page = 1, pageSize = 20 } = {}) {
-    const from = (page - 1) * pageSize;
-    const to = from + pageSize - 1;
-
-    let q = supabase
-      .from('students')
-      .select('*', { count: 'exact' });
-
-    q = entityFilter(q, entity);
-
-    if (status) q = q.eq('status', status);
-    if (query) q = q.ilike('name', `%${query}%`);
-
-    q = q.order('name', { ascending: true }).range(from, to);
-
-    const { data, count, error } = await q;
-    return {
-      data: toCamelKeys(data || []),
-      count: count || 0,
-      error,
-    };
+    const filters = {};
+    if (status) filters.status = status;
+    return super.list({ entity, filters, page, pageSize, orderBy: 'name', ascending: true, query });
   }
 
   /**

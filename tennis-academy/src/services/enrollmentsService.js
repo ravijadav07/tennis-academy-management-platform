@@ -5,7 +5,6 @@
  *          created_at, updated_at
  */
 import { BaseService } from './BaseService.js';
-import { supabase, toCamelKeys } from '../utils/supabase.js';
 
 class EnrollmentsService extends BaseService {
   constructor() {
@@ -27,26 +26,14 @@ class EnrollmentsService extends BaseService {
    * Get enrollments for a student.
    */
   async getByStudent(studentId) {
-    const { data, error } = await supabase
-      .from('enrollments')
-      .select('*, batches(name, program, day_pattern, start_time, end_time)')
-      .eq('student_id', studentId)
-      .order('created_at', { ascending: false });
-
-    return { data: toCamelKeys(data || []), error };
+    return this.list({ studentId, pageSize: 200 });
   }
 
   /**
    * Get enrollments for a batch.
    */
   async getByBatch(batchId) {
-    const { data, error } = await supabase
-      .from('enrollments')
-      .select('*, students(name, age, level, guardian_name, guardian_phone)')
-      .eq('batch_id', batchId)
-      .order('created_at', { ascending: true });
-
-    return { data: toCamelKeys(data || []), error };
+    return this.list({ batchId, pageSize: 200 });
   }
 
   /**

@@ -12,7 +12,7 @@ const ACTION_WEBHOOK_MAP = {
 
 const ACTION_NAMES = new Set(Object.keys(ACTION_WEBHOOK_MAP));
 
-export async function triggerWorkflow(action, payload, { sync = false } = {}) {
+export async function triggerWorkflow(action, payload, { sync = false, test = false } = {}) {
   let webhookUrl = ACTION_WEBHOOK_MAP[action];
   const isMockMode = import.meta.env.VITE_MOCK_WEBHOOKS === 'true' || webhookUrl === 'mock';
 
@@ -21,7 +21,10 @@ export async function triggerWorkflow(action, payload, { sync = false } = {}) {
     return { success: true, mock: true, message: `Workflow "${action}" executed via local simulation.` };
   }
 
-  if ((sync || action === 'student.onboard' || action === 'payment.capture' || action === 'report.send') && webhookUrl.startsWith('http') && !webhookUrl.endsWith('/sync')) {
+  const isExplicitTest = test || import.meta.env.VITE_TEST_WEBHOOKS === 'true';
+  if (isExplicitTest && webhookUrl.startsWith('http') && !webhookUrl.endsWith('/test')) {
+    webhookUrl = `${webhookUrl.replace(/\/sync$/, '').replace(/\/$/, '')}/test`;
+  } else if (sync && webhookUrl.startsWith('http') && !webhookUrl.endsWith('/sync') && !webhookUrl.endsWith('/test')) {
     webhookUrl = `${webhookUrl.replace(/\/$/, '')}/sync`;
   }
 

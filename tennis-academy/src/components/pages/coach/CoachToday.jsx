@@ -62,7 +62,7 @@ export default function CoachToday() {
     loadData();
   }, [loadData]);
 
-  const coachId = user?.linkedCoachId || (data.coaches.find((c) => c.email === user?.email)?.id) || data.coaches[0]?.id;
+  const coachId = user?.linkedCoachId || (data.coaches.find((c) => c.email === user?.email)?.id);
 
   const coachAtt = (data.coachAttendance || []).find((a) => a.coachId === coachId && a.date === today);
   const checkedIn = !!(coachAtt?.checkIn || coachAtt?.status === 'checked_in');

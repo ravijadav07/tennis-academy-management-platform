@@ -32,15 +32,17 @@ export default function CoachAttendance() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const today = getToday();
-  const coachId = user?.linkedCoachId;
-
   const [state, setState] = useState({
+    coaches: [],
     batches: [],
     courts: [],
     enrollments: [],
     students: [],
     attendance: [],
   });
+
+  const coachId = user?.linkedCoachId || (state.coaches.find((c) => c.email === user?.email)?.id);
+
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(today);
   const isPastDate = selectedDate < today;
@@ -48,7 +50,8 @@ export default function CoachAttendance() {
   const loadData = useCallback(async () => {
     try {
       const entityOpt = entity === 'all' ? undefined : entity;
-      const [batchesRes, courtsRes, enrollmentsRes, studentsRes, attendanceRes] = await Promise.all([
+      const [coachesRes, batchesRes, courtsRes, enrollmentsRes, studentsRes, attendanceRes] = await Promise.all([
+        services.coaches.list({ entity: entityOpt, pageSize: 200 }),
         services.batches.list({ entity: entityOpt, pageSize: 500 }),
         services.courts.list({ entity: entityOpt, pageSize: 100 }),
         services.enrollments.list({ entity: entityOpt, pageSize: 500 }),
@@ -56,6 +59,7 @@ export default function CoachAttendance() {
         services.attendance.list({ entity: entityOpt, date: selectedDate, pageSize: 500 }),
       ]);
       setState({
+        coaches: coachesRes.data || [],
         batches: batchesRes.data || [],
         courts: courtsRes.data || [],
         enrollments: enrollmentsRes.data || [],
@@ -137,23 +141,24 @@ export default function CoachAttendance() {
   const roster = useMemo(() => {
     if (!batch) return [];
     const marked = (state.attendance || []).filter(
-      (a) => a.batchId === selectedBatchId && a.date === selectedDate
+      (a) => (a.batchId || a.batch_id) === selectedBatchId && a.date === selectedDate
     );
     return (state.enrollments || [])
-      .filter((e) => e.batchId === selectedBatchId && (e.status === 'ACTIVE' || e.status === 'active'))
+      .filter((e) => (e.batchId || e.batch_id) === selectedBatchId && (e.status || '').toLowerCase() === 'active')
       .map((e) => {
-        const student = (state.students || []).find((s) => String(s.id).trim() === String(e.studentId).trim());
-        const att = marked.find((a) => String(a.studentId).trim() === String(e.studentId).trim());
-        const key = `${e.studentId}|${selectedBatchId}|${selectedDate}`;
+        const sId = e.studentId || e.student_id;
+        const student = (state.students || []).find((s) => String(s.id).trim() === String(sId).trim());
+        const att = marked.find((a) => String(a.studentId || a.student_id).trim() === String(sId).trim());
+        const key = `${sId}|${selectedBatchId}|${selectedDate}`;
         const optStatus = optimistic[key];
         const status = optStatus || att?.status || null;
 
         return {
-          studentId: e.studentId,
-          name: student?.name || student?.fullName || student?.full_name || student?.studentName || 'Unknown Student',
-          program: e.billingProgram || batch.program,
+          studentId: sId,
+          name: student ? (student.name || student.fullName || student.full_name || student.studentName || 'Student') : 'Unknown Student',
+          program: e.billingProgram || e.billing_program || batch.program,
           ballLevel: e.ballLevel || batch.ballLevel,
-          membershipType: student?.membershipType || 'Member',
+          membershipType: student?.membershipType || student?.membership_type || 'Member',
           attendance: att,
           status,
           notes: [],

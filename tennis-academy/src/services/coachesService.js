@@ -7,7 +7,6 @@
  *          batches (text[]), students (int), created_at, updated_at
  */
 import { BaseService } from './BaseService.js';
-import { supabase, toCamelKeys, entityFilter } from '../utils/supabase.js';
 
 class CoachesService extends BaseService {
   constructor() {
@@ -64,14 +63,13 @@ class CoachesService extends BaseService {
    * Update coach hours logged.
    */
   async updateHoursLogged(id, hours) {
-    const { data, error } = await supabase
-      .from('coaches')
-      .update({ hours_logged: hours })
-      .eq('id', id)
-      .select()
-      .single();
-
-    return { data: toCamelKeys(data), error };
+    const res = await this.getById(id);
+    if (res.data) {
+      const updated = { ...res.data, hoursLogged: hours, hours_logged: hours };
+      await this.upsert(updated);
+      return { data: updated, error: null };
+    }
+    return { data: null, error: new Error('Coach not found') };
   }
 }
 

@@ -12,7 +12,15 @@ import { SearchX } from 'lucide-react';
 
 const PAGE_SIZES = [10, 25, 50];
 
-export default function DataGrid({ data, columns, searchPlaceholder = 'Search...', onRowClick, hideSearch = false }) {
+export default function DataGrid({
+  data,
+  columns,
+  searchPlaceholder = 'Search...',
+  onRowClick,
+  hideSearch = false,
+  emptyTitle,
+  emptyDescription,
+}) {
   const [sorting, setSorting] = useState([]);
   const [globalFilter, setGlobalFilter] = useState('');
   const [pageSize, setPageSize] = useState(10);
@@ -127,7 +135,19 @@ export default function DataGrid({ data, columns, searchPlaceholder = 'Search...
             {table.getRowModel().rows.length === 0 && (
               <tr>
                 <td colSpan={columns.length} className="px-4 py-0">
-                  <EmptyState icon={SearchX} title="No results found" description="Try adjusting your search or filters." />
+                  <EmptyState
+                    icon={SearchX}
+                    title={
+                      !data || data.length === 0
+                        ? (emptyTitle || 'No items found')
+                        : 'No results found'
+                    }
+                    description={
+                      !data || data.length === 0
+                        ? (emptyDescription || 'No items available to display.')
+                        : 'Try adjusting your search or filters.'
+                    }
+                  />
                 </td>
               </tr>
             )}

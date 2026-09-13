@@ -10,7 +10,6 @@
  *          created_at, updated_at
  */
 import { BaseService } from './BaseService.js';
-import { supabase, toCamelKeys } from '../utils/supabase.js';
 
 class PackagesService extends BaseService {
   constructor() {
@@ -32,62 +31,47 @@ class PackagesService extends BaseService {
    * Get packages for a specific student.
    */
   async getByStudent(studentId) {
-    const { data, error } = await supabase
-      .from('packages')
-      .select('*')
-      .eq('student_id', studentId)
-      .order('created_at', { ascending: false });
-
-    return { data: toCamelKeys(data || []), error };
+    return this.list({ studentId, pageSize: 200 });
   }
 
   /**
    * Get active package for a student.
    */
   async getActivePackage(studentId) {
-    const { data, error } = await supabase
-      .from('packages')
-      .select('*')
-      .eq('student_id', studentId)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    return { data: toCamelKeys(data), error };
+    const res = await this.list({ studentId, status: 'active', pageSize: 1 });
+    return { data: res.data?.[0] || null, error: null };
   }
 
   /**
    * Record a payment against a package.
    */
   async recordPayment({ packageId, amount, paymentMode, transactionRef, paymentDate }) {
-    const { data, error } = await supabase
-      .from('packages')
-      .update({
-        amount_received: amount,
-        payment_mode: paymentMode,
-        transaction_ref: transactionRef,
-        payment_date: paymentDate,
-      })
-      .eq('id', packageId)
-      .select()
-      .single();
-
-    return { data: toCamelKeys(data), error };
+    const pkgRes = await this.getById(packageId);
+    if (pkgRes.data) {
+      const updated = {
+        ...pkgRes.data,
+        amountReceived: amount,
+        paymentMode,
+        transactionRef,
+        paymentDate,
+      };
+      await this.upsert(updated);
+      return { data: updated, error: null };
+    }
+    return { data: null, error: new Error('Package not found') };
   }
 
   /**
    * Update session consumption.
    */
   async updateSessionsConsumed(packageId, sessionsConsumed) {
-    const { data, error } = await supabase
-      .from('packages')
-      .update({ sessions_consumed: sessionsConsumed })
-      .eq('id', packageId)
-      .select()
-      .single();
-
-    return { data: toCamelKeys(data), error };
+    const pkgRes = await this.getById(packageId);
+    if (pkgRes.data) {
+      const updated = { ...pkgRes.data, sessionsConsumed };
+      await this.upsert(updated);
+      return { data: updated, error: null };
+    }
+    return { data: null, error: new Error('Package not found') };
   }
 
   /**

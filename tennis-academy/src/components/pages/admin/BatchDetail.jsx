@@ -14,10 +14,11 @@ import { formatTime12h, formatDateDDMMYY } from '../../../utils/formatters';
 import { ArrowLeft, Clock, MapPin, Pencil, Archive } from 'lucide-react';
 import TimePicker12h from '../../ui/TimePicker12h';
 import { db } from '../../../mocks/localDb';
+import { generateIncrementalId } from '../../../utils/idGenerator';
 
 const FIELD = 'w-full h-[38px] px-3 rounded-lg border border-line bg-white text-[13px] text-ink outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand transition-all';
 const LBL = 'block text-[10px] font-semibold text-ink-muted uppercase tracking-[0.04em] mb-1';
-const PATTERNS = ['MWF', 'TTS'];
+const PATTERNS = ['MWF', 'TTS', 'SAT_SUN'];
 const CATEGORY_OPTIONS = [
   { value: 'ADV', label: 'Advance' },
   { value: 'INT', label: 'Intermediate' },
@@ -93,37 +94,16 @@ export default function BatchDetail() {
         services.packages.list({ entity: entityOpt, pageSize: 1000 }),
       ]);
 
-      if (!batchesRes.data || batchesRes.data.length === 0) {
-        const local = db.readAll();
-        setData({
-          batches: local.batches || [],
-          courts: local.courts || [],
-          coaches: local.coaches || [],
-          enrollments: local.enrollments || [],
-          students: local.students || [],
-          packages: local.packages || [],
-        });
-      } else {
-        setData({
-          batches: batchesRes.data || [],
-          courts: courtsRes.data || [],
-          coaches: coachesRes.data || [],
-          enrollments: enrollmentsRes.data || [],
-          students: studentsRes.data || [],
-          packages: packagesRes.data || [],
-        });
-      }
-    } catch (err) {
-      console.warn('[BatchDetail] load error, using localDb fallback:', err);
-      const local = db.readAll();
       setData({
-        batches: local.batches || [],
-        courts: local.courts || [],
-        coaches: local.coaches || [],
-        enrollments: local.enrollments || [],
-        students: local.students || [],
-        packages: local.packages || [],
+        batches: batchesRes.data || [],
+        courts: courtsRes.data || [],
+        coaches: coachesRes.data || [],
+        enrollments: enrollmentsRes.data || [],
+        students: studentsRes.data || [],
+        packages: packagesRes.data || [],
       });
+    } catch (err) {
+      console.error('[BatchDetail] Google Sheets load error:', err);
     } finally {
       setLoading(false);
     }
@@ -166,7 +146,13 @@ export default function BatchDetail() {
     }
     const autoName = computeBatchName({ ...nf, ballLevel: ballForCreate }, courts);
     try {
+      const newBatchId = generateIncrementalId('b', batches, { startFrom: 101 });
+      const academyId = import.meta.env.VITE_ACADEMY_ID;
+
       const res = await services.batches.upsert({
+        id: newBatchId,
+        academyId,
+        academy_id: academyId,
         ...nf,
         name: autoName,
         ballLevel: ballForCreate,
@@ -232,7 +218,7 @@ export default function BatchDetail() {
                   label="Day Pattern *"
                   value={nf.dayPattern}
                   onChange={(v) => setNf((f) => ({ ...f, dayPattern: v }))}
-                  options={PATTERNS.map((p) => ({ value: p, label: p === 'WEEKEND' ? 'Sat-Sun' : p }))}
+                  options={PATTERNS.map((p) => ({ value: p, label: (p === 'SAT_SUN' || p === 'WEEKEND') ? 'Sat-Sun' : p }))}
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -270,10 +256,10 @@ export default function BatchDetail() {
 
   if (!batch) return <div className="p-4 text-sm text-ink-muted">Batch not found.</div>;
 
-  const roster = enrollments.filter((e) => e.batchId === batchId && (e.status === 'ACTIVE' || e.status === 'active'));
-  const pc = coaches.find((c) => c.id === batch.primaryCoachId);
-  const sc = coaches.find((c) => c.id === batch.supportCoachId);
-  const court = courts.find((c) => c.id === batch.courtId);
+  const roster = enrollments.filter((e) => (e.batchId || e.batch_id) === batchId && (e.status || '').toLowerCase() === 'active');
+  const pc = coaches.find((c) => c.id === (batch.primaryCoachId || batch.coach_id || batch.coachId));
+  const sc = coaches.find((c) => c.id === (batch.supportCoachId || batch.support_coach_id));
+  const court = courts.find((c) => c.id === (batch.courtId || batch.court_id));
   const waitlist = batch.waitlist || [];
 
   const openEdit = () => {
@@ -474,7 +460,7 @@ export default function BatchDetail() {
                 options={courts.map((c) => ({ value: c.id, label: c.name }))}
                 emptyOption="Select Court..."
               />
-              <Sel label="Day Pattern *" value={ef.dayPattern || 'MWF'} onChange={(v) => setEf((f) => ({ ...f, dayPattern: v }))} options={PATTERNS.map((p) => ({ value: p, label: p === 'WEEKEND' ? 'Sat-Sun' : p }))} />
+              <Sel label="Day Pattern *" value={ef.dayPattern || 'MWF'} onChange={(v) => setEf((f) => ({ ...f, dayPattern: v }))} options={PATTERNS.map((p) => ({ value: p, label: (p === 'SAT_SUN' || p === 'WEEKEND') ? 'Sat-Sun' : p }))} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Start Time *" type="time" value={ef.startTime || ''} onChange={(v) => setEf((f) => ({ ...f, startTime: v }))} />

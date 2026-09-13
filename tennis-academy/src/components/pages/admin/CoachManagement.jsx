@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { validatePhone, validateName, validateRequired, sanitizePhone } from '../../../utils/validators';
 import { Plus, Pencil, Archive, RotateCcw } from 'lucide-react';
 import { db } from '../../../mocks/localDb';
+import { generateIncrementalId } from '../../../utils/idGenerator';
 
 const FIELD = 'w-full h-[38px] px-3 rounded-lg border border-line bg-white text-[13px] text-ink outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand transition-all';
 const LBL = 'block text-[10px] font-semibold text-ink-muted uppercase tracking-[0.04em] mb-1';
@@ -25,16 +26,9 @@ export default function CoachManagement() {
     try {
       const entityOpt = entity === 'all' ? undefined : entity;
       const res = await services.coaches.list({ entity: entityOpt, pageSize: 200 });
-      if (!res.data || res.data.length === 0) {
-        const local = db.readAll();
-        setCoachesList(local.coaches || []);
-      } else {
-        setCoachesList(res.data || []);
-      }
+      setCoachesList(res.data || []);
     } catch (err) {
-      console.warn('[CoachManagement] load error, using localDb fallback:', err);
-      const local = db.readAll();
-      setCoachesList(local.coaches || []);
+      console.error('[CoachManagement] Google Sheets load error:', err);
     } finally {
       setLoading(false);
     }
@@ -44,8 +38,8 @@ export default function CoachManagement() {
     loadCoaches();
   }, [loadCoaches]);
 
-  const coaches = useMemo(() => coachesList.filter((c) => c.status !== 'INACTIVE' && c.status !== 'inactive'), [coachesList]);
-  const inactiveCoaches = useMemo(() => coachesList.filter((c) => c.status === 'INACTIVE' || c.status === 'inactive'), [coachesList]);
+  const coaches = useMemo(() => coachesList.filter((c) => (c.status || '').toLowerCase() !== 'inactive'), [coachesList]);
+  const inactiveCoaches = useMemo(() => coachesList.filter((c) => (c.status || '').toLowerCase() === 'inactive'), [coachesList]);
 
   const [showAdd, setShowAdd] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
@@ -72,7 +66,13 @@ export default function CoachManagement() {
   const handleAdd = async () => {
     if (!validateForm()) return;
     try {
+      const newCoachId = generateIncrementalId('coach', coachesList, { startFrom: 101 });
+      const academyId = import.meta.env.VITE_ACADEMY_ID;
+
       await services.coaches.upsert({
+        id: newCoachId,
+        academyId,
+        academy_id: academyId,
         name: form.name, phone: form.phone, designation: form.designation,
         dutyType: form.dutyType, baseSalary: parseInt(form.baseSalary) || 0,
         rate1on1PerHour: parseInt(form.rate1on1PerHour) || 0,
@@ -167,7 +167,7 @@ export default function CoachManagement() {
                   </div>
                   <div className="flex items-center gap-2 sm:gap-3 flex-wrap shrink-0 justify-between sm:justify-end">
                     <span className="font-semibold text-ink">₹{(c.baseSalary || 0).toLocaleString('en-IN')}<span className="text-[10px] text-ink-faint font-normal">/mo</span></span>
-                    <StatusPill status={c.status === 'ACTIVE' || c.status === 'active' ? 'active' : 'inactive'} />
+                    <StatusPill status={(c.status || '').toLowerCase() === 'inactive' ? 'inactive' : 'active'} />
                     <div className="flex items-center gap-1">
                       <Button size="sm" variant="ghost" icon={Pencil} onClick={() => openEdit(c)}>Edit</Button>
                       <Button size="sm" variant="ghost" icon={Archive} onClick={() => { setArchiveId(c.id); setArchiveReason(''); setShowArchive(true); }}>Archive</Button>

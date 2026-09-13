@@ -9,7 +9,6 @@
  *   );
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '../utils/supabase.js';
 
 export function useSupabaseQuery(fetchFn, deps = [], opts = {}) {
   const { enabled = true, immediate = true } = opts;
@@ -57,12 +56,7 @@ export function useSupabaseQuery(fetchFn, deps = [], opts = {}) {
 }
 
 /**
- * useSupabaseMutation — Generic hook for Supabase write operations.
- * Returns { mutate, loading, error, data }.
- *
- * Usage:
- *   const { mutate, loading } = useSupabaseMutation();
- *   await mutate(() => coachesService.upsert(coachData));
+ * useSupabaseMutation — Generic hook for write operations.
  */
 export function useSupabaseMutation() {
   const [loading, setLoading] = useState(false);
@@ -96,28 +90,10 @@ export function useSupabaseMutation() {
 }
 
 /**
- * useSupabaseSubscription — Subscribe to real-time changes.
- *
- * Usage:
- *   useSupabaseSubscription('coaches', (payload) => {
- *     console.log('Change:', payload);
- *   });
+ * useSupabaseSubscription — Fallback subscription hook.
  */
 export function useSupabaseSubscription(table, callback) {
   useEffect(() => {
-    if (!table || !callback) return;
-
-    const channel = supabase
-      .channel(`public:${table}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table },
-        callback
-      )
-      .subscribe();
-
-    return () => {
-      channel.unsubscribe();
-    };
+    // No-op for Google Sheets / runtime store
   }, [table, callback]);
 }

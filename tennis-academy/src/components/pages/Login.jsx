@@ -36,47 +36,44 @@ const Mascot = ({ imageSrc, delay, x, y, size = "w-16 h-16", cursorColor = "text
     );
 };
 
+const DEFAULT_SEED_USERS = [
+    { id: 'user_admin', name: 'Arnav Jain', email: 'admin@tennisacademy.com', password: 'admin123', role: 'ADMIN' },
+    { id: 'user_ops', name: 'Ops Head', email: 'ops@tennisacademy.com', password: 'ops123', role: 'OPS_HEAD' },
+    { id: 'user_coach_santosh', name: 'Santosh', email: 'santosh@tennisacademy.com', password: 'coach123', role: 'COACH' },
+    { id: 'user_coach_anil', name: 'Anil', email: 'anil@tennisacademy.com', password: 'coach123', role: 'COACH' },
+    { id: 'user_coach_jagdish', name: 'Jagdish', email: 'jagdish@tennisacademy.com', password: 'coach123', role: 'COACH' },
+    { id: 'user_coach_sunil', name: 'Sunil', email: 'sunil@tennisacademy.com', password: 'coach123', role: 'COACH' },
+    { id: 'user_coach_karan', name: 'Karan', email: 'karan@tennisacademy.com', password: 'coach123', role: 'COACH' },
+    { id: 'user_coach_karim', name: 'Karim', email: 'karim@tennisacademy.com', password: 'coach123', role: 'COACH' },
+    { id: 'user_coach_vinod', name: 'Vinod D', email: 'vinod.d@tennisacademy.com', password: 'coach123', role: 'COACH' },
+    { id: 'user_coach_nanu', name: 'Nanu', email: 'nanu@tennisacademy.com', password: 'coach123', role: 'COACH' },
+    { id: 'user_coach_fitness', name: 'Team One Aim', email: 'team.one.aim@tennisacademy.com', password: 'coach123', role: 'COACH' },
+    { id: 'user_coach_parth', name: 'Parth Kalke', email: 'parth.kalke@tennisacademy.com', password: 'coach123', role: 'COACH' },
+];
+
 const Login = () => {
     const { login, user } = useAuth();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
-    const [selectedUserId, setSelectedUserId] = useState('user_admin');
-    const [pin, setPin] = useState('1234');
+    const [email, setEmail] = useState('admin@tennisacademy.com');
+    const [password, setPassword] = useState('admin123');
     const [error, setError] = useState('');
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
     const [isTouchDevice, setIsTouchDevice] = useState(false);
-    const [seedUsers, setSeedUsers] = useState({ admins: [], coaches: [] });
+    const [seedUsers, setSeedUsers] = useState(DEFAULT_SEED_USERS);
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const dropdownRef = useRef(null);
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
-    const allUsers = [...seedUsers.admins, ...seedUsers.coaches];
 
-    // Load real system users & coaches on mount
+    // Load available users for quick preset selection on mount (excluding parents)
     useEffect(() => {
-        import('../../utils/googleSheets').then(({ fetchTableData }) => {
-            fetchTableData('coaches').then((coaches) => {
-                const coachUsers = (coaches || []).map((c) => ({
-                    id: c.id,
-                    name: c.name || c.fullName || 'Coach',
-                    role: 'COACH',
-                    linkedCoachId: c.id,
-                }));
-                setSeedUsers({
-                    admins: [
-                        { id: 'user_admin', name: 'Arnav Jain', role: 'ADMIN' },
-                        { id: 'user_ops', name: 'Ops Head', role: 'OPS_HEAD' },
-                    ],
-                    coaches: coachUsers,
-                });
-            }).catch(() => {
-                setSeedUsers({
-                    admins: [
-                        { id: 'user_admin', name: 'Arnav Jain', role: 'ADMIN' },
-                        { id: 'user_ops', name: 'Ops Head', role: 'OPS_HEAD' },
-                    ],
-                    coaches: [],
-                });
-            });
+        import('../../services/usersService').then(({ usersService }) => {
+            usersService.list({ pageSize: 500 }).then((res) => {
+                const list = (Array.isArray(res) ? res : res?.data || []).filter(u => (u.role || '').toLowerCase() !== 'parent');
+                if (list && list.length > 0) {
+                    setSeedUsers(list);
+                }
+            }).catch(() => {});
         });
     }, []);
 
@@ -115,35 +112,32 @@ const Login = () => {
         return () => document.removeEventListener('mousedown', handleOutsideClick);
     }, [dropdownOpen]);
 
-    // Keyboard navigation
-    const handleDropdownKey = (e) => {
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            setHighlightedIndex(i => Math.min(i + 1, allUsers.length - 1));
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            setHighlightedIndex(i => Math.max(i - 1, 0));
-        } else if (e.key === 'Enter' && highlightedIndex >= 0) {
-            e.preventDefault();
-            setSelectedUserId(allUsers[highlightedIndex].id);
-            setDropdownOpen(false);
-            setHighlightedIndex(-1);
-        } else if (e.key === 'Escape') {
-            setDropdownOpen(false);
+    const handleSelectPresetUser = async (u) => {
+        const targetEmail = u.email;
+        const targetPassword = u.password || '1234';
+        setEmail(targetEmail);
+        setPassword(targetPassword);
+        setDropdownOpen(false);
+        setError('');
+        setLoading(true);
+
+        const result = await login(targetEmail, targetPassword);
+        if (!result.success) {
+            setError(result.message || 'Login failed. Please check your credentials.');
+            setLoading(false);
         }
     };
 
-    const getSelectedUser = () => allUsers.find(u => u.id === selectedUserId);
-
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!selectedUserId) { setError('Please select your account'); return; }
+        if (!email) { setError('Please enter your email address'); return; }
+        if (!password) { setError('Please enter your password'); return; }
         setLoading(true);
         setError('');
 
-        const result = await login(selectedUserId, pin);
+        const result = await login(email, password);
         if (!result.success) {
-            setError(result.message || 'Login failed');
+            setError(result.message || 'Login failed. Please check your credentials.');
             setLoading(false);
         }
     };
@@ -253,7 +247,7 @@ const Login = () => {
                         </h1>
 
                         <p className="text-[#111834] text-xs md:text-sm lg:text-base leading-relaxed max-w-md mx-auto md:mx-0 opacity-70 hidden md:block">
-                            The Club &amp; TOTS Tennis &mdash; Academy management platform for coaches, parents, and administrators.
+                            The Club &amp; TOTS Tennis &mdash; Academy management platform for coaches and administrators.
                         </p>
                     </div>
 
@@ -279,103 +273,94 @@ const Login = () => {
                         </div>
 
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            {/* Custom Account Selection Dropdown */}
+                            {/* Preset Account Quick Selector */}
                             <div className="space-y-1.5" ref={dropdownRef}>
-                                <label className="block text-[10px] font-semibold text-[#6B7280] uppercase tracking-[0.04em]">
-                                    Sign in as
-                                </label>
+                                <div className="flex justify-between items-center">
+                                    <label className="block text-[10px] font-semibold text-[#6B7280] uppercase tracking-[0.04em]">
+                                        Quick Select Account / Role
+                                    </label>
+                                    <span className="text-[10px] text-purple-600 font-semibold">One-Click Login</span>
+                                </div>
                                 <button
                                     type="button"
-                                    onClick={() => { setDropdownOpen(o => !o); setHighlightedIndex(-1); }}
-                                    onKeyDown={handleDropdownKey}
-                                    className="w-full h-[52px] px-4 rounded-2xl border border-gray-200 bg-white/80 text-sm text-[#111834] outline-none focus:border-[#8b5cf6] focus:ring-2 focus:ring-[#8b5cf6]/15 transition-all cursor-pointer flex items-center justify-between"
+                                    onClick={() => setDropdownOpen(o => !o)}
+                                    className="w-full h-[48px] px-4 rounded-xl border border-purple-100 bg-purple-50/60 text-xs text-[#111834] font-medium outline-none hover:bg-purple-100/60 transition-all cursor-pointer flex items-center justify-between gap-2"
                                 >
-                                    <span className={getSelectedUser() ? 'text-[#111834]' : 'text-gray-400'}>
-                                        {getSelectedUser() ? `${getSelectedUser().name} (${getSelectedUser().role === 'OPS_HEAD' ? 'Ops Head' : getSelectedUser().role === 'ADMIN' ? 'Admin' : 'Coach'})` : 'Select your account...'}
+                                    <span className="truncate text-left font-semibold text-[#111834]">
+                                        {(() => {
+                                            const matched = seedUsers.find(u => u.email === email);
+                                            if (matched) {
+                                                return `${matched.name} (${matched.role})`;
+                                            }
+                                            return email ? email : 'Choose account for instant login...';
+                                        })()}
                                     </span>
-                                    <svg className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <svg className={`w-4 h-4 text-purple-600 shrink-0 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M6 8l4 4 4-4" />
                                     </svg>
                                 </button>
 
                                 {dropdownOpen && (
                                     <div className="relative z-30">
-                                        <div className="absolute top-1 left-0 right-0 bg-white rounded-2xl border border-gray-200 shadow-[0_12px_30px_rgba(20,24,40,0.10)] overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                                        <div className="absolute top-1 left-0 right-0 bg-white rounded-2xl border border-gray-200 shadow-[0_12px_30px_rgba(20,24,40,0.15)] overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
                                             <div className="max-h-[220px] overflow-y-auto overscroll-contain py-1">
-                                                {seedUsers.admins.length > 0 && (
-                                                    <>
-                                                        <div className="px-4 py-1.5 text-[10px] font-semibold text-[#8C93A6] uppercase tracking-[0.06em] bg-white sticky top-0">
-                                                            Admin / Operations
+                                                <div className="px-4 py-1.5 text-[10px] font-semibold text-[#8C93A6] uppercase tracking-[0.06em] bg-white sticky top-0 border-b border-gray-100 flex justify-between items-center">
+                                                    <span>Quick Login Accounts</span>
+                                                    <span className="text-[9px] text-purple-600">Click to Sign In</span>
+                                                </div>
+                                                {seedUsers.map((u) => (
+                                                    <button
+                                                        key={u.id || u.email}
+                                                        type="button"
+                                                        onClick={() => handleSelectPresetUser(u)}
+                                                        className={`w-full text-left px-4 py-2.5 text-xs transition-colors flex items-center gap-2.5 group
+                                                            ${u.email === email ? 'bg-[#F1ECFF] text-brand-600 font-semibold' : 'text-[#111834] hover:bg-[#F8F8FC]'}`}
+                                                    >
+                                                        <span className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-[10px] font-bold flex-shrink-0 uppercase">
+                                                            {(u.role || 'U').charAt(0)}
+                                                        </span>
+                                                        <div className="flex flex-col overflow-hidden min-w-0 flex-1">
+                                                            <span className="truncate font-semibold text-[#111834] group-hover:text-purple-700 transition-colors">{u.name}</span>
+                                                            <span className="text-[10px] text-gray-400 truncate">{u.email}</span>
                                                         </div>
-                                                        {seedUsers.admins.map((u, idx) => (
-                                                            <button
-                                                                key={u.id}
-                                                                type="button"
-                                                                onClick={() => { setSelectedUserId(u.id); setDropdownOpen(false); setError(''); }}
-                                                                onMouseEnter={() => setHighlightedIndex(idx)}
-                                                                className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-2.5
-                                                                    ${u.id === selectedUserId ? 'bg-[#F1ECFF] text-brand-600 font-semibold' : highlightedIndex === idx ? 'bg-[#F8F8FC] text-[#111834]' : 'text-[#111834] hover:bg-[#F8F8FC]'}`}
-                                                            >
-                                                                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${u.id === selectedUserId ? 'bg-brand-600 text-white' : 'bg-brand-50 text-brand-600'}`}>
-                                                                    {u.name.charAt(0)}
-                                                                </span>
-                                                                <span>{u.name}</span>
-                                                                <span className="text-[10px] text-[#8C93A6] ml-auto">{u.role === 'OPS_HEAD' ? 'Ops Head' : 'Admin'}</span>
-                                                                {u.id === selectedUserId && (
-                                                                    <svg className="w-4 h-4 text-brand-600 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                                                                )}
-                                                            </button>
-                                                        ))}
-                                                    </>
-                                                )}
-                                                {seedUsers.coaches.length > 0 && (
-                                                    <>
-                                                        <div className="px-4 py-1.5 text-[10px] font-semibold text-[#8C93A6] uppercase tracking-[0.06em] bg-white sticky top-0 border-t border-[#F0F0F0]">
-                                                            Coaches
-                                                        </div>
-                                                        {seedUsers.coaches.map((u, idx) => {
-                                                            const globalIdx = seedUsers.admins.length + idx;
-                                                            return (
-                                                                <button
-                                                                    key={u.id}
-                                                                    type="button"
-                                                                    onClick={() => { setSelectedUserId(u.id); setDropdownOpen(false); setError(''); }}
-                                                                    onMouseEnter={() => setHighlightedIndex(globalIdx)}
-                                                                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-2.5
-                                                                        ${u.id === selectedUserId ? 'bg-[#F1ECFF] text-brand-600 font-semibold' : highlightedIndex === globalIdx ? 'bg-[#F8F8FC] text-[#111834]' : 'text-[#111834] hover:bg-[#F8F8FC]'}`}
-                                                                >
-                                                                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${u.id === selectedUserId ? 'bg-brand-600 text-white' : 'bg-brand-50 text-brand-600'}`}>
-                                                                        {u.name.charAt(0)}
-                                                                    </span>
-                                                                    <span>{u.name}</span>
-                                                                    <span className="text-[10px] text-[#8C93A6] ml-auto">Coach</span>
-                                                                    {u.id === selectedUserId && (
-                                                                        <svg className="w-4 h-4 text-brand-600 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                                                                    )}
-                                                                </button>
-                                                            );
-                                                        })}
-                                                    </>
-                                                )}
+                                                        <span className="text-[9px] uppercase font-bold text-purple-700 bg-purple-50 border border-purple-100 px-2 py-0.5 rounded-full flex-shrink-0">{u.role}</span>
+                                                    </button>
+                                                ))}
                                             </div>
                                         </div>
                                     </div>
                                 )}
                             </div>
 
+                            {/* Email Input */}
+                            <div className="space-y-1">
+                                <label className="block text-[10px] font-semibold text-[#6B7280] uppercase tracking-[0.04em]">
+                                    Email Address
+                                </label>
+                                <input
+                                    type="email"
+                                    required
+                                    placeholder="e.g. admin@tennisacademy.com"
+                                    value={email}
+                                    onChange={(e) => { setEmail(e.target.value); setError(''); }}
+                                    className="w-full h-[50px] px-4 rounded-xl border border-gray-200 bg-white/90 text-sm text-[#111834] outline-none focus:border-[#8b5cf6] focus:ring-2 focus:ring-[#8b5cf6]/15 transition-all"
+                                />
+                            </div>
+
+                            {/* Password Input */}
                             <Input
-                                label="PIN"
+                                label="Password"
                                 type="password"
                                 icon={LockIcon}
-                                placeholder="4-digit PIN"
-                                value={pin}
-                                onChange={(e) => { setPin(e.target.value.slice(0, 4)); setError(''); }}
-                                autoComplete="off"
-                                name="pin"
+                                placeholder="Enter password"
+                                value={password}
+                                onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                                autoComplete="current-password"
+                                name="password"
                             />
 
                             {error && (
-                                <div className="p-3 rounded-lg bg-red-50 text-red-600 text-sm">
+                                <div className="p-3 rounded-lg bg-red-50 text-red-600 text-xs font-medium border border-red-100">
                                     {error}
                                 </div>
                             )}
@@ -415,7 +400,7 @@ const Login = () => {
                     {/* Mobile Only: Description and Badges moved below form */}
                     <div className="block md:hidden text-center mt-6 space-y-4">
                         <p className="text-[#111834] text-xs leading-relaxed max-w-xs mx-auto opacity-70">
-                            The Club &amp; TOTS Tennis &mdash; Academy management platform for coaches, parents, and administrators.
+                            The Club &amp; TOTS Tennis &mdash; Academy management platform for coaches and administrators.
                         </p>
                         <div className="flex flex-wrap justify-center gap-2">
                             <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 border border-purple-100 rounded-full text-[10px] font-bold text-purple-700">

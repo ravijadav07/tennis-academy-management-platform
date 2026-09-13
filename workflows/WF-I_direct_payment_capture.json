@@ -6,7 +6,8 @@
   "tags": [],
   "pieces": [
     "@puchoaistudio/tool-webhook",
-    "@puchoaistudio/tool-google-sheets"
+    "@puchoaistudio/tool-google-sheets",
+    "@puchoaistudio/tool-date-helper"
   ],
   "template": {
     "displayName": "WF-I Direct Payment Capture",
@@ -53,7 +54,7 @@
             "payload": "{{trigger['body']}}"
           },
           "sourceCode": {
-            "code": "export const code = async (inputs) => {\\n  const p = typeof inputs.payload === \"string\" ? JSON.parse(inputs.payload) : inputs.payload;\\n  const studentId = (p.student_id || \"\").toString().trim();\\n  const amount = parseInt(p.amount || \"0\");\\n  const gateway = (p.gateway || \"stripe\").trim();\\n  const paymentIntentId = (p.payment_intent_id || p.stripe_payment_intent_id || \"\").trim();\\n  const date = (p.date || p.created_at || new Date().toISOString().split(\"T\")[0]).trim();\\n  const parentPhone = (p.parent_phone || \"\").trim();\\n  const parentName = (p.parent_name || \"\").trim();\\n  const valid = studentId.length > 0 && amount > 0 && gateway.length > 0;\\n  return {\\n    valid: valid,\\n    student_id: studentId,\\n    amount: amount,\\n    gateway: gateway,\\n    payment_intent_id: paymentIntentId,\\n    date: date,\\n    parent_phone: parentPhone,\\n    parent_name: parentName,\\n    error: valid ? \"\" : \"Missing required fields: student_id, amount, gateway\"\\n  };\\n};",
+            "code": "export const code = async (inputs) => {\n  const p = typeof inputs.payload === 'string' ? JSON.parse(inputs.payload) : (inputs.payload || {});\n  const payment_id = p.payment_id || p.paymentId || p.id || '';\n  const student_id = p.student_id || p.studentId || '';\n  const student_name = p.student_name || p.studentName || p.name || '';\n  const parent_name = p.parent_name || p.parentName || p.guardianName || '';\n  const parent_email = p.parent_email || p.parentEmail || p.email || p.guardianEmail || '';\n  const parent_phone = p.parent_phone || p.parentPhone || p.phone || p.guardianPhone || '';\n  const amount = parseFloat(p.amount || '0');\n  const status = p.status || 'PAID';\n  const gateway = p.gateway || 'Stripe';\n  const type = p.type || 'Group';\n  const entity = p.business_entity || p.businessEntity || p.entity || 'tots-tennis';\n  const ref = p.transactionRef || p.ref || '';\n  const payment_date = p.paymentDate || p.payment_date || new Date().toISOString().split('T')[0];\n  return {\n    valid: Boolean(payment_id || student_name),\n    payment_id,\n    student_id,\n    student_name,\n    parent_name,\n    parent_email,\n    parent_phone,\n    amount,\n    status,\n    gateway,\n    type,\n    business_entity: entity,\n    entity,\n    transaction_ref: ref,\n    payment_date\n  };\n};",
             "packageJson": "{}"
           },
           "propertySettings": {

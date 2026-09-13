@@ -7,7 +7,8 @@
   "pieces": [
     "@puchoaistudio/tool-webhook",
     "@puchoaistudio/tool-google-sheets",
-    "@puchoaistudio/tool-gmail"
+    "@puchoaistudio/tool-gmail",
+    "@puchoaistudio/tool-date-helper"
   ],
   "template": {
     "displayName": "WF-E Course Completion & Certification",
@@ -579,9 +580,9 @@
                                   "receiver": [
                                     "{{step_5c[0]['email']}}"
                                   ],
-                                  "subject": "Congratulations! Course Completed - Arnav Jain Tennis Academy",
-                                  "body": "Dear {{step_5c[0]['name']}},\n\nYour child {{step_2[0]['name']}} has successfully completed the tennis program at Arnav Jain Tennis Academy!\n\nCompletion Date: {{step_1['completion_date']}}\n\nYour certificate is attached to this email. You can also download it anytime from your parent portal.\n\nWe are proud of this achievement and wish them the very best in their future tennis journey.\n\nBest regards,\nArnav Jain Tennis Academy",
-                                  "body_type": "text",
+                                  "subject": "Congratulations! Course Completed - TOTS Tennis Academy",
+                                  "body": "<div style=\"max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; overflow: hidden;\"><div style=\"background-color: #0f172a; padding: 24px; text-align: center;\"><h2 style=\"color: #38bdf8; margin: 0; font-size: 22px; font-weight: 700;\">TOTS Tennis Academy</h2><p style=\"color: #94a3b8; margin: 4px 0 0 0; font-size: 13px;\">Course Completion & Certificate Award</p></div><div style=\"padding: 24px;\"><p style=\"font-size: 15px; margin-top: 0;\">Dear <strong>{{step_5c[0]['name']}}</strong>,</p><p style=\"font-size: 14px; color: #475569;\">Congratulations! We are delighted to inform you that your child, <strong>{{step_2[0]['name']}}</strong>, has successfully completed their tennis training program at TOTS Tennis Academy.</p><div style=\"background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 20px 0;\"><h4 style=\"margin: 0 0 12px 0; color: #0f172a; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;\">Completion Summary</h4><table style=\"width: 100%; font-size: 13px; color: #334155; border-collapse: collapse;\"><tr><td style=\"padding: 6px 0; font-weight: 600; width: 40%;\">Student Name:</td><td style=\"padding: 6px 0;\">{{step_2[0]['name']}}</td></tr><tr><td style=\"padding: 6px 0; font-weight: 600;\">Completion Date:</td><td style=\"padding: 6px 0;\">{{step_1['completion_date']}}</td></tr><tr><td style=\"padding: 6px 0; font-weight: 600;\">Certificate:</td><td style=\"padding: 6px 0;\">Attached to this email</td></tr></table></div><p style=\"font-size: 14px; color: #475569;\">We are tremendously proud of their dedication and achievement. Your official completion certificate is attached to this email.</p></div><div style=\"background-color: #f1f5f9; padding: 16px 24px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0;\"><p style=\"margin: 0;\">© TOTS Tennis Academy. All rights reserved.</p></div></div>",
+                                  "body_type": "html",
                                   "cc": [],
                                   "bcc": [],
                                   "reply_to": [],

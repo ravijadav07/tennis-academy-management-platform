@@ -4,7 +4,6 @@
  * Columns: id, name, entity, status, created_at, updated_at
  */
 import { BaseService } from './BaseService.js';
-import { supabase, toCamelKeys } from '../utils/supabase.js';
 
 class CourtsService extends BaseService {
   constructor() {

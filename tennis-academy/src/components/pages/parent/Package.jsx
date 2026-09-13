@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { Calendar, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../../../context/AuthContext';
-import { supabase } from '../../../utils/supabase';
 import Card from '../../ui/Card';
 import StatusPill from '../../ui/StatusPill';
 import { formatCurrency, formatDate, daysUntil } from '../../../utils/formatters';
@@ -17,70 +16,59 @@ export default function Package() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const parentName = user?.name;
-      if (!parentName) { setLoading(false); return; }
+      const { fetchTableData } = await import('../../../utils/googleSheets');
+      const [allStudents, allPackages, allPayments] = await Promise.all([
+        fetchTableData('students'),
+        fetchTableData('packages'),
+        fetchTableData('payments'),
+      ]);
 
-      const { data: parentRows, error: parentErr } = await supabase
-        .from('parents')
-        .select('id')
-        .eq('name', parentName)
-        .limit(1);
+      const phone = user?.guardianPhone || user?.phone;
+      const cleanPhone = (phone || '').replace(/\D/g, '');
+      const userChildIds = user?.childrenIds || [];
 
-      if (parentErr) throw parentErr;
-      if (!parentRows || parentRows.length === 0) { setLoading(false); return; }
-      const parentId = parentRows[0].id;
+      const matchedChildren = allStudents.filter((s) => {
+        if (userChildIds.includes(s.id)) return true;
+        const gPhone = (s.guardianPhone || s.guardian_phone || s.phone || '').replace(/\D/g, '');
+        return Boolean(cleanPhone && gPhone && (gPhone.includes(cleanPhone) || cleanPhone.includes(gPhone)));
+      });
 
-      const { data: spRows, error: spErr } = await supabase
-        .from('student_parents')
-        .select('student_id')
-        .eq('parent_id', parentId);
+      const matchedChildIds = matchedChildren.map((c) => c.id);
 
-      if (spErr) throw spErr;
-      if (!spRows || spRows.length === 0) { setLoading(false); return; }
-      const studentIds = spRows.map(r => r.student_id);
-
-      const { data: pkgs, error: pkgErr } = await supabase
-        .from('packages')
-        .select('id, plan_type, amount, start_date, expiry_date, status, payment_status, overdue_days, students(name)')
-        .in('student_id', studentIds)
-        .order('expiry_date', { ascending: false })
-        .limit(1);
-
-      if (pkgErr) throw pkgErr;
-
+      const pkgs = allPackages.filter((p) => matchedChildIds.includes(p.studentId || p.student_id));
+      
       let pkgInfo = null;
       if (pkgs && pkgs.length > 0) {
         const p = pkgs[0];
         const now = new Date();
-        const start = new Date(p.start_date);
-        const exp = new Date(p.expiry_date);
-        const totalDays = Math.ceil((exp.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+        const start = new Date(p.startDate || p.start_date || Date.now());
+        const exp = new Date(p.expiryDate || p.expiry_date || Date.now());
+        const totalDays = Math.max(1, Math.ceil((exp.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
         const elapsedDays = Math.ceil((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
         const daysUsed = Math.max(0, Math.min(elapsedDays, totalDays));
 
+        const student = matchedChildren.find((c) => c.id === (p.studentId || p.student_id));
+
         pkgInfo = {
           id: p.id,
-          planType: p.plan_type,
-          amount: p.amount,
-          startDate: p.start_date,
-          expiryDate: p.expiry_date,
-          status: p.status,
-          paymentStatus: p.payment_status,
-          overdueDays: p.overdue_days,
-          studentName: p.students ? p.students.name : 'Your child',
+          planType: p.planType || p.plan_type || p.program || 'Standard Package',
+          amount: parseFloat(p.amount || 0),
+          startDate: p.startDate || p.start_date,
+          expiryDate: p.expiryDate || p.expiry_date,
+          status: p.status || 'active',
+          paymentStatus: p.paymentStatus || p.payment_status || 'paid',
+          overdueDays: parseInt(p.overdueDays || 0, 10),
+          studentName: student ? student.name : 'Your child',
           daysUsed,
-          totalDays: Math.max(1, totalDays),
+          totalDays,
         };
       }
       setPackageData(pkgInfo);
 
-      const { data: payRows, error: payErr } = await supabase
-        .from('payments')
-        .select('id, amount, date, gateway, type, status, invoice_id')
-        .eq('parent_id', parentId)
-        .order('date', { ascending: false });
-
-      if (payErr) throw payErr;
+      const payRows = allPayments.filter((p) => 
+        matchedChildIds.includes(p.studentId || p.student_id) || 
+        (p.parentId && p.parentId === user?.linkedParentId)
+      );
       setPayments(payRows || []);
     } catch (err) {
       console.error('Failed to fetch package data:', err);

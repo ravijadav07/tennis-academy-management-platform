@@ -16,7 +16,7 @@ export default function PrivateLog() {
   const { services, entity } = useSupabase();
   const { user } = useAuth();
   const today = getToday();
-  const coachId = user?.linkedCoachId;
+  const coachId = user?.linkedCoachId || (state.coaches.find((c) => c.email === user?.email)?.id);
   const [showNew, setShowNew] = useState(false);
   const [newName, setNewName] = useState('');
   const [newTime, setNewTime] = useState('');

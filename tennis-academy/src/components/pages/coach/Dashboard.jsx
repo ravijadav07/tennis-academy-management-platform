@@ -38,37 +38,16 @@ export default function CoachDashboard() {
         ]);
 
         if (active) {
-          if (!coachesRes.data || coachesRes.data.length === 0) {
-            const local = db.readAll();
-            setData({
-              coaches: local.coaches || [],
-              batches: local.batches || [],
-              courts: local.courts || [],
-              enrollments: local.enrollments || [],
-              coachAttendance: local.coachAttendance || [],
-            });
-          } else {
-            setData({
-              coaches: coachesRes.data || [],
-              batches: batchesRes.data || [],
-              courts: courtsRes.data || [],
-              enrollments: enrollmentsRes.data || [],
-              coachAttendance: coachAttRes.data || [],
-            });
-          }
-        }
-      } catch (err) {
-        console.warn('[CoachDashboard] load error, using localDb fallback:', err);
-        if (active) {
-          const local = db.readAll();
           setData({
-            coaches: local.coaches || [],
-            batches: local.batches || [],
-            courts: local.courts || [],
-            enrollments: local.enrollments || [],
-            coachAttendance: local.coachAttendance || [],
+            coaches: coachesRes.data || [],
+            batches: batchesRes.data || [],
+            courts: courtsRes.data || [],
+            enrollments: enrollmentsRes.data || [],
+            coachAttendance: coachAttRes.data || [],
           });
         }
+      } catch (err) {
+        console.error('[CoachDashboard] Google Sheets load error:', err);
       } finally {
         if (active) setLoading(false);
       }

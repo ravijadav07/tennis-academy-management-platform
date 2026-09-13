@@ -1,11 +1,7 @@
-// src/context/AuthContext.jsx
-// PIN-based mock auth against SEED.users. No email/password, no entity filter.
-// Parent accounts synthesized from guardianPhone. 4 roles: admin, ops_head, coach, parent.
-// All localStorage persistence goes through DbContext.setSession() — no direct writes.
-// Session restored synchronously on init from ata.db.v1 to avoid redirect flash.
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useDb } from './DbContext';
 import { fetchTableData } from '../utils/googleSheets';
+import { usersService } from '../services/usersService';
 import { db } from '../mocks/localDb';
 
 const AuthCtx = createContext(null);
@@ -15,14 +11,17 @@ export function AuthProvider({ children }) {
   const { setSession, clearSession, session } = useDb();
   const [user, setUser] = useState(() => db.readSessionSync());
 
-  // Keep user in sync with DbContext on login/logout (NOT on the initial null→restored transition)
   useEffect(() => {
     if (session?.userId) {
       setUser({
         userId: session.userId,
+        id: session.userId,
         name: session.name,
+        email: session.email,
         role: session.role,
         linkedCoachId: session.linkedCoachId || null,
+        linkedParentId: session.linkedParentId || null,
+        linkedStudentId: session.linkedStudentId || null,
         isParent: session.isParent || false,
         guardianPhone: session.guardianPhone || null,
         childrenIds: session.childrenIds || [],
@@ -30,70 +29,60 @@ export function AuthProvider({ children }) {
     }
   }, [session]);
 
-  const login = useCallback(async (userId, pin) => {
-    if (String(pin) !== '1234') return { success: false, message: 'Invalid credentials' };
-
-    if (userId === 'user_admin') {
-      const userData = { userId: 'user_admin', name: 'Arnav Jain', role: 'admin', linkedCoachId: null, isParent: false };
-      setUser(userData);
-      setSession({ ...userData, guardianPhone: null, childrenIds: [] });
-      return { success: true, user: userData };
-    }
-
-    if (userId === 'user_ops') {
-      const userData = { userId: 'user_ops', name: 'Ops Head', role: 'ops_head', linkedCoachId: null, isParent: false };
-      setUser(userData);
-      setSession({ ...userData, guardianPhone: null, childrenIds: [] });
-      return { success: true, user: userData };
-    }
-
+  const login = useCallback(async (identifier, password) => {
     try {
-      const coaches = await fetchTableData('coaches');
-      const c = coaches.find((x) => String(x.id) === String(userId) || String(x.name || x.fullName || '').toLowerCase() === String(userId).toLowerCase());
-      if (c) {
-        const userData = { userId: c.id, name: c.name || c.fullName || 'Coach', role: 'coach', linkedCoachId: c.id, isParent: false };
+      const authRes = await usersService.authenticate({ identifier, password });
+      if (authRes.success && authRes.user) {
+        const u = authRes.user;
+        let childrenIds = [];
+        if (u.role === 'parent') {
+          const students = await fetchTableData('students');
+          const cleanPhone = String(u.phone || '').replace(/\D/g, '');
+          const children = students.filter((s) => {
+            const gPhone = String(s.guardianPhone || s.guardian_phone || s.phone || '').replace(/\D/g, '');
+            return cleanPhone && gPhone.includes(cleanPhone);
+          });
+          childrenIds = children.map((c) => c.id);
+        }
+
+        const userData = {
+          userId: u.userId,
+          id: u.userId,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          linkedCoachId: u.linkedCoachId,
+          linkedParentId: u.linkedParentId,
+          linkedStudentId: u.linkedStudentId,
+          isParent: u.role === 'parent',
+          guardianPhone: u.phone,
+          childrenIds,
+        };
+
         setUser(userData);
-        setSession({ ...userData, guardianPhone: null, childrenIds: [] });
+        setSession(userData);
         return { success: true, user: userData };
       }
-    } catch (e) {}
-
-    return { success: false, message: 'Invalid credentials' };
-  }, [setSession]);
-
-  const loginAsParent = useCallback(async (guardianPhone, pin) => {
-    if (String(pin) !== '1234') return { success: false, message: 'Invalid credentials' };
-
-    try {
-      const students = await fetchTableData('students');
-      const cleanPhone = String(guardianPhone || '').replace(/\D/g, '');
-      const children = students.filter((s) => String(s.guardianPhone || '').replace(/\D/g, '') === cleanPhone);
-      if (!children.length) return { success: false, message: 'No students found for this phone' };
-
-      const parentName = children[0].guardianName || children[0].parentName || 'Parent';
-      const userData = {
-        userId: 'parent_' + cleanPhone,
-        name: parentName,
-        role: 'parent',
-        linkedCoachId: null,
-        isParent: true,
-        guardianPhone,
-        childrenIds: children.map((c) => c.id),
-      };
-
-      setUser(userData);
-      setSession({ ...userData });
-      return { success: true, user: userData };
-    } catch (e) {
-      return { success: false, message: 'Login failed' };
+      return { success: false, message: authRes.message || 'Invalid credentials' };
+    } catch (err) {
+      console.error('[AuthContext] Login error:', err);
+      return { success: false, message: 'Authentication failed' };
     }
   }, [setSession]);
+
+  const loginAsParent = useCallback(async (guardianPhone, password) => {
+    return login(guardianPhone, password);
+  }, [login]);
 
   const getStudentsForParent = useCallback(async (parentUser) => {
     if (!parentUser?.isParent) return [];
     try {
       const students = await fetchTableData('students');
-      return students.filter((s) => parentUser.childrenIds?.includes(s.id));
+      const cleanPhone = String(parentUser.guardianPhone || parentUser.phone || '').replace(/\D/g, '');
+      return students.filter((s) => {
+        const gPhone = String(s.guardianPhone || s.guardian_phone || s.phone || '').replace(/\D/g, '');
+        return (cleanPhone && gPhone.includes(cleanPhone)) || parentUser.childrenIds?.includes(s.id);
+      });
     } catch (e) { return []; }
   }, []);
 

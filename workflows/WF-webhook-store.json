@@ -6,7 +6,8 @@
   "tags": [],
   "pieces": [
     "@puchoaistudio/tool-webhook",
-    "@puchoaistudio/tool-store"
+    "@puchoaistudio/tool-store",
+    "@puchoaistudio/tool-date-helper"
   ],
   "template": {
     "displayName": "WF-Webhook-Store Data",

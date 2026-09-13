@@ -6,7 +6,7 @@
  *          created_at, updated_at
  */
 import { BaseService } from './BaseService.js';
-import { supabase, toCamelKeys } from '../utils/supabase.js';
+import { fetchTableData } from '../utils/googleSheets.js';
 
 class ParentsService extends BaseService {
   constructor() {
@@ -26,38 +26,29 @@ class ParentsService extends BaseService {
    * Get parent by phone (for parent login).
    */
   async getByPhone(phone) {
-    const { data, error } = await supabase
-      .from('parents')
-      .select('*')
-      .eq('phone', phone)
-      .single();
-
-    return { data: toCamelKeys(data), error };
+    const res = await this.list({ pageSize: 500 });
+    const found = (res.data || []).find(p => (p.phone || '').replace(/\D/g, '') === (phone || '').replace(/\D/g, ''));
+    return { data: found || null, error: null };
   }
 
   /**
    * Get parent with children info.
    */
   async getByIdWithChildren(id) {
-    const { data, error } = await supabase
-      .from('parents')
-      .select('*, students!students_parent_id_fkey(*)')
-      .eq('id', id)
-      .single();
-
-    return { data: toCamelKeys(data), error };
+    const parentRes = await this.getById(id);
+    if (!parentRes.data) return { data: null, error: null };
+    const allStudents = await fetchTableData('students');
+    const children = allStudents.filter(s => String(s.parentId || s.parent_id) === String(id));
+    return { data: { ...parentRes.data, students: children }, error: null };
   }
 
   /**
    * Get child names for a parent.
    */
   async getChildNames(parentId) {
-    const { data, error } = await supabase
-      .from('students')
-      .select('id, name')
-      .eq('parent_id', parentId);
-
-    return { data: toCamelKeys(data || []), error };
+    const allStudents = await fetchTableData('students');
+    const children = allStudents.filter(s => String(s.parentId || s.parent_id) === String(parentId));
+    return { data: children, error: null };
   }
 
   /**

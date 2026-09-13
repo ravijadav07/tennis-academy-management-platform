@@ -35,31 +35,14 @@ export default function Batches() {
         services.enrollments.list({ entity: entityOpt, pageSize: 1000 }),
       ]);
 
-      if (!batchesRes.data || batchesRes.data.length === 0) {
-        const local = db.readAll();
-        setData({
-          batches: local.batches || [],
-          courts: local.courts || [],
-          coaches: local.coaches || [],
-          enrollments: local.enrollments || [],
-        });
-      } else {
-        setData({
-          batches: batchesRes.data || [],
-          courts: courtsRes.data || [],
-          coaches: coachesRes.data || [],
-          enrollments: enrollmentsRes.data || [],
-        });
-      }
-    } catch (err) {
-      console.warn('[Batches] load error, using localDb fallback:', err);
-      const local = db.readAll();
       setData({
-        batches: local.batches || [],
-        courts: local.courts || [],
-        coaches: local.coaches || [],
-        enrollments: local.enrollments || [],
+        batches: batchesRes.data || [],
+        courts: courtsRes.data || [],
+        coaches: coachesRes.data || [],
+        enrollments: enrollmentsRes.data || [],
       });
+    } catch (err) {
+      console.error('[Batches] Google Sheets load error:', err);
     } finally {
       setLoading(false);
     }
@@ -78,17 +61,23 @@ export default function Batches() {
     return batches
       .filter((b) => (b.status || '').toLowerCase() === 'active')
       .map((b) => {
-        const roster = enrollments.filter((e) => e.batchId === b.id && (e.status === 'ACTIVE' || e.status === 'active'));
-        const court = courts.find((c) => c.id === b.courtId);
-        const coach = coaches.find((c) => c.id === b.primaryCoachId);
-        const displayName = getBatchDisplayName(b, courts);
+        const batchCap = Number(b.capacity || b.maxCapacity || b.max_capacity || 0);
+        const dayPat = b.dayPattern || b.daysOfWeek || b.days_of_week || '';
+        const coachId = b.primaryCoachId || b.coach_id || b.coachId;
+        const courtId = b.courtId || b.court_id;
+        const roster = enrollments.filter((e) => (e.batchId || e.batch_id) === b.id && (e.status || '').toLowerCase() === 'active');
+        const court = courts.find((c) => c.id === courtId);
+        const coach = coaches.find((c) => c.id === coachId);
+        const displayName = getBatchDisplayName({ ...b, dayPattern: dayPat, capacity: batchCap }, courts);
         return {
           ...b,
+          capacity: batchCap,
+          dayPattern: dayPat,
           displayName,
           courtName: court?.name || 'Court',
           coachName: coach?.name || 'Unassigned',
           enrolled: roster.length,
-          scheduleText: `${b.dayPattern} · ${formatTime12h(b.startTime)} - ${formatTime12h(b.endTime)}`,
+          scheduleText: `${dayPat} · ${formatTime12h(b.startTime || b.start_time)} - ${formatTime12h(b.endTime || b.end_time)}`,
         };
       });
   }, [batches, enrollments, courts, coaches]);

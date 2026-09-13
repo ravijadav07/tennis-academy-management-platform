@@ -5,7 +5,6 @@
  *          status, notes, created_at, updated_at
  */
 import { BaseService } from './BaseService.js';
-import { supabase, toCamelKeys } from '../utils/supabase.js';
 
 class ReconciliationService extends BaseService {
   constructor() {
@@ -27,15 +26,8 @@ class ReconciliationService extends BaseService {
    * Get reconciliation entry by month/year/entity.
    */
   async getByMonthYear(entity, month, year) {
-    const { data, error } = await supabase
-      .from('reconciliation')
-      .select('*')
-      .eq('entity', entity)
-      .eq('month', month)
-      .eq('year', year)
-      .single();
-
-    return { data: toCamelKeys(data), error };
+    const res = await this.list({ entity, month, year, pageSize: 1 });
+    return { data: res.data?.[0] || null, error: null };
   }
 
   /**

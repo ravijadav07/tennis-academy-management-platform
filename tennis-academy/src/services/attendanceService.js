@@ -1,14 +1,9 @@
 /**
  * Attendance service — student + coach attendance tracking.
- * Table: attendance
- * Columns: id, student_id, batch_id, entity, date, status, session_period,
- *          check_in, check_out, marked_by, created_at, updated_at
- * Table: coach_attendance
- * Columns: id, coach_id, entity, date, status, session_period, check_in,
- *          check_out, approval_status, created_at, updated_at
+ * Uses Google Sheets database storage (via fetchTableData and saveTableData).
  */
 import { BaseService } from './BaseService.js';
-import { supabase, toCamelKeys, entityFilter } from '../utils/supabase.js';
+import { fetchTableData, saveTableData } from '../utils/googleSheets.js';
 
 class AttendanceService extends BaseService {
   constructor() {
@@ -30,62 +25,85 @@ class AttendanceService extends BaseService {
   }
 
   /**
-   * Mark student attendance (calls RPC or direct insert).
+   * Mark student attendance (Google Sheets data store).
    */
   async markAttendance({ studentId, batchId, date, status, sessionPeriod, markedBy = 'coach' }) {
-    const { data, error } = await supabase
-      .from('attendance')
-      .upsert({
-        student_id: studentId,
-        batch_id: batchId,
-        date,
-        status,
-        session_period: sessionPeriod,
-        marked_by: markedBy,
-      }, { onConflict: 'student_id,batch_id,date' })
-      .select()
-      .single();
+    try {
+      const allRows = await fetchTableData('attendance');
+      const sId = String(studentId).trim();
+      const bId = String(batchId).trim();
+      const existingIdx = allRows.findIndex(
+        (r) => String(r.studentId || r.student_id || '').trim() === sId &&
+               String(r.batchId || r.batch_id || '').trim() === bId &&
+               r.date === date
+      );
 
-    return { data: toCamelKeys(data), error };
+      const record = {
+        id: existingIdx >= 0 ? allRows[existingIdx].id : `att_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        studentId: sId,
+        batchId: bId,
+        date,
+        status: String(status).toUpperCase(),
+        sessionPeriod: sessionPeriod || 'full_day',
+        markedBy,
+        createdAt: existingIdx >= 0 ? (allRows[existingIdx].createdAt || new Date().toISOString()) : new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (existingIdx >= 0) {
+        allRows[existingIdx] = { ...allRows[existingIdx], ...record };
+      } else {
+        allRows.unshift(record);
+      }
+
+      saveTableData('attendance', allRows);
+      return { data: record, error: null };
+    } catch (err) {
+      console.warn('[AttendanceService] Google Sheets attendance save issue:', err);
+      return { data: null, error: err };
+    }
   }
 
   /**
    * Get attendance for a specific batch + date.
    */
   async getByBatchAndDate(batchId, date) {
-    const { data, error } = await supabase
-      .from('attendance')
-      .select('*, students(name)')
-      .eq('batch_id', batchId)
-      .eq('date', date)
-      .order('created_at', { ascending: true });
-
-    return { data: toCamelKeys(data || []), error };
+    try {
+      const allRows = await fetchTableData('attendance');
+      const filtered = allRows.filter(
+        (r) => String(r.batchId || r.batch_id || '').trim() === String(batchId).trim() && r.date === date
+      );
+      return { data: filtered, error: null };
+    } catch (err) {
+      return { data: [], error: err };
+    }
   }
 
   /**
    * Get monthly attendance for a student.
    */
   async getMonthlyAttendance(studentId, month, year) {
-    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-    const endDate = `${year}-${String(month).padStart(2, '0')}-31`;
+    try {
+      const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+      const endDate = `${year}-${String(month).padStart(2, '0')}-31`;
+      const allRows = await fetchTableData('attendance');
+      const records = allRows.filter(
+        (r) => String(r.studentId || r.student_id || '').trim() === String(studentId).trim() &&
+               r.date >= startDate && r.date <= endDate
+      );
+      const total = records.length;
+      const attended = records.filter(
+        (r) => String(r.status).toLowerCase() === 'present' || String(r.status).toLowerCase() === 'late'
+      ).length;
 
-    const { data, error } = await supabase
-      .from('attendance')
-      .select('*')
-      .eq('student_id', studentId)
-      .gte('date', startDate)
-      .lte('date', endDate);
-
-    const records = data || [];
-    const total = records.length;
-    const attended = records.filter(r => r.status === 'present' || r.status === 'late').length;
-
-    return {
-      data: toCamelKeys(records),
-      stats: { total, attended, percentage: total > 0 ? Math.round((attended / total) * 100) : 0 },
-      error,
-    };
+      return {
+        data: records,
+        stats: { total, attended, percentage: total > 0 ? Math.round((attended / total) * 100) : 0 },
+        error: null,
+      };
+    } catch (err) {
+      return { data: [], stats: { total: 0, attended: 0, percentage: 0 }, error: err };
+    }
   }
 
   /**
@@ -103,35 +121,58 @@ class AttendanceService extends BaseService {
    * Coach attendance: check-in.
    */
   async coachCheckIn({ coachId, date, sessionPeriod, time }) {
-    const { data, error } = await supabase
-      .from('coach_attendance')
-      .upsert({
-        coach_id: coachId,
+    try {
+      const allRows = await fetchTableData('coach_attendance');
+      const cId = String(coachId).trim();
+      const existingIdx = allRows.findIndex(
+        (r) => String(r.coachId || r.coach_id || '').trim() === cId && r.date === date && r.sessionPeriod === sessionPeriod
+      );
+      const record = {
+        id: existingIdx >= 0 ? allRows[existingIdx].id : `catt_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        coachId: cId,
         date,
         status: 'checked_in',
-        session_period: sessionPeriod,
-        check_in: time,
-        approval_status: 'pending',
-      }, { onConflict: 'coach_id,date,session_period' })
-      .select()
-      .single();
-
-    return { data: toCamelKeys(data), error };
+        sessionPeriod: sessionPeriod || 'full_day',
+        checkIn: time || new Date().toTimeString().slice(0, 5),
+        approvalStatus: 'pending',
+        updatedAt: new Date().toISOString(),
+      };
+      if (existingIdx >= 0) {
+        allRows[existingIdx] = { ...allRows[existingIdx], ...record };
+      } else {
+        allRows.unshift(record);
+      }
+      saveTableData('coach_attendance', allRows);
+      return { data: record, error: null };
+    } catch (err) {
+      return { data: null, error: err };
+    }
   }
 
   /**
    * Coach attendance: check-out.
    */
   async coachCheckOut({ coachId, date, time }) {
-    const { data, error } = await supabase
-      .from('coach_attendance')
-      .update({ check_out: time, status: 'checked_out' })
-      .eq('coach_id', coachId)
-      .eq('date', date)
-      .select()
-      .single();
-
-    return { data: toCamelKeys(data), error };
+    try {
+      const allRows = await fetchTableData('coach_attendance');
+      const cId = String(coachId).trim();
+      const existingIdx = allRows.findIndex(
+        (r) => String(r.coachId || r.coach_id || '').trim() === cId && r.date === date
+      );
+      if (existingIdx >= 0) {
+        allRows[existingIdx] = {
+          ...allRows[existingIdx],
+          checkOut: time || new Date().toTimeString().slice(0, 5),
+          status: 'checked_out',
+          updatedAt: new Date().toISOString(),
+        };
+        saveTableData('coach_attendance', allRows);
+        return { data: allRows[existingIdx], error: null };
+      }
+      return { data: null, error: new Error('Coach attendance record not found') };
+    } catch (err) {
+      return { data: null, error: err };
+    }
   }
 
   /**
@@ -146,13 +187,11 @@ class AttendanceService extends BaseService {
    */
   async getSessionRemark({ batchId, date }) {
     try {
-      const { data, error } = await supabase
-        .from('session_remarks')
-        .select('*')
-        .eq('batch_id', batchId)
-        .eq('date', date)
-        .maybeSingle();
-      return { data: data ? toCamelKeys(data) : null, error };
+      const allRows = await fetchTableData('session_remarks');
+      const found = allRows.find(
+        (r) => String(r.batchId || r.batch_id || '').trim() === String(batchId).trim() && r.date === date
+      );
+      return { data: found || null, error: null };
     } catch (e) {
       return { data: null, error: e };
     }
@@ -163,12 +202,25 @@ class AttendanceService extends BaseService {
    */
   async saveSessionRemark({ batchId, date, remark }) {
     try {
-      const { data, error } = await supabase
-        .from('session_remarks')
-        .upsert({ batch_id: batchId, date, remark }, { onConflict: 'batch_id,date' })
-        .select()
-        .single();
-      return { data: data ? toCamelKeys(data) : null, error };
+      const allRows = await fetchTableData('session_remarks');
+      const bId = String(batchId).trim();
+      const existingIdx = allRows.findIndex(
+        (r) => String(r.batchId || r.batch_id || '').trim() === bId && r.date === date
+      );
+      const record = {
+        id: existingIdx >= 0 ? allRows[existingIdx].id : `sr_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        batchId: bId,
+        date,
+        remark,
+        updatedAt: new Date().toISOString(),
+      };
+      if (existingIdx >= 0) {
+        allRows[existingIdx] = { ...allRows[existingIdx], ...record };
+      } else {
+        allRows.unshift(record);
+      }
+      saveTableData('session_remarks', allRows);
+      return { data: record, error: null };
     } catch (e) {
       return { data: null, error: e };
     }
@@ -179,22 +231,23 @@ class AttendanceService extends BaseService {
    */
   async createCorrectionRequest({ attendanceId, studentId, batchId, date, oldStatus, newStatus, reason, requestedBy }) {
     try {
-      const { data, error } = await supabase
-        .from('attendance_corrections')
-        .insert({
-          attendance_id: attendanceId,
-          student_id: studentId,
-          batch_id: batchId,
-          date,
-          old_status: oldStatus,
-          new_status: newStatus,
-          reason,
-          requested_by: requestedBy,
-          status: 'pending',
-        })
-        .select()
-        .single();
-      return { data: data ? toCamelKeys(data) : null, error };
+      const allRows = await fetchTableData('attendance_corrections');
+      const record = {
+        id: `corr_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        attendanceId,
+        studentId,
+        batchId,
+        date,
+        oldStatus,
+        newStatus,
+        reason,
+        requestedBy,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+      };
+      allRows.unshift(record);
+      saveTableData('attendance_corrections', allRows);
+      return { data: record, error: null };
     } catch (e) {
       return { data: null, error: e };
     }

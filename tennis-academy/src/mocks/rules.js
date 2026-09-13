@@ -46,10 +46,15 @@ export function computeSlotAnalysis(batches, enrollments, { month } = {}) {
   };
   const patternBk = { MWF: {}, TTS: {} };
 
-  for (const b of batches) {
-    if (b.status !== 'ACTIVE' && b.status !== 'active') continue;
+  for (const rawB of batches) {
+    if ((rawB.status || '').toLowerCase() !== 'active') continue;
+    const b = {
+      ...rawB,
+      capacity: Number(rawB.capacity || rawB.maxCapacity || rawB.max_capacity || 0),
+      dayPattern: rawB.dayPattern || rawB.daysOfWeek || rawB.days_of_week || '',
+    };
     const roster = enrollments.filter(
-      (e) => e.batchId === b.id && (e.status === 'ACTIVE' || e.status === 'active') && activeInMonth(e, month)
+      (e) => (e.batchId || e.batch_id) === b.id && ((e.status || '').toLowerCase() === 'active') && activeInMonth(e, month)
     );
 
     if (b.program === 'FITNESS') {
@@ -73,14 +78,15 @@ export function computeSlotAnalysis(batches, enrollments, { month } = {}) {
 
     const reallocated = {};
     for (const e of roster) {
-      if (e.billingProgram !== b.program) {
-        reallocated[e.billingProgram] = (reallocated[e.billingProgram] || 0) + 1;
+      const billingProg = e.billingProgram || e.billing_program || b.program;
+      if (billingProg !== b.program) {
+        reallocated[billingProg] = (reallocated[billingProg] || 0) + 1;
       }
     }
     const movedOut = Object.values(reallocated).reduce((a, c) => a + c, 0);
 
     const ownCap = b.capacity - movedOut;
-    const ownBk = roster.filter((e) => e.billingProgram === b.program).length;
+    const ownBk = roster.filter((e) => (e.billingProgram || e.billing_program || b.program) === b.program).length;
 
     bump(cap, b.program, ownCap);
     bump(booked, b.program, ownBk);
@@ -217,7 +223,7 @@ export function resolveBillingProgram(programs) {
 export function findAmbiguousStudents(enrollments) {
   const byStudent = {};
   for (const e of enrollments) {
-    if (e.status !== 'ACTIVE') continue;
+    if ((e.status || '').toLowerCase() !== 'active') continue;
     if (e.billingProgram === 'FITNESS') continue;
     (byStudent[e.studentId] ||= []).push(e);
   }

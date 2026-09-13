@@ -7,7 +7,8 @@
   "pieces": [
     "@puchoaistudio/tool-webhook",
     "@puchoaistudio/tool-google-sheets",
-    "@puchoaistudio/tool-gmail"
+    "@puchoaistudio/tool-gmail",
+    "@puchoaistudio/tool-date-helper"
   ],
   "template": {
     "displayName": "WF-D Student Onboarding",
@@ -55,7 +56,7 @@
             "payload": "{{trigger['body']}}"
           },
           "sourceCode": {
-            "code": "export const code = async (inputs) => {\n  const p = typeof inputs.payload === 'string' ? JSON.parse(inputs.payload) : inputs.payload;\n  const name = (p.name || p.student_name || '').trim();\n  const phone = (p.phone || p.parent_phone || '').trim();\n  const email = (p.email || p.parent_email || '').trim();\n  const valid = name.length > 0 && (phone.length > 0 || email.length > 0);\n    const dupCheck = name.length > 0 && phone.length > 0 ? { name, phone } : null;\n  return {\n    valid: valid,\n    student_name: name,\n    student_age: p.age || p.student_age || '',\n    student_level: p.level || p.student_level || 'beginner',\n    parent_name: p.parent_name || name + \"'s Parent\",\n    parent_phone: phone,\n    parent_email: email,\n    entity: p.entity || 'tots-tennis',\n    batch_id: p.batch_id || '',\n    coach_id: p.coach_id || '',\n    plan_type: p.plan_type || 'Monthly',\n    amount: parseInt(p.amount || '0'),\n    start_date: p.start_date || new Date().toISOString().split('T')[0],\n    error: valid ? '' : 'Missing required fields: name and at least phone or email'\n  };\n};",
+            "code": "export const code = async (inputs) => {\n  const p = typeof inputs.payload === 'string' ? JSON.parse(inputs.payload) : (inputs.payload || {});\n  const name = (p.name || p.student_name || p.studentName || p.full_name || '').trim();\n  const phone = (p.guardianPhone || p.phone || p.parent_phone || p.guardian_phone || p.parentPhone || '').trim();\n  const email = (p.guardianEmail || p.email || p.parent_email || p.guardian_email || p.parentEmail || '').trim();\n  const guardianName = (p.guardianName || p.parent_name || p.guardian_name || (name ? name + \"'s Guardian\" : '')).trim();\n  const valid = name.length > 0;\n  const hasParent = phone.length > 0 || email.length > 0 || (p.guardianName || p.parent_name || p.guardian_name || '').trim().length > 0;\n  const dob = p.dateOfBirth || p.date_of_birth || p.dob || '';\n  const age = String(p.age || p.student_age || p.studentAge || '');\n  const ageVal = parseInt(age || '0');\n  const ageGroup = p.ageGroup || p.age_group || (ageVal > 0 ? (ageVal < 8 ? 'Under 8' : '8+') : '');\n  const gender = p.gender || 'Male';\n  return {\n    valid: valid ? 'true' : 'false',\n    has_parent: hasParent ? 'true' : 'false',\n    student_id: p.studentId || p.student_id || '',\n    student_name: name,\n    full_name: name,\n    dup_check_name: name,\n    date_of_birth: dob,\n    student_age: age,\n    age: age,\n    age_group: ageGroup,\n    gender: gender,\n    guardian_name: guardianName,\n    parent_name: guardianName,\n    guardian_phone: phone,\n    parent_phone: phone,\n    guardian_email: email,\n    parent_email: email,\n    guardian_relationship: p.guardianRelationship || p.guardian_relationship || 'Parent',\n    alternate_phone: p.alternatePhone || p.alternate_phone || '',\n    student_level: p.level || p.student_level || p.ball_color || p.ballColor || 'Beginner',\n    membership_type: p.membershipType || p.membership_type || 'Member',\n    status: p.status || 'active',\n    remarks: p.remarks || '',\n    enrolled_from: p.enrolledFrom || p.enrolled_from || new Date().toISOString().split('T')[0],\n    enrollment_type: p.enrollmentType || p.enrollment_type || 'Group',\n    program: p.program || p.category || 'General',\n    ball_color: p.ballColor || p.ball_color || 'Red',\n    batch_id: p.batchId || p.batch_id || '',\n    start_date: p.joiningDate || p.joining_date || p.start_date || new Date().toISOString().split('T')[0],\n    joining_date: p.joiningDate || p.joining_date || p.start_date || new Date().toISOString().split('T')[0],\n    package_duration: p.packageDuration || p.package_duration || 'Monthly',\n    plan_type: p.packageDuration || p.package_duration || p.plan_type || 'Monthly',\n    end_date: p.endDate || p.end_date || '',\n    amount: String(p.amount || '0'),\n    base_amount: parseFloat(p.baseAmount || p.amount || '0'),\n    tax_amount: parseFloat(p.taxAmount || '0'),\n    discount: parseFloat(p.discount || '0'),\n    tax_inclusive: p.taxInclusive || false,\n    discount_type: p.discountType || '',\n    discount_val: p.discountVal || '',\n    discount_reason: p.discountReason || '',\n    payment_status: p.paymentStatus || p.payment_status || 'PAID',\n    payment_mode: p.paymentMode || p.payment_mode || 'Cash',\n    amount_received: parseFloat(p.amountReceived || p.amount_received || p.amount || '0'),\n    balance_amount: parseFloat(p.balanceAmount || p.balance_amount || '0'),\n    payment_date: p.paymentDate || p.payment_date || new Date().toISOString().split('T')[0],\n    transaction_ref: p.transactionRef || p.transaction_ref || '',\n    next_payment_due: p.nextPaymentDue || p.next_payment_due || '',\n    coach_id: p.coachId || p.coach_id || '',\n    entity: p.entity || 'TOTS Tennis Academy',\n    academy_id: p.academyId || p.academy_id || 'TOTS',\n    enrollments: p.enrollments || [],\n    error: valid ? '' : 'Missing required field: student name'\n  };\n};",
             "packageJson": "{}"
           },
           "propertySettings": {
@@ -205,7 +206,7 @@
                   "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
                   "sheetId": 74175770,
                   "columnName": "name",
-                  "searchValue": "{{step_1[\"dup_check_name\"]}}",
+                  "searchValue": "{{step_1['student_name']}}",
                   "matchCase": false,
                   "startingRow": 1,
                   "numberOfRows": 1,
@@ -268,14 +269,14 @@
                         [
                           {
                             "operator": "TEXT_EXACTLY_MATCHES",
-                            "firstValue": "{{step_1[\"valid\"]}}",
+                            "firstValue": "{{step_1['valid']}}",
                             "secondValue": "true",
                             "caseSensitive": false
                           },
                           {
-                            "operator": "TEXT_EXACTLY_MATCHES",
-                            "firstValue": "{{step_1_dup[\"rows_count\"]}}",
-                            "secondValue": "1",
+                            "operator": "NUMBER_IS_GREATER_THAN",
+                            "firstValue": "{{step_1_dup['rows'].length}}",
+                            "secondValue": "0",
                             "caseSensitive": false
                           }
                         ]
@@ -294,7 +295,7 @@
                           },
                           {
                             "operator": "TEXT_EXACTLY_MATCHES",
-                            "firstValue": "{{step_1[\"has_parent\"]}}",
+                            "firstValue": "{{step_1['has_parent']}}",
                             "secondValue": "true",
                             "caseSensitive": false
                           }
@@ -308,13 +309,13 @@
                         [
                           {
                             "operator": "TEXT_EXACTLY_MATCHES",
-                            "firstValue": "{{step_1[\"valid\"]}}",
+                            "firstValue": "{{step_1['valid']}}",
                             "secondValue": "true",
                             "caseSensitive": false
                           },
                           {
                             "operator": "TEXT_EXACTLY_MATCHES",
-                            "firstValue": "{{step_1[\"has_parent\"]}}",
+                            "firstValue": "{{step_1['has_parent']}}",
                             "secondValue": "false",
                             "caseSensitive": false
                           }
@@ -403,14 +404,26 @@
                         "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
                         "sheetId": 74175770,
                         "values": {
+                          "id": "{{step_1['student_id']}}",
+                          "academy_id": "{{step_1['academy_id']}}",
+                          "parent_id": "{{step_3['id']}}",
+                          "full_name": "{{step_1['student_name']}}",
                           "name": "{{step_1['student_name']}}",
+                          "date_of_birth": "{{step_1['date_of_birth']}}",
                           "age": "{{step_1['student_age']}}",
+                          "age_group": "{{step_1['age_group']}}",
+                          "gender": "{{step_1['gender']}}",
+                          "skill_level": "{{step_1['student_level']}}",
                           "level": "{{step_1['student_level']}}",
                           "batch_id": "{{step_1['batch_id']}}",
                           "coach_id": "{{step_1['coach_id']}}",
                           "entity": "{{step_1['entity']}}",
-                          "status": "active",
-                          "join_date": "{{step_1['start_date']}}"
+                          "status": "{{step_1['status']}}",
+                          "join_date": "{{step_1['start_date']}}",
+                          "guardian_name": "{{step_1['guardian_name']}}",
+                          "guardian_phone": "{{step_1['guardian_phone']}}",
+                          "guardian_email": "{{step_1['guardian_email']}}",
+                          "membership_type": "{{step_1['membership_type']}}"
                         },
                         "as_string": false,
                         "first_row_headers": true,
@@ -641,9 +654,9 @@
                                 "receiver": [
                                   "{{step_1['parent_email']}}"
                                 ],
-                                "subject": "Welcome to Arnav Jain Tennis Academy!",
-                                "body": "Dear {{step_1['parent_name']}},\n\nYour child {{step_1['student_name']}} has been enrolled in the {{step_1['plan_type']}} program at Arnav Jain Tennis Academy.\n\nProgram: {{step_1['plan_type']}}\nLevel: {{step_1['student_level']}}\nStart Date: {{step_1['start_date']}}\n\nWe are excited to have you on board! For any queries, feel free to reach out.\n\nBest regards,\nArnav Jain Tennis Academy",
-                                "body_type": "text",
+                                 "subject": "Welcome to TOTS Tennis Academy!",
+                                 "body": "<div style=\"max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; overflow: hidden;\"><div style=\"background-color: #0f172a; padding: 24px; text-align: center;\"><h2 style=\"color: #38bdf8; margin: 0; font-size: 22px; font-weight: 700;\">TOTS Tennis Academy</h2><p style=\"color: #94a3b8; margin: 4px 0 0 0; font-size: 13px;\">Student Admission & Onboarding</p></div><div style=\"padding: 24px;\"><p style=\"font-size: 15px; margin-top: 0;\">Dear <strong>{{step_1['guardian_name']}}</strong>,</p><p style=\"font-size: 14px; color: #475569;\">We are thrilled to welcome <strong>{{step_1['student_name']}}</strong> to TOTS Tennis Academy! Your admission and program enrollment details have been confirmed.</p><div style=\"background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 20px 0;\"><h4 style=\"margin: 0 0 12px 0; color: #0f172a; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;\">Enrollment Summary</h4><table style=\"width: 100%; font-size: 13px; color: #334155; border-collapse: collapse;\"><tr><td style=\"padding: 6px 0; font-weight: 600; width: 40%;\">Student Name:</td><td style=\"padding: 6px 0;\">{{step_1['student_name']}}</td></tr><tr><td style=\"padding: 6px 0; font-weight: 600;\">Program / Category:</td><td style=\"padding: 6px 0;\">{{step_1['program']}}</td></tr><tr><td style=\"padding: 6px 0; font-weight: 600;\">Ball Color / Level:</td><td style=\"padding: 6px 0;\">{{step_1['ball_color']}}</td></tr><tr><td style=\"padding: 6px 0; font-weight: 600;\">Enrollment Type:</td><td style=\"padding: 6px 0;\">{{step_1['enrollment_type']}}</td></tr><tr><td style=\"padding: 6px 0; font-weight: 600;\">Joining Date:</td><td style=\"padding: 6px 0;\">{{step_1['joining_date']}}</td></tr><tr><td style=\"padding: 6px 0; font-weight: 600;\">Payment Status:</td><td style=\"padding: 6px 0;\"><span style=\"background-color: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 4px; font-weight: 600;\">{{step_1['payment_status']}}</span></td></tr></table></div><p style=\"font-size: 14px; color: #475569;\">If you have any questions or require assistance, please feel free to reach out to our team.</p></div><div style=\"background-color: #f1f5f9; padding: 16px 24px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0;\"><p style=\"margin: 0;\">© TOTS Tennis Academy. All rights reserved.</p></div></div>",
+                                 "body_type": "html",
                                 "cc": [],
                                 "bcc": [],
                                 "reply_to": [],
@@ -718,7 +731,7 @@
                                       "parent_id": "{{step_3['id']}}",
                                       "message": "Student enrolled successfully",
                                       "batch_capacity": "{{step_1a_cap['rows'][0]['capacity']}}",
-                                      "batch_enrolled": "{{step_1b_count['rows_count']}}"
+                                      "batch_enrolled": "{{step_1b_count['rows'].length}}"
                                     },
                                     "status": 200,
                                     "headers": {}
@@ -787,14 +800,26 @@
                         "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
                         "sheetId": 74175770,
                         "values": {
+                          "id": "{{step_1['student_id']}}",
+                          "academy_id": "{{step_1['academy_id']}}",
+                          "parent_id": "",
+                          "full_name": "{{step_1['student_name']}}",
                           "name": "{{step_1['student_name']}}",
+                          "date_of_birth": "{{step_1['date_of_birth']}}",
                           "age": "{{step_1['student_age']}}",
+                          "age_group": "{{step_1['age_group']}}",
+                          "gender": "{{step_1['gender']}}",
+                          "skill_level": "{{step_1['student_level']}}",
                           "level": "{{step_1['student_level']}}",
                           "batch_id": "{{step_1['batch_id']}}",
                           "coach_id": "{{step_1['coach_id']}}",
                           "entity": "{{step_1['entity']}}",
-                          "status": "active",
-                          "join_date": "{{step_1['start_date']}}"
+                          "status": "{{step_1['status']}}",
+                          "join_date": "{{step_1['start_date']}}",
+                          "guardian_name": "{{step_1['guardian_name']}}",
+                          "guardian_phone": "{{step_1['guardian_phone']}}",
+                          "guardian_email": "{{step_1['guardian_email']}}",
+                          "membership_type": "{{step_1['membership_type']}}"
                         },
                         "as_string": false,
                         "first_row_headers": true,
@@ -913,7 +938,7 @@
                                 "package_id": "{{step_3np['id']}}",
                                 "message": "Student enrolled successfully (no parent info provided)",
                                 "batch_capacity": "{{step_1a_cap['rows'][0]['capacity']}}",
-                                "batch_enrolled": "{{step_1b_count['rows_count']}}"
+                                "batch_enrolled": "{{step_1b_count['rows'].length}}"
                               },
                               "status": 200,
                               "headers": {}

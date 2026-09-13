@@ -9,6 +9,7 @@ import Modal from '../../ui/Modal';
 import Button from '../../ui/Button';
 import EligibilityStatusPill from '../../ui/EligibilityStatusPill';
 import Dropdown from '../../ui/Dropdown';
+import DatePicker from '../../ui/DatePicker';
 import { toast } from 'sonner';
 import { Search, Plus, Pencil, Archive, UserPlus, FileText, RefreshCw, Mail } from 'lucide-react';
 import { GST_RATE } from '../../../utils/settings';
@@ -16,6 +17,7 @@ import { preparePaymentReminder } from '../../../utils/notificationEngine';
 import { triggerWorkflow } from '../../../utils/api';
 import { formatDateDDMMYY, formatTime12h, getBatchDisplayName } from '../../../utils/formatters';
 import { validatePhone, validateEmail, validateName } from '../../../utils/validators';
+import { generateStudentOnboardingIds, generateIncrementalId } from '../../../utils/idGenerator';
 
 const fieldBase = 'w-full h-[38px] px-3 rounded-lg border border-line bg-white text-[13px] text-ink outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand transition-all';
 const labelCls = 'block text-[10px] font-semibold text-ink-muted uppercase tracking-[0.04em] mb-1';
@@ -192,14 +194,14 @@ function renderEnrollmentBlock(blk, setBlk, removable, onRemove, batchOptions = 
           React.createElement(Dropdown, { value: blk.batchId, onChange: (v) => setBlk({ ...blk, batchId: typeof v === 'object' ? (v?.value || '') : (v || '') }), placeholder: !blk.program ? 'Select Category first' : batches.length === 0 ? 'No batches available' : 'Select batch...', disabled: !blk.program || batches.length === 0, options: batches.map((b) => ({ value: b.id, label: `${getBatchDisplayName(b, courts)} (${b.dayPattern})` })), getOptionLabel: (o) => o?.label || '', getOptionValue: (o) => o?.value || '' })),
         React.createElement('div', { className: 'space-y-1' },
           React.createElement('label', { className: labelCls }, 'Joining Date'),
-          React.createElement('input', { type: 'date', value: blk.joiningDate, onChange: (e) => setBlk({ ...blk, joiningDate: e.target.value }), className: fieldBase }))),
+          React.createElement('input', { type: 'date', value: blk.joiningDate, onChange: (e) => { const jd = e.target.value; const dur = DURATION_OPTIONS.find((x) => x.value === blk.packageDuration); const months = dur?.months; const endDate = blk.packageDuration === 'custom' ? blk.endDate : computeEndDate(jd, months); setBlk({ ...blk, joiningDate: jd, endDate }); }, className: fieldBase }))),
       React.createElement('div', { className: 'grid grid-cols-2 gap-3 mt-3' },
         React.createElement('div', { className: 'space-y-1' },
           React.createElement('label', { className: labelCls }, 'Package Duration'),
           React.createElement(Dropdown, { value: blk.packageDuration, onChange: (v) => { const d = typeof v === 'object' ? (v?.value || '') : (v || ''); const dur = DURATION_OPTIONS.find((x) => x.value === d); const months = dur?.months; const endDate = d === 'custom' ? blk.endDate : computeEndDate(blk.joiningDate, months); setBlk({ ...blk, packageDuration: d, endDate }); }, placeholder: 'Skip', options: DURATION_OPTIONS, getOptionLabel: (o) => o?.label || '', getOptionValue: (o) => o?.value || '' })),
         React.createElement('div', { className: 'space-y-1' },
           React.createElement('label', { className: labelCls }, 'End Date ' + (blk.packageDuration === 'custom' ? '(manual)' : '(auto)')),
-          React.createElement('input', { type: blk.packageDuration === 'custom' ? 'date' : 'text', value: blk.endDate || '', onChange: (e) => setBlk({ ...blk, endDate: e.target.value }), className: fieldBase, disabled: blk.packageDuration && blk.packageDuration !== 'custom', placeholder: blk.packageDuration ? 'auto-computed' : 'YYYY-MM-DD' }))),
+          React.createElement('input', { type: 'date', value: blk.endDate || '', onChange: (e) => setBlk({ ...blk, endDate: e.target.value }), className: fieldBase, disabled: blk.packageDuration && blk.packageDuration !== 'custom' }))),
       React.createElement('div', { className: 'border-t border-line mt-3 pt-3' },
         React.createElement('p', { className: 'text-[10px] font-semibold text-ink-muted uppercase mb-2' }, 'Fee & Tax'),
         React.createElement('div', { className: 'grid grid-cols-2 gap-3' },
@@ -242,10 +244,42 @@ export default function AdminStudents() {
   // Add Student modal
   const [showAdd, setShowAdd] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [addForm, setAddForm] = useState({ name: '', guardianName: '', guardianPhone: '', guardianEmail: '', membershipType: 'Member', program: '', ballColor: '', batchId: '', sessionsPurchased: '', amount: '', paymentStatus: 'PAID', enrollments: [newEnrollmentBlock()] });
+  const [addForm, setAddForm] = useState({ name: '', dateOfBirth: '', age: '', ageGroup: 'Under 8', gender: 'Male', guardianName: '', guardianPhone: '', guardianEmail: '', membershipType: 'Member', program: '', ballColor: '', batchId: '', sessionsPurchased: '', amount: '', paymentStatus: 'PAID', enrollments: [newEnrollmentBlock()] });
   const [addErrors, setAddErrors] = useState({});
   const [editErrors, setEditErrors] = useState({});
   const [dupCheck, setDupCheck] = useState(null);
+
+  const getAgeGroupFromAge = (ageStr) => {
+    const num = parseInt(ageStr || '0', 10);
+    if (isNaN(num) || num <= 0) return 'Under 8';
+    if (num < 8) return 'Under 8';
+    if (num >= 8 && num < 18) return '8+';
+    return 'Adult';
+  };
+
+  const handleAgeChange = (ageStr) => {
+    const calculatedGroup = getAgeGroupFromAge(ageStr);
+    setAddForm((f) => ({ ...f, age: ageStr, ageGroup: calculatedGroup }));
+  };
+
+  const handleDobChange = (dobStr) => {
+    let calculatedAge = addForm.age;
+    let calculatedGroup = addForm.ageGroup || 'Under 8';
+    if (dobStr) {
+      const dob = new Date(dobStr);
+      if (!isNaN(dob.getTime())) {
+        const today = new Date();
+        let ageYears = today.getFullYear() - dob.getFullYear();
+        const m = today.getMonth() - dob.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+          ageYears--;
+        }
+        calculatedAge = String(Math.max(0, ageYears));
+        calculatedGroup = getAgeGroupFromAge(calculatedAge);
+      }
+    }
+    setAddForm((f) => ({ ...f, dateOfBirth: dobStr, age: calculatedAge, ageGroup: calculatedGroup }));
+  };
 
   // Edit Student modal
   const [showEdit, setShowEdit] = useState(false);
@@ -406,8 +440,20 @@ export default function AdminStudents() {
     }
     setIsSubmitting(true);
     try {
+      const dbState = db.readAll();
+      const ids = generateStudentOnboardingIds(dbState);
+
       const student = await db.upsertStudent({
+        id: ids.studentId,
+        parentId: ids.parentId,
+        academyId: ids.academyId,
         name: addForm.name.trim(),
+        dateOfBirth: addForm.dateOfBirth || '',
+        date_of_birth: addForm.dateOfBirth || '',
+        age: addForm.age || '',
+        ageGroup: addForm.ageGroup || '',
+        age_group: addForm.ageGroup || '',
+        gender: addForm.gender || 'Male',
         guardianName: addForm.guardianName || addForm.name + "'s Guardian",
         guardianPhone: addForm.guardianPhone || '',
         guardianEmail: addForm.guardianEmail || '',
@@ -422,6 +468,10 @@ export default function AdminStudents() {
       const blocks = addForm.membershipType === 'Guest' ? addForm.enrollments.slice(0, 1) : addForm.enrollments;
 
       for (const blk of blocks) {
+        const currentData = db.readAll();
+        const enrId = generateIncrementalId('en', currentData.enrollments || [], { padZeroes: 3, startFrom: 1 });
+        const pkgId = generateIncrementalId('pkg', currentData.packages || [], { padZeroes: 3, startFrom: 1 });
+
         if (blk.enrollmentType === 'Customised') {
           if (!blk.customLineItems || blk.customLineItems.length === 0) {
             throw new Error('Customised package requires at least one line item mapped to a category');
@@ -434,8 +484,10 @@ export default function AdminStudents() {
           const fee = calcFee(finalAmt, blk.taxInclusive, blk.discountType, blk.discountVal, GST_RATE);
           const rec = parseFloat(blk.amountReceived) || 0;
           await db.upsertEnrollment({
+            id: enrId,
             studentId: student.id,
             batchId: null,
+            packageId: pkgId,
             billingProgram: blk.customLineItems[0]?.category || 'ADV',
             enrollmentType: 'Customised',
             customLineItems: blk.customLineItems,
@@ -443,6 +495,7 @@ export default function AdminStudents() {
             startDate: blk.joiningDate || new Date().toISOString().split('T')[0],
           });
           await db.upsertPackage({
+            id: pkgId,
             studentId: student.id,
             program: blk.customLineItems[0]?.category || 'ADV',
             enrollmentType: 'Customised',
@@ -466,8 +519,10 @@ export default function AdminStudents() {
           const rate = parseFloat(blk.amount) || 0;
           const fee = calcFee(rate, blk.taxInclusive, blk.discountType, blk.discountVal, GST_RATE);
           await db.upsertEnrollment({
+            id: enrId,
             studentId: student.id,
             batchId: null,
+            packageId: pkgId,
             coachId: blk.coachId || null,
             billingProgram: 'PRIVATE',
             enrollmentType: 'Private',
@@ -475,6 +530,7 @@ export default function AdminStudents() {
             startDate: blk.joiningDate || new Date().toISOString().split('T')[0],
           });
           await db.upsertPackage({
+            id: pkgId,
             studentId: student.id,
             program: 'PRIVATE',
             coachId: blk.coachId || null,
@@ -497,8 +553,10 @@ export default function AdminStudents() {
           // Group, Add-on, HPP, Guest
           if (blk.program && blk.batchId) {
             await db.upsertEnrollment({
+              id: enrId,
               studentId: student.id,
               batchId: blk.batchId,
+              packageId: pkgId,
               billingProgram: blk.program,
               ballLevel: blk.ballColor || null,
               enrollmentType: blk.enrollmentType || 'Group',
@@ -511,6 +569,7 @@ export default function AdminStudents() {
               const fee = calcFee(blk.amount, blk.taxInclusive, blk.discountType, blk.discountVal, GST_RATE);
               const rec = parseFloat(blk.amountReceived) || 0;
               await db.upsertPackage({
+                id: pkgId,
                 studentId: student.id,
                 program: blk.program,
                 packageDuration: blk.packageDuration || null,
@@ -537,13 +596,68 @@ export default function AdminStudents() {
         }
       }
 
-      // Trigger WF-D Student Onboarding Webhook
+      const firstBlock = addForm.enrollments[0] || {};
+      const firstDm = DURATION_OPTIONS.find((d) => d.value === firstBlock.packageDuration)?.months;
+      const firstEnd = firstBlock.packageDuration === 'custom' ? firstBlock.endDate : computeEndDate(firstBlock.joiningDate, firstDm);
+      const firstFee = calcFee(firstBlock.amount, firstBlock.taxInclusive, firstBlock.discountType, firstBlock.discountVal, GST_RATE);
+      const firstRec = parseFloat(firstBlock.amountReceived) || 0;
+
+      // Trigger WF-D Student Onboarding Webhook with all form fields and pre-created IDs
       triggerWorkflow('student.onboard', {
         studentId: student.id,
+        student_id: student.id,
+        parentId: ids.parentId,
+        parent_id: ids.parentId,
+        packageId: ids.packageId,
+        package_id: ids.packageId,
+        enrollmentId: ids.enrollmentId,
+        enrollment_id: ids.enrollmentId,
+        paymentId: ids.paymentId,
+        payment_id: ids.paymentId,
+        academyId: ids.academyId,
+        academy_id: ids.academyId,
         name: student.name,
+        dateOfBirth: addForm.dateOfBirth || '',
+        date_of_birth: addForm.dateOfBirth || '',
+        age: addForm.age || '',
+        student_age: addForm.age || '',
+        ageGroup: addForm.ageGroup || '',
+        age_group: addForm.ageGroup || '',
+        gender: addForm.gender || 'Male',
         guardianName: student.guardianName,
         guardianEmail: student.guardianEmail,
         guardianPhone: student.guardianPhone,
+        guardianRelationship: student.guardianRelationship || 'Father',
+        alternatePhone: student.alternatePhone || '',
+        membershipType: student.membershipType || 'Member',
+        status: student.status || 'ACTIVE',
+        remarks: student.remarks || '',
+        enrolledFrom: student.enrolledFrom || new Date().toISOString().split('T')[0],
+        enrollmentType: firstBlock.enrollmentType || 'Group',
+        program: firstBlock.program || '',
+        category: firstBlock.program || '',
+        ballColor: firstBlock.ballColor || '',
+        batchId: firstBlock.batchId || '',
+        joiningDate: firstBlock.joiningDate || '',
+        packageDuration: firstBlock.packageDuration || '',
+        endDate: firstEnd || firstBlock.endDate || '',
+        amount: firstFee.finalAmount || parseFloat(firstBlock.amount) || 0,
+        baseAmount: firstFee.baseAmount || 0,
+        taxAmount: firstFee.taxAmount || 0,
+        discount: firstFee.discount || 0,
+        taxInclusive: firstBlock.taxInclusive || false,
+        discountType: firstBlock.discountType || '',
+        discountVal: firstBlock.discountVal || '',
+        discountReason: firstBlock.discountReason || '',
+        paymentStatus: firstBlock.paymentStatus || 'PAID',
+        paymentMode: firstBlock.paymentMode || '',
+        amountReceived: firstRec,
+        balanceAmount: (firstFee.finalAmount || 0) - firstRec,
+        paymentDate: firstBlock.paymentDate || '',
+        transactionRef: firstBlock.transactionRef || '',
+        nextPaymentDue: firstBlock.nextPaymentDue || '',
+        coachId: firstBlock.coachId || '',
+        enrollments: addForm.enrollments,
       }).then((res) => {
         if (res?.mock || res?.status === 410) {
           toast.info(`WF-D Student Onboarding: Processed for ${student.name} (Offline Mode)`);
@@ -913,6 +1027,29 @@ export default function AdminStudents() {
             <input value={addForm.name} onChange={(e) => { const v = e.target.value; setAddForm((f) => ({ ...f, name: v })); setAddErrors((prev) => ({ ...prev, name: validateName(v, 'Student name') })); }} onBlur={checkDup}
               className={`${fieldBase} ${addErrors.name ? 'border-red-400' : ''}`} placeholder="Student name" />
             {addErrors.name && <p className="text-[10px] text-err mt-0.5">{addErrors.name}</p>}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mt-2">
+            <div className="space-y-1">
+              <label className={labelCls}>Date of Birth</label>
+              <input
+                type="date"
+                value={addForm.dateOfBirth || ''}
+                onChange={(e) => handleDobChange(e.target.value)}
+                className={fieldBase}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className={labelCls}>Age</label>
+              <input type="number" value={addForm.age || ''} onChange={(e) => handleAgeChange(e.target.value)} className={fieldBase} placeholder="Years" />
+            </div>
+            <div className="space-y-1">
+              <label className={labelCls}>Age Group</label>
+              <Dropdown value={addForm.ageGroup || 'Under 8'} onChange={(v) => setAddForm((f) => ({ ...f, ageGroup: typeof v === 'object' ? (v.value || v) : v }))} options={['Under 8', '8+', 'U-6', 'U-8', 'U-10', 'U-12', 'U-14', 'U-16', 'U-18', 'Adult'].map((g) => ({ value: g, label: g }))} getOptionLabel={(o) => o.label} getOptionValue={(o) => o.value} />
+            </div>
+            <div className="space-y-1">
+              <label className={labelCls}>Gender</label>
+              <Dropdown value={addForm.gender || 'Male'} onChange={(v) => setAddForm((f) => ({ ...f, gender: typeof v === 'object' ? (v.value || v) : v }))} options={[{ value: 'Male', label: 'Male' }, { value: 'Female', label: 'Female' }, { value: 'Other', label: 'Other' }]} getOptionLabel={(o) => o.label} getOptionValue={(o) => o.value} />
+            </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">

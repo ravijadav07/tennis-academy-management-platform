@@ -13,6 +13,8 @@ import Input from '../../ui/Input';
 import Dropdown from '../../ui/Dropdown';
 import Button from '../../ui/Button';
 import { formatCurrency, formatDate } from '../../../utils/formatters';
+import { db } from '../../../mocks/localDb';
+import { generateIncrementalId } from '../../../utils/idGenerator';
 
 const gatewayOptions = [
   { value: 'stripe', label: 'Stripe' },
@@ -162,15 +164,43 @@ export default function Payments() {
   const handleMarkAsPaid = async (item) => {
     const p = toast.loading('Capturing payment...');
     try {
+      const paymentId = item.id || `pay_${Date.now()}`;
+      const studentId = item.studentId || `st_${Date.now()}`;
+      const parentId = item.parentId || `parent-${Date.now()}`;
+      const packageId = item.packageId || `pkg-${Date.now()}`;
+      const enrollmentId = item.enrollmentId || `en-${Date.now()}`;
+      const academyId = import.meta.env.VITE_ACADEMY_ID;
+
       await triggerWorkflow('payment.capture', {
-        payment_id: item.id,
-        student_id: item.studentId,
+        payment_id: paymentId,
+        paymentId: paymentId,
+        student_id: studentId,
+        studentId: studentId,
+        parent_id: parentId,
+        parentId: parentId,
+        package_id: packageId,
+        packageId: packageId,
+        enrollment_id: enrollmentId,
+        enrollmentId: enrollmentId,
+        academy_id: academyId,
+        academyId: academyId,
         student_name: item.studentName,
-        parent_name: item.parentName,
+        studentName: item.studentName,
+        parent_name: item.parentName || item.guardianName || '',
+        parentName: item.parentName || item.guardianName || '',
+        parent_email: item.email || item.guardianEmail || '',
+        parentEmail: item.email || item.guardianEmail || '',
+        parent_phone: item.phone || item.guardianPhone || '',
+        parentPhone: item.phone || item.guardianPhone || '',
         amount: item.amount,
+        status: 'PAID',
         gateway: item.gateway,
         type: item.type,
-        business_entity: item.business_entity,
+        business_entity: item.business_entity || item.entity,
+        entity: item.business_entity || item.entity,
+        ref: item.ref || item.transactionRef || '',
+        transactionRef: item.ref || item.transactionRef || '',
+        paymentDate: item.date || new Date().toISOString().split('T')[0],
       });
       toast.success(`Payment captured for ${item.studentName}`, { id: p });
     } catch (err) {

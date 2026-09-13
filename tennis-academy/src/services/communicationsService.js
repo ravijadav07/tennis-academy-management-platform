@@ -5,7 +5,6 @@
  *          date, created_at, updated_at
  */
 import { BaseService } from './BaseService.js';
-import { supabase, toCamelKeys } from '../utils/supabase.js';
 
 class CommunicationsService extends BaseService {
   constructor() {
@@ -35,13 +34,7 @@ class CommunicationsService extends BaseService {
    * Get communications for a parent.
    */
   async getByParent(parentId) {
-    const { data, error } = await supabase
-      .from('communications_log')
-      .select('*')
-      .eq('parent_id', parentId)
-      .order('date', { ascending: false });
-
-    return { data: toCamelKeys(data || []), error };
+    return this.list({ parentId, pageSize: 200 });
   }
 
   /**

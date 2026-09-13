@@ -373,7 +373,7 @@
                         "llmOutput": "{{step_6['data']['response']}}"
                       },
                       "sourceCode": {
-                        "code": "export const code = async (inputs) => {\n  const step5 = inputs.step5 || {};\n  const llmOutput = inputs.llmOutput || '';\n  const target = step5.target || {};\n\n  // Clean LLM output — remove any markdown fences or preamble\n  let body = llmOutput;\n  const match = body.match(/[\\s\\S]*/);\n  if (match) body = match[0];\n  body = body.replace(/```[\\s\\S]*?```/g, '').trim();\n\n  return {\n    parentEmail: target.parentEmail || '',\n    parentName: target.parentName || 'Parent',\n    studentName: target.studentName || 'Student',\n    subject: step5.subject || 'Payment Reminder',\n    body: body || 'Dear Parent,\\n\\nThis is a payment reminder for your child\\'s tennis academy enrollment.\\n\\nRegards,\\nTennis Academy Management',\n    studentId: target.studentId || '',\n    packageId: target.packageId || '',\n    totalPending: step5.totalPending || 0\n  };\n};",
+                        "code": "export const code = async (inputs) => {\n  const step5 = inputs.step5 || {};\n  const llmOutput = inputs.llmOutput || '';\n  const target = step5.target || {};\n\n  let textBody = llmOutput.replace(/```[a-z]*\\n?/gi, '').replace(/```/g, '').trim();\n  if (!textBody) {\n    textBody = `Dear ${target.parentName || 'Parent'},\n\nThis is a friendly payment reminder for ${target.studentName || 'your child'}'s training package at TOTS Tennis Academy.\n\nRegards,\nTOTS Tennis Academy`;\n  }\n  textBody = textBody.replace(/Arnav Jain Tennis Academy/gi, 'TOTS Tennis Academy');\n\n  const htmlBody = `<div style=\"max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; overflow: hidden;\"><div style=\"background-color: #0f172a; padding: 24px; text-align: center;\"><h2 style=\"color: #38bdf8; margin: 0; font-size: 22px; font-weight: 700;\">TOTS Tennis Academy</h2><p style=\"color: #94a3b8; margin: 4px 0 0 0; font-size: 13px;\">Fee Payment Reminder</p></div><div style=\"padding: 24px;\"><p style=\"font-size: 15px; margin-top: 0;\">Dear <strong>${target.parentName || 'Parent'}</strong>,</p><div style=\"background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 16px 0; font-size: 14px; color: #334155; line-height: 1.6;\">${textBody.replace(/\\n/g, '<br>')}</div><p style=\"font-size: 14px; color: #475569;\">Thank you for your prompt attention to this matter.</p></div><div style=\"background-color: #f1f5f9; padding: 16px 24px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0;\"><p style=\"margin: 0;\">© TOTS Tennis Academy. All rights reserved.</p></div></div>`;\n\n  const rawSub = step5.subject || 'Payment Reminder — TOTS Tennis Academy';\n  const cleanSub = rawSub.replace(/Arnav Jain Tennis Academy/gi, 'TOTS Tennis Academy');\n\n  return {\n    parentEmail: target.parentEmail || '',\n    parentName: target.parentName || 'Parent',\n    studentName: target.studentName || 'Student',\n    subject: cleanSub.includes('TOTS Tennis Academy') ? cleanSub : cleanSub + ' - TOTS Tennis Academy',\n    body: htmlBody,\n    body_type: 'html',\n    studentId: target.studentId || '',\n    packageId: target.packageId || '',\n    totalPending: step5.totalPending || 0\n  };\n};",
                         "packageJson": "{}"
                       },
                       "propertySettings": {
@@ -406,11 +406,11 @@
                           "to": "{{step_7['parentEmail']}}",
                           "subject": "{{step_7['subject']}}",
                           "body": "{{step_7['body']}}",
-                          "body_type": "text",
+                          "body_type": "html",
                           "cc": [],
                           "bcc": [],
                           "reply_to": [],
-                          "sender_name": "Tennis Academy Management",
+                          "sender_name": "TOTS Tennis Academy",
                           "draft": false
                         },
                         "pieceName": "@puchoaistudio/tool-gmail",

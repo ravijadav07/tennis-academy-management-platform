@@ -103,8 +103,8 @@ export function useDashboard() {
         id: s.id,
         _type: 'private',
         name: `Private Coaching - ${s.clientName || 'Client'}`,
-        startTime: s.startTime,
-        endTime: s.endTime,
+        startTime: s?.startTime || '',
+        endTime: s?.endTime || '',
         primaryCoachId: s.coachId,
         coachName: coach?.name || 'Coach',
         clientName: s.clientName,
@@ -138,7 +138,7 @@ export function useDashboard() {
     const slots = {};
     activeBatches.forEach((b) => {
       if (!b.primaryCoachId) return;
-      const key = b.primaryCoachId + '|' + b.dayPattern + '|' + b.startTime;
+      const key = (b.primaryCoachId || '') + '|' + (b.dayPattern || '') + '|' + (b.startTime || '');
       if (!slots[key]) slots[key] = { coachId: b.primaryCoachId, batches: [] };
       slots[key].batches.push(b);
     });
