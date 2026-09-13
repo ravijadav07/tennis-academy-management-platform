@@ -197,7 +197,7 @@ export default function Reports() {
 
   // Filtered batches
   const filteredBatches = useMemo(() => {
-    let b = batches.filter((b) => b.status === 'ACTIVE');
+    let b = batches.filter((b) => (b.status || '').toLowerCase() === 'active');
     if (filterPattern) b = b.filter((b) => b.dayPattern === filterPattern);
     if (filterCategory) b = b.filter((b) => b.program === filterCategory);
     if (filterCourt) b = b.filter((b) => b.courtId === filterCourt);

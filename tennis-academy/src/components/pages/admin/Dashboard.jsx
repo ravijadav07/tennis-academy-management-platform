@@ -44,7 +44,7 @@ export default function AdminDashboard() {
     (courts || []).filter(c => c.status !== 'INACTIVE' && c.status !== 'inactive').forEach(c => {
       courtsMap[c.id] = { court: c, batches: [] };
     });
-    (batches || []).filter(b => (b.status === 'ACTIVE' || b.status === 'active') && b.dayPattern === agendaPattern).forEach(b => {
+    (batches || []).filter(b => (b.status || '').toLowerCase() === 'active' && b.dayPattern === agendaPattern).forEach(b => {
       if (courtsMap[b.courtId]) courtsMap[b.courtId].batches.push(b);
     });
     return Object.values(courtsMap).filter(g => g.batches.length > 0);

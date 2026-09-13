@@ -56,7 +56,7 @@ export default function MyStats() {
   const coachBatches = useMemo(() => {
     if (!coachId) return [];
     return (state.batches || []).filter(
-      (b) => (b.primaryCoachId === coachId || b.supportCoachId === coachId) && (b.status === 'ACTIVE' || b.status === 'active')
+      (b) => (b.primaryCoachId === coachId || b.supportCoachId === coachId) && ((b.status || '').toLowerCase() === 'active')
     );
   }, [state.batches, coachId]);
 

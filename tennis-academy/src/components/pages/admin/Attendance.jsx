@@ -263,7 +263,7 @@ export default function AdminAttendance() {
             value={selectedBatchId}
             onChange={(v) => setSelectedBatchId(typeof v === 'object' ? (v.value || v) : v)}
             placeholder="Select batch..."
-            options={(data.batches || []).filter((b) => b.status === 'ACTIVE' || b.status === 'active').map((b) => ({
+            options={(data.batches || []).filter((b) => (b.status || '').toLowerCase() === 'active').map((b) => ({
               value: b.id,
               label: `${getBatchDisplayName(b, data.courts)} (${b.dayPattern})`
             }))}

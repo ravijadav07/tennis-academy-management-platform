@@ -55,7 +55,7 @@ export function useSchedule(dayPattern = 'MWF') {
 
   const filtered = useMemo(() => {
     const active = batches.filter((b) => {
-      const matchStatus = b.status === 'ACTIVE' || b.status === 'active';
+      const matchStatus = (b.status || '').toLowerCase() === 'active';
       const matchPattern = b.dayPattern === dayPattern ||
         (dayPattern === 'SAT_SUN' && (b.dayPattern === 'WEEKEND' || b.dayPattern === 'SAT_SUN')) ||
         (dayPattern === 'WEEKEND' && (b.dayPattern === 'SAT_SUN' || b.dayPattern === 'WEEKEND'));

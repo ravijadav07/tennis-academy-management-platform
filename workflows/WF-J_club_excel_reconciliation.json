@@ -131,7 +131,8 @@
               "input": {
                 "excel_rows": "{{step_1['rows']}}",
                 "students": "{{step_2['data']}}",
-                "entity": "{{step_1['entity']}}"
+                "entity": "{{step_1['entity']}}",
+                "sheetId": 1376492719
               },
               "sourceCode": {
                 "code": "export const code = async (inputs) => {\n  const excelRows = typeof inputs.excel_rows === 'string' ? JSON.parse(inputs.excel_rows) : (inputs.excel_rows || []);\n  const students = typeof inputs.students === 'string' ? JSON.parse(inputs.students) : (inputs.students || []);\n  const entity = inputs.entity || 'the-club';\n  const studentMap = {};\n  students.forEach(s => { studentMap[s.name.toLowerCase()] = s; });\n  let matchedCount = 0, mismatchCount = 0, newCount = 0;\n  const entries = excelRows.map(r => {\n    const student = studentMap[r.student_name.toLowerCase()];\n    let status = 'new';\n    if (student) { status = 'matched'; matchedCount++; }\n    else { newCount++; }\n    return {\n      student_id: student ? student.id : '',\n      student_name: r.student_name,\n      entity: entity,\n      excel_amount: r.excel_amount,\n      system_amount: 0,\n      gateway: r.gateway,\n      status: status,\n      date: r.date,\n      note: r.note\n    };\n  });\n  return { entries: entries, matched_count: matchedCount, mismatch_count: mismatchCount, new_count: newCount, total_rows: excelRows.length };\n};",
@@ -167,7 +168,7 @@
                 "input": {
                   "auth": "",
                   "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
-                  "sheetId": 0,
+                  "sheetId": 1376492719,
                   "values": {
                     "student_id": "{{step_3['entries'][0]['student_id']}}",
                     "entity": "{{step_3['entries'][0]['entity']}}",

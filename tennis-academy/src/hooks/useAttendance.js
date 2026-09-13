@@ -82,7 +82,7 @@ export function useAllBatches() {
         const entityOpt = entity === 'all' ? undefined : entity;
         const res = await services.batches.list({ entity: entityOpt, pageSize: 500 });
         if (active) {
-          setBatches((res.data || []).filter((b) => b.status === 'ACTIVE' || b.status === 'active'));
+          setBatches((res.data || []).filter((b) => (b.status || '').toLowerCase() === 'active'));
         }
       } catch (err) {
         console.error('[useAllBatches] error:', err);

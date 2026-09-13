@@ -69,7 +69,7 @@ export default function CoachToday() {
 
   const batches = (data.batches || []).filter(
     (b) => (b.primaryCoachId === coachId || b.supportCoachId === coachId) &&
-           (b.status === 'ACTIVE' || b.status === 'active') &&
+           ((b.status || '').toLowerCase() === 'active') &&
            b.dayPattern === todayPattern
   );
 

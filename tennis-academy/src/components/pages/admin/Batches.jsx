@@ -76,7 +76,7 @@ export default function Batches() {
 
   const processedBatches = useMemo(() => {
     return batches
-      .filter((b) => b.status === 'ACTIVE' || b.status === 'active')
+      .filter((b) => (b.status || '').toLowerCase() === 'active')
       .map((b) => {
         const roster = enrollments.filter((e) => e.batchId === b.id && (e.status === 'ACTIVE' || e.status === 'active'));
         const court = courts.find((c) => c.id === b.courtId);

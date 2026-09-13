@@ -79,7 +79,7 @@ export default function CoachAttendance() {
     if (!coachId) return [];
     return (state.batches || []).filter(
       (b) => (b.primaryCoachId === coachId || b.supportCoachId === coachId) &&
-             (b.status === 'ACTIVE' || b.status === 'active') &&
+             ((b.status || '').toLowerCase() === 'active') &&
              b.dayPattern === todayPattern
     );
   }, [state.batches, coachId, todayPattern]);

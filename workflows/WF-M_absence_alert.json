@@ -5,25 +5,26 @@
   "description": "Cron-driven workflow checking for scheduled sessions with no attendance marked after a configurable timeframe. Sends absence notification email to parent via Gmail. Distinct from WF-F (pre-session confirmation) — WF-M is reactive/post-session. Configurable via platform_settings.absence_alert_delay_hours (default: 2 hours).",
   "tags": [],
   "pieces": [
-    "@puchoaistudio/tool-webhook",
+    "@puchoaistudio/tool-date-helper",
+    "@puchoaistudio/tool-gmail",
     "@puchoaistudio/tool-google-sheets",
-    "@puchoaistudio/tool-gmail"
+    "@puchoaistudio/tool-webhook"
   ],
   "template": {
     "displayName": "WF-M Absence Alert Engine",
     "trigger": {
       "name": "trigger",
-      "type": "TOOL_TRIGGER",
-      "displayName": "Catch Absence Check Trigger",
       "valid": true,
+      "displayName": "Catch Absence Check Trigger",
+      "type": "TOOL_TRIGGER",
       "settings": {
         "pieceName": "@puchoaistudio/tool-webhook",
         "pieceVersion": "^2.0.4",
-        "triggerName": "catch_webhook",
         "input": {
           "authType": "none",
           "authFields": {}
         },
+        "sampleData": {},
         "propertySettings": {
           "authType": {
             "type": "MANUAL"
@@ -42,17 +43,16 @@
             "type": "MANUAL"
           }
         },
-        "sampleData": {}
+        "triggerName": "catch_webhook"
       },
       "nextAction": {
         "name": "step_1",
-        "type": "PIECE",
-        "displayName": "Read Absence Alert Delay Setting",
-        "valid": true,
         "skip": false,
+        "type": "PIECE",
+        "valid": true,
         "settings": {
           "input": {
-            "auth": "",
+            "auth": "{{connections['ifn7Ir2FCcJFwy2JQjUtW']}}",
             "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
             "sheetId": 0,
             "columnName": "key",
@@ -64,6 +64,7 @@
           },
           "pieceName": "@puchoaistudio/tool-google-sheets",
           "actionName": "find_rows",
+          "sampleData": {},
           "pieceVersion": "^2.0.9",
           "propertySettings": {
             "auth": {
@@ -94,7 +95,6 @@
               "type": "MANUAL"
             }
           },
-          "sampleData": {},
           "errorHandlingOptions": {
             "retryOnFailure": {
               "value": true
@@ -106,28 +106,19 @@
         },
         "nextAction": {
           "name": "step_2",
-          "type": "CODE",
-          "displayName": "Compute Check Window",
-          "valid": true,
           "skip": false,
+          "type": "CODE",
+          "valid": true,
           "settings": {
             "input": {
-              "settings_result": "{{step_1}}",
-              "payload": "{{trigger['body']}}"
-            },
-            "sourceCode": {
-              "code": "export const code = async (inputs) => {\n  // Default to 2 hours if setting not found\n  const settings = Array.isArray(inputs.settings_result) ? inputs.settings_result : [];\n  let delayHours = 2;\n  if (settings.length > 0 && settings[0].value) {\n    const parsed = parseInt(settings[0].value);\n    if (!isNaN(parsed) && parsed > 0) delayHours = parsed;\n  }\n\n  const now = new Date();\n  const checkStart = new Date(now.getTime() - delayHours * 60 * 60 * 1000);\n  const checkEnd = new Date(now.getTime() - 60 * 60 * 1000); // 1h buffer to avoid checking sessions just ending\n\n  const today = now.toISOString().split('T')[0];\n  const startTime = checkStart.toTimeString().slice(0, 8);\n  const endTime = checkEnd.toTimeString().slice(0, 8);\n\n  return {\n    delay_hours: delayHours,\n    check_date: today,\n    start_time: startTime,\n    end_time: endTime,\n    start_datetime: checkStart.toISOString(),\n    end_datetime: checkEnd.toISOString()\n  };\n};",
-              "packageJson": "{}"
-            },
-            "propertySettings": {
-              "settings_result": {
-                "type": "MANUAL"
-              },
-              "payload": {
-                "type": "MANUAL"
-              }
+              "payload": "{{trigger['body']}}",
+              "settings_result": "{{step_1['data']}}"
             },
             "sampleData": {},
+            "sourceCode": {
+              "code": "export const code = async (inputs) => {\n  // Default to 2 hours if setting not found\n  const settings = Array.isArray(inputs.settings_result) ? inputs.settings_result : [];\n  let delayHours = 2;\n  if (settings.length > 0 && settings[0].value) {\n    const parsed = parseInt(settings[0].value);\n    if (!isNaN(parsed) && parsed > 0) delayHours = parsed;\n  }\n\n  const now = new Date();\n  const checkStart = new Date(now.getTime() - delayHours * 60 * 60 * 1000);\n  const checkEnd = new Date(now.getTime() - 60 * 60 * 1000); // 1h buffer\n\n  const today = now.toISOString().split('T')[0];\n  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];\n  const dayName = days[now.getDay()];\n  const startTime = checkStart.toTimeString().slice(0, 8);\n  const endTime = checkEnd.toTimeString().slice(0, 8);\n\n  return {\n    delay_hours: delayHours,\n    check_date: today,\n    day_name: dayName,\n    start_time: startTime,\n    end_time: endTime,\n    start_datetime: checkStart.toISOString(),\n    end_datetime: checkEnd.toISOString()\n  };\n};",
+              "packageJson": "{}"
+            },
             "errorHandlingOptions": {
               "retryOnFailure": {
                 "value": false
@@ -139,17 +130,16 @@
           },
           "nextAction": {
             "name": "step_3",
-            "type": "PIECE",
-            "displayName": "Query Today's Scheduled Sessions",
-            "valid": true,
             "skip": false,
+            "type": "PIECE",
+            "valid": true,
             "settings": {
               "input": {
-                "auth": "",
+                "auth": "{{connections['ifn7Ir2FCcJFwy2JQjUtW']}}",
                 "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
                 "sheetId": 721558255,
                 "columnName": "day",
-                "searchValue": "{{step_2['check_date']}}",
+                "searchValue": "{{step_2['day_name']}}",
                 "matchCase": false,
                 "startingRow": 1,
                 "numberOfRows": 200,
@@ -157,6 +147,7 @@
               },
               "pieceName": "@puchoaistudio/tool-google-sheets",
               "actionName": "find_rows",
+              "sampleData": {},
               "pieceVersion": "^2.0.9",
               "propertySettings": {
                 "auth": {
@@ -187,7 +178,6 @@
                   "type": "MANUAL"
                 }
               },
-              "sampleData": {},
               "errorHandlingOptions": {
                 "retryOnFailure": {
                   "value": true
@@ -199,13 +189,12 @@
             },
             "nextAction": {
               "name": "step_4",
-              "type": "PIECE",
-              "displayName": "Query Today's Attendance Records",
-              "valid": true,
               "skip": false,
+              "type": "PIECE",
+              "valid": true,
               "settings": {
                 "input": {
-                  "auth": "",
+                  "auth": "{{connections['ifn7Ir2FCcJFwy2JQjUtW']}}",
                   "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
                   "sheetId": 772014212,
                   "columnName": "date",
@@ -217,6 +206,7 @@
                 },
                 "pieceName": "@puchoaistudio/tool-google-sheets",
                 "actionName": "find_rows",
+                "sampleData": {},
                 "pieceVersion": "^2.0.9",
                 "propertySettings": {
                   "auth": {
@@ -247,7 +237,6 @@
                     "type": "MANUAL"
                   }
                 },
-                "sampleData": {},
                 "errorHandlingOptions": {
                   "retryOnFailure": {
                     "value": true
@@ -259,32 +248,20 @@
               },
               "nextAction": {
                 "name": "step_5",
-                "type": "CODE",
-                "displayName": "Identify Missed Sessions & Resolve Parents",
-                "valid": true,
                 "skip": false,
+                "type": "CODE",
+                "valid": true,
                 "settings": {
                   "input": {
-                    "schedule_json": "{{step_3}}",
-                    "attendance_json": "{{step_4}}",
-                    "window": "{{step_2}}"
+                    "window": "{{step_2}}",
+                    "schedule_json": "{{step_3['data']}}",
+                    "attendance_json": "{{step_4['data']}}"
                   },
+                  "sampleData": {},
                   "sourceCode": {
                     "code": "export const code = async (inputs) => {\n  const schedule = Array.isArray(inputs.schedule_json) ? inputs.schedule_json : [];\n  const attendance = Array.isArray(inputs.attendance_json) ? inputs.attendance_json : [];\n\n  // Build set of (student_id, batch_id) pairs that have attendance\n  const attendedPairs = new Set();\n  attendance.forEach(a => {\n    const key = (a.student_id || '') + '|' + (a.batch_id || '');\n    attendedPairs.add(key);\n  });\n\n  // Find scheduled sessions in the check window with no attendance\n  const missed = [];\n  schedule.forEach(s => {\n    // Only check sessions that have started before check_end\n    const sessionTime = s.start_time || '';\n    if (sessionTime > (inputs.window.end_time || '23:59:59')) return;\n    if (sessionTime < (inputs.window.start_time || '00:00:00')) return;\n\n    // Determine which students to check\n    if (s.type === 'group') {\n      // For group sessions, we know the batch_id — check if any attendance exists\n      // We'll need to query students in this batch separately\n      missed.push({\n        type: 'group',\n        schedule_id: s.id,\n        batch_id: s.batch_id,\n        coach_id: s.coach_id,\n        entity: s.entity,\n        start_time: s.start_time,\n        end_time: s.end_time\n      });\n    } else if (s.type === 'one_on_one') {\n      const key = (s.student_id || '') + '|' + (s.batch_id || '');\n      if (!attendedPairs.has(key)) {\n        missed.push({\n          type: 'one_on_one',\n          schedule_id: s.id,\n          student_id: s.student_id,\n          coach_id: s.coach_id,\n          entity: s.entity,\n          start_time: s.start_time,\n          end_time: s.end_time\n        });\n      }\n    }\n  });\n\n  return {\n    missed_count: missed.length,\n    missed_sessions: missed,\n    delay_hours: inputs.window.delay_hours || 2\n  };\n};",
                     "packageJson": "{}"
                   },
-                  "propertySettings": {
-                    "schedule_json": {
-                      "type": "MANUAL"
-                    },
-                    "attendance_json": {
-                      "type": "MANUAL"
-                    },
-                    "window": {
-                      "type": "MANUAL"
-                    }
-                  },
-                  "sampleData": {},
                   "errorHandlingOptions": {
                     "retryOnFailure": {
                       "value": false
@@ -296,13 +273,12 @@
                 },
                 "nextAction": {
                   "name": "step_6",
-                  "type": "PIECE",
-                  "displayName": "Query Students from Affected Batches",
-                  "valid": true,
                   "skip": false,
+                  "type": "PIECE",
+                  "valid": true,
                   "settings": {
                     "input": {
-                      "auth": "",
+                      "auth": "{{connections['ifn7Ir2FCcJFwy2JQjUtW']}}",
                       "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
                       "sheetId": 74175770,
                       "columnName": "status",
@@ -314,6 +290,7 @@
                     },
                     "pieceName": "@puchoaistudio/tool-google-sheets",
                     "actionName": "find_rows",
+                    "sampleData": {},
                     "pieceVersion": "^2.0.9",
                     "propertySettings": {
                       "auth": {
@@ -344,7 +321,6 @@
                         "type": "MANUAL"
                       }
                     },
-                    "sampleData": {},
                     "errorHandlingOptions": {
                       "retryOnFailure": {
                         "value": true
@@ -356,13 +332,12 @@
                   },
                   "nextAction": {
                     "name": "step_7",
-                    "type": "PIECE",
-                    "displayName": "Query Parent-Student Links",
-                    "valid": true,
                     "skip": false,
+                    "type": "PIECE",
+                    "valid": true,
                     "settings": {
                       "input": {
-                        "auth": "",
+                        "auth": "{{connections['ifn7Ir2FCcJFwy2JQjUtW']}}",
                         "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
                         "sheetId": 605693083,
                         "memKey": "row_number",
@@ -372,6 +347,7 @@
                       },
                       "pieceName": "@puchoaistudio/tool-google-sheets",
                       "actionName": "get_all_rows",
+                      "sampleData": {},
                       "pieceVersion": "^2.0.9",
                       "propertySettings": {
                         "auth": {
@@ -396,7 +372,6 @@
                           "type": "MANUAL"
                         }
                       },
-                      "sampleData": {},
                       "errorHandlingOptions": {
                         "retryOnFailure": {
                           "value": true
@@ -408,13 +383,12 @@
                     },
                     "nextAction": {
                       "name": "step_8",
-                      "type": "PIECE",
-                      "displayName": "Query Parents for Email",
-                      "valid": true,
                       "skip": false,
+                      "type": "PIECE",
+                      "valid": true,
                       "settings": {
                         "input": {
-                          "auth": "",
+                          "auth": "{{connections['ifn7Ir2FCcJFwy2JQjUtW']}}",
                           "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
                           "sheetId": 1278619599,
                           "memKey": "row_number",
@@ -424,6 +398,7 @@
                         },
                         "pieceName": "@puchoaistudio/tool-google-sheets",
                         "actionName": "get_all_rows",
+                        "sampleData": {},
                         "pieceVersion": "^2.0.9",
                         "propertySettings": {
                           "auth": {
@@ -448,7 +423,6 @@
                             "type": "MANUAL"
                           }
                         },
-                        "sampleData": {},
                         "errorHandlingOptions": {
                           "retryOnFailure": {
                             "value": true
@@ -460,36 +434,22 @@
                       },
                       "nextAction": {
                         "name": "step_9",
-                        "type": "CODE",
-                        "displayName": "Resolve Absentees & Parent Emails",
-                        "valid": true,
                         "skip": false,
+                        "type": "CODE",
+                        "valid": true,
                         "settings": {
                           "input": {
+                            "sp_json": "{{step_7['data']}}",
                             "missed_json": "{{step_5}}",
-                            "students_json": "{{step_6}}",
-                            "sp_json": "{{step_7}}",
-                            "parents_json": "{{step_8}}"
-                          },
-                          "sourceCode": {
-                            "code": "export const code = async (inputs) => {\n  const missedResult = typeof inputs.missed_json === 'string' ? JSON.parse(inputs.missed_json) : (inputs.missed_json || {});\n  const missedSessions = missedResult.missed_sessions || [];\n  const students = Array.isArray(inputs.students_json) ? inputs.students_json : [];\n  const spLinks = Array.isArray(inputs.sp_json) ? inputs.sp_json : [];\n  const parents = Array.isArray(inputs.parents_json) ? inputs.parents_json : [];\n\n  // Index students by id and batch_id\n  const studentById = {};\n  students.forEach(s => { studentById[s.id] = s; });\n\n  // Index parent by id\n  const parentById = {};\n  parents.forEach(p => { parentById[p.id] = p; });\n\n  // Build student -> parent map\n  const studentParentMap = {};\n  spLinks.forEach(sp => {\n    if (!studentParentMap[sp.student_id]) studentParentMap[sp.student_id] = [];\n    studentParentMap[sp.student_id].push(sp.parent_id);\n  });\n\n  // Resolve absent students with parent emails\n  const notifications = [];\n\n  missedSessions.forEach(missed => {\n    if (missed.type === 'one_on_one') {\n      const student = studentById[missed.student_id];\n      if (!student) return; // Skip unknown students\n\n      // Skip trial students — no alert needed\n      if (student.status === 'trial') return;\n\n      const parentIds = studentParentMap[missed.student_id] || [];\n      parentIds.forEach(pid => {\n        const parent = parentById[pid];\n        if (parent && parent.email) {\n          notifications.push({\n            student_id: missed.student_id,\n            student_name: student.name || 'Student',\n            parent_id: pid,\n            parent_email: parent.email,\n            parent_name: parent.name || 'Parent',\n            session_time: missed.start_time || '',\n            session_date: new Date().toISOString().split('T')[0]\n          });\n        }\n      });\n    } else if (missed.type === 'group') {\n      // For group sessions, find all students in the batch who have no attendance\n      const batchStudents = students.filter(s => s.batch_id === missed.batch_id);\n      batchStudents.forEach(student => {\n        if (student.status === 'trial') return; // Skip trial\n        // We don't individually check group attendance here — the triggers\n        // mark individual students. Alert for any missing group student.\n        // In production, add per-student attendance check.\n        const parentIds = studentParentMap[student.id] || [];\n        parentIds.forEach(pid => {\n          const parent = parentById[pid];\n          if (parent && parent.email) {\n            notifications.push({\n              student_id: student.id,\n              student_name: student.name || 'Student',\n              parent_id: pid,\n              parent_email: parent.email,\n              parent_name: parent.name || 'Parent',\n              session_time: missed.start_time || '',\n              session_date: new Date().toISOString().split('T')[0]\n            });\n          }\n        });\n      });\n    }\n  });\n\n  // Deduplicate by student_id\n  const seen = new Set();\n  const unique = notifications.filter(n => {\n    if (seen.has(n.student_id)) return false;\n    seen.add(n.student_id);\n    return true;\n  });\n\n  return {\n    notification_count: unique.length,\n    notifications: unique,\n    delay_hours: missedResult.delay_hours || 2\n  };\n};",
-                            "packageJson": "{}"
-                          },
-                          "propertySettings": {
-                            "missed_json": {
-                              "type": "MANUAL"
-                            },
-                            "students_json": {
-                              "type": "MANUAL"
-                            },
-                            "sp_json": {
-                              "type": "MANUAL"
-                            },
-                            "parents_json": {
-                              "type": "MANUAL"
-                            }
+                            "parents_json": "{{step_8['data']}}",
+                            "students_json": "{{step_6['data']}}",
+                            "attendance_json": "{{step_4['data']}}"
                           },
                           "sampleData": {},
+                          "sourceCode": {
+                            "code": "export const code = async (inputs) => {\n  const missedResult = typeof inputs.missed_json === 'string' ? JSON.parse(inputs.missed_json) : (inputs.missed_json || {});\n  const missedSessions = missedResult.missed_sessions || [];\n  const students = Array.isArray(inputs.students_json) ? inputs.students_json : [];\n  const spLinks = Array.isArray(inputs.sp_json) ? inputs.sp_json : [];\n  const parents = Array.isArray(inputs.parents_json) ? inputs.parents_json : [];\n  const attendance = Array.isArray(inputs.attendance_json) ? inputs.attendance_json : [];\n\n  const studentById = {};\n  students.forEach(s => { studentById[s.id] = s; });\n  const parentById = {};\n  parents.forEach(p => { parentById[p.id] = p; });\n\n  const studentParentMap = {};\n  spLinks.forEach(sp => {\n    if (!studentParentMap[sp.student_id]) studentParentMap[sp.student_id] = [];\n    studentParentMap[sp.student_id].push(sp.parent_id);\n  });\n\n  const attendedPairs = new Set();\n  attendance.forEach(a => {\n    attendedPairs.add((a.student_id || '') + '|' + (a.batch_id || ''));\n  });\n\n  const notifications = [];\n  const seen = new Set();\n\n  missedSessions.forEach(missed => {\n    if (missed.type === 'one_on_one') {\n      const student = studentById[missed.student_id];\n      if (!student || student.status === 'trial') return;\n      if (seen.has(student.id)) return;\n      seen.add(student.id);\n      const parentIds = studentParentMap[missed.student_id] || [];\n      parentIds.forEach(pid => {\n        const parent = parentById[pid];\n        if (parent && parent.email) {\n          notifications.push({\n            student_id: missed.student_id, student_name: student.name || 'Student',\n            parent_id: pid, parent_email: parent.email, parent_name: parent.name || 'Parent',\n            session_time: missed.start_time || '', session_date: new Date().toISOString().split('T')[0]\n          });\n        }\n      });\n    } else if (missed.type === 'group') {\n      const batchStudents = students.filter(st => st.batch_id === missed.batch_id);\n      batchStudents.forEach(student => {\n        if (student.status === 'trial') return;\n        const key = (student.id || '') + '|' + (missed.batch_id || '');\n        if (attendedPairs.has(key)) return;\n        if (seen.has(student.id)) return;\n        seen.add(student.id);\n        const parentIds = studentParentMap[student.id] || [];\n        parentIds.forEach(pid => {\n          const parent = parentById[pid];\n          if (parent && parent.email) {\n            notifications.push({\n              student_id: student.id, student_name: student.name || 'Student',\n              parent_id: pid, parent_email: parent.email, parent_name: parent.name || 'Parent',\n              session_time: missed.start_time || '', session_date: new Date().toISOString().split('T')[0]\n            });\n          }\n        });\n      });\n    }\n  });\n\n  return {\n    notifications: notifications,\n    notification_count: notifications.length,\n    delay_hours: missedResult.delay_hours || 2\n  };\n};",
+                            "packageJson": "{}"
+                          },
                           "errorHandlingOptions": {
                             "retryOnFailure": {
                               "value": false
@@ -500,151 +460,207 @@
                           }
                         },
                         "nextAction": {
-                          "name": "step_10",
-                          "type": "PIECE",
-                          "displayName": "Send Absence Alert Emails",
-                          "valid": true,
+                          "name": "step_15",
                           "skip": false,
-                          "settings": {
-                            "input": {
-                              "auth": "",
-                              "receiver": "{% set emails = [] %}{% for n in step_9['notifications'] %}{% if n.parent_email %}{% set _ = emails.push(n.parent_email) %}{% endif %}{% endfor %}{{ emails | join(',') }}",
-                              "subject": "{{step_9['notification_count']}} Student(s) Absent — Arnav Jain Tennis Academy",
-                              "body": "Dear Parents,\n\nOur system detected that the following student(s) may have missed their scheduled tennis session today ({{step_9['notifications'][0]['session_date']}}):\n\n{% for n in step_9['notifications'] %}\n  - {{n.student_name}} (scheduled at {{n.session_time}})\n{% endfor %}\n\nIf this absence was not intended, please contact your coach or the academy administration.\n\n{% if step_9['notification_count'] == 1 %}\nWe hope everything is okay with {{step_9['notifications'][0]['student_name']}}. Regular attendance is important for consistent progress. If your child was present and this notification was sent in error, please reach out and we'll update our records.\n{% else %}\nWe hope everything is okay. Regular attendance is important for consistent progress. If any students were present and this notification was sent in error, please reach out and we'll update our records.\n{% endif %}\n\nThis is an automated alert from the Arnav Jain Tennis Academy platform.\nNotification sent {{step_9['delay_hours']}} hours after the scheduled session time.\n\n— Arnav Jain Tennis Academy",
-                              "body_type": "text",
-                              "cc": [
-                                "admin@arnavtennis.com"
-                              ],
-                              "bcc": [],
-                              "reply_to": [],
-                              "draft": false
-                            },
-                            "pieceName": "@puchoaistudio/tool-gmail",
-                            "actionName": "send_email",
-                            "pieceVersion": "^2.0.4",
-                            "propertySettings": {
-                              "auth": {
-                                "type": "MANUAL"
-                              },
-                              "receiver": {
-                                "type": "MANUAL"
-                              },
-                              "subject": {
-                                "type": "MANUAL"
-                              },
-                              "body": {
-                                "type": "MANUAL"
-                              },
-                              "body_type": {
-                                "type": "MANUAL"
-                              },
-                              "cc": {
-                                "type": "MANUAL"
-                              },
-                              "bcc": {
-                                "type": "MANUAL"
-                              },
-                              "reply_to": {
-                                "type": "MANUAL"
-                              },
-                              "draft": {
-                                "type": "MANUAL"
-                              },
-                              "from": {
-                                "type": "MANUAL"
-                              },
-                              "sender_name": {
-                                "type": "MANUAL"
-                              },
-                              "attachment": {
-                                "type": "MANUAL"
-                              },
-                              "attachment_name": {
-                                "type": "MANUAL"
-                              }
-                            },
-                            "sampleData": {},
-                            "errorHandlingOptions": {
-                              "retryOnFailure": {
-                                "value": false
-                              },
-                              "continueOnFailure": {
-                                "value": true
-                              }
-                            }
-                          },
-                          "nextAction": {
-                            "name": "step_11",
-                            "type": "PIECE",
-                            "displayName": "Log Absence Alerts",
-                            "valid": true,
-                            "skip": false,
-                            "settings": {
-                              "input": {
-                                "auth": "",
-                                "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
-                                "sheetId": 0,
-                                "values": {
-                                  "type": "absence_alert",
-                                  "channel": "email",
-                                  "status": "sent",
-                                  "date": "{{step_9['notifications'][0]['session_date']}}"
-                                },
-                                "as_string": false,
-                                "first_row_headers": true,
-                                "includeTeamDrives": false
-                              },
-                              "pieceName": "@puchoaistudio/tool-google-sheets",
-                              "actionName": "insert_row",
-                              "pieceVersion": "^2.0.9",
-                              "propertySettings": {
-                                "auth": {
-                                  "type": "MANUAL"
-                                },
-                                "spreadsheetId": {
-                                  "type": "MANUAL"
-                                },
-                                "sheetId": {
-                                  "type": "MANUAL"
-                                },
-                                "values": {
-                                  "type": "MANUAL",
-                                  "schema": {}
-                                },
-                                "as_string": {
-                                  "type": "MANUAL"
-                                },
-                                "first_row_headers": {
-                                  "type": "MANUAL"
-                                },
-                                "includeTeamDrives": {
-                                  "type": "MANUAL"
-                                }
-                              },
-                              "sampleData": {},
-                              "errorHandlingOptions": {
-                                "retryOnFailure": {
-                                  "value": true
-                                },
-                                "continueOnFailure": {
-                                  "value": false
-                                }
-                              }
-                            },
-                            "nextAction": {
-                              "name": "step_12",
-                              "type": "PIECE",
-                              "displayName": "Return Absence Alert Response",
-                              "valid": true,
+                          "type": "ROUTER",
+                          "valid": true,
+                          "displayName": "Router",
+                          "children": [
+                            {
+                              "name": "step_14",
                               "skip": false,
+                              "type": "LOOP_ON_ITEMS",
+                              "valid": true,
+                              "displayName": "Loop on Items",
+                              "settings": {
+                                "items": "{{step_9['notifications']}}",
+                                "sampleData": {}
+                              },
+                              "nextAction": {
+                                "name": "step_10",
+                                "skip": false,
+                                "type": "PIECE",
+                                "valid": true,
+                                "displayName": "Send Absence Alert Emails",
+                                "settings": {
+                                  "input": {
+                                    "auth": "{{connections['QQ8QdTnbO4wLW62w6f3eq']}}",
+                                    "subject": "Absence Notification — {{step_14['item']['student_name']}}",
+                                    "receiver": "{{step_14['item']['parent_email']}}",
+                                    "body": "<!DOCTYPE html>\n<html>\n<head><meta charset=\"UTF-8\"></head>\n<body style=\"margin:0; padding:0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f4;\">\n<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color: #f4f4f4; padding: 20px 0;\">\n<tr><td align=\"center\">\n<table width=\"560\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 30px;\">\n<tr><td style=\"font-size: 22px; font-weight: bold; color: #2c3e50; text-align: center; padding-bottom: 20px; border-bottom: 2px solid #ecf0f1;\">Tennis Academy Management</td></tr>\n<tr><td style=\"padding: 20px 0; font-size: 16px; color: #34495e; line-height: 1.6;\">\n<p>Dear {{step_14['item']['parent_name']}},</p>\n<p>This is to inform you that <strong>{{step_14['item']['student_name']}}</strong> was marked absent for their scheduled tennis session today.</p>\n<p><strong>Session Date:</strong> {{step_14['item']['session_date']}}<br><strong>Scheduled Time:</strong> {{step_14['item']['session_time']}}</p>\n<p>If this absence was not intended, please contact your coach or the academy administration.</p>\n<p>We hope everything is okay. Regular attendance is important for consistent progress. If your child was present and this notification was sent in error, please reach out and we'll update our records.</p>\n<p style=\"margin-top: 24px; padding: 12px 16px; background-color: #fef9e7; border-left: 4px solid #f1c40f; border-radius: 4px; font-size: 13px;\">\nThis is an automated alert from the Tennis Academy Management platform.<br>\nNotification sent {{step_9['delay_hours']}} hours after the scheduled session time.\n</p></td></tr>\n<tr><td style=\"padding-top: 20px; border-top: 1px solid #ecf0f1; text-align: center; color: #7f8c8d; font-size: 13px;\">Tennis Academy Management</td></tr>\n</table></td></tr></table></body></html>",
+                                    "body_type": "html",
+                                    "draft": false,
+                                    "cc": [
+                                      "admin@arnavtennis.com"
+                                    ],
+                                    "bcc": [],
+                                    "reply_to": []
+                                  },
+                                  "pieceName": "@puchoaistudio/tool-gmail",
+                                  "actionName": "send_email",
+                                  "sampleData": {},
+                                  "pieceVersion": "^2.0.4",
+                                  "propertySettings": {
+                                    "auth": {
+                                      "type": "MANUAL"
+                                    },
+                                    "subject": {
+                                      "type": "MANUAL"
+                                    },
+                                    "body": {
+                                      "type": "MANUAL"
+                                    },
+                                    "body_type": {
+                                      "type": "MANUAL"
+                                    },
+                                    "cc": {
+                                      "type": "MANUAL"
+                                    },
+                                    "bcc": {
+                                      "type": "MANUAL"
+                                    },
+                                    "reply_to": {
+                                      "type": "MANUAL"
+                                    },
+                                    "sender_name": {
+                                      "type": "MANUAL"
+                                    },
+                                    "draft": {
+                                      "type": "MANUAL"
+                                    },
+                                    "attachment": {
+                                      "type": "MANUAL"
+                                    },
+                                    "attachment_name": {
+                                      "type": "MANUAL"
+                                    },
+                                    "from": {
+                                      "type": "MANUAL"
+                                    },
+                                    "receiver": {
+                                      "type": "MANUAL"
+                                    },
+                                    "in_reply_to": {
+                                      "type": "MANUAL"
+                                    }
+                                  },
+                                  "errorHandlingOptions": {
+                                    "retryOnFailure": {
+                                      "value": false
+                                    },
+                                    "continueOnFailure": {
+                                      "value": true
+                                    }
+                                  }
+                                },
+                                "nextAction": {
+                                  "name": "step_13",
+                                  "skip": false,
+                                  "type": "PIECE",
+                                  "valid": true,
+                                  "displayName": "Get Current Date",
+                                  "settings": {
+                                    "input": {
+                                      "timeZone": "Asia/Kolkata",
+                                      "timeFormat": "YYYY-MM-DD HH:mm:ss"
+                                    },
+                                    "pieceName": "@puchoaistudio/tool-date-helper",
+                                    "actionName": "get_current_date",
+                                    "sampleData": {},
+                                    "pieceVersion": "^2.0.0",
+                                    "propertySettings": {
+                                      "timeZone": {
+                                        "type": "MANUAL"
+                                      },
+                                      "timeFormat": {
+                                        "type": "MANUAL"
+                                      }
+                                    },
+                                    "errorHandlingOptions": {
+                                      "retryOnFailure": {
+                                        "value": false
+                                      },
+                                      "continueOnFailure": {
+                                        "value": false
+                                      }
+                                    }
+                                  },
+                                  "nextAction": {
+                                    "name": "step_11",
+                                    "skip": false,
+                                    "type": "PIECE",
+                                    "valid": true,
+                                    "displayName": "Log Absence Alerts",
+                                    "settings": {
+                                      "input": {
+                                        "auth": "{{connections['ifn7Ir2FCcJFwy2JQjUtW']}}",
+                                        "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
+                                        "sheetId": 0,
+                                        "values": {
+                                          "date": "{{step_13['result']}}",
+                                          "type": "absence_alert",
+                                          "status": "sent",
+                                          "channel": "email"
+                                        },
+                                        "as_string": false,
+                                        "first_row_headers": true,
+                                        "includeTeamDrives": false
+                                      },
+                                      "pieceName": "@puchoaistudio/tool-google-sheets",
+                                      "actionName": "insert_row",
+                                      "sampleData": {},
+                                      "pieceVersion": "^2.0.9",
+                                      "propertySettings": {
+                                        "auth": {
+                                          "type": "MANUAL"
+                                        },
+                                        "spreadsheetId": {
+                                          "type": "MANUAL"
+                                        },
+                                        "sheetId": {
+                                          "type": "MANUAL"
+                                        },
+                                        "values": {
+                                          "type": "MANUAL",
+                                          "schema": {}
+                                        },
+                                        "as_string": {
+                                          "type": "MANUAL"
+                                        },
+                                        "first_row_headers": {
+                                          "type": "MANUAL"
+                                        },
+                                        "includeTeamDrives": {
+                                          "type": "MANUAL"
+                                        }
+                                      },
+                                      "errorHandlingOptions": {
+                                        "retryOnFailure": {
+                                          "value": true
+                                        },
+                                        "continueOnFailure": {
+                                          "value": false
+                                        }
+                                      }
+                                    },
+                                    "nextAction": null
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "name": "step_17",
+                              "skip": false,
+                              "type": "PIECE",
+                              "valid": true,
+                              "displayName": "Return No Absentees",
                               "settings": {
                                 "input": {
                                   "fields": {
                                     "body": {
                                       "success": true,
-                                      "notifications_sent": "{{step_9['notification_count']}}",
-                                      "delay_hours": "{{step_9['delay_hours']}}",
-                                      "message": "Absence alert notifications sent to parents"
+                                      "notifications_sent": 0,
+                                      "message": "No absent students found for today"
                                     },
                                     "status": 200,
                                     "headers": {}
@@ -654,6 +670,7 @@
                                 },
                                 "pieceName": "@puchoaistudio/tool-webhook",
                                 "actionName": "return_response",
+                                "sampleData": {},
                                 "pieceVersion": "^2.0.4",
                                 "propertySettings": {
                                   "fields": {
@@ -684,7 +701,6 @@
                                     "type": "MANUAL"
                                   }
                                 },
-                                "sampleData": {},
                                 "errorHandlingOptions": {
                                   "retryOnFailure": {
                                     "value": false
@@ -695,21 +711,120 @@
                                 }
                               }
                             }
+                          ],
+                          "nextAction": {
+                            "name": "step_16",
+                            "skip": false,
+                            "type": "PIECE",
+                            "valid": true,
+                            "displayName": "Return Final Response",
+                            "settings": {
+                              "input": {
+                                "fields": {
+                                  "body": {
+                                    "success": true,
+                                    "notifications_sent": "{{step_9['notification_count']}}",
+                                    "delay_hours": "{{step_9['delay_hours']}}",
+                                    "message": "Absence notifications sent to all parents"
+                                  },
+                                  "status": 200,
+                                  "headers": {}
+                                },
+                                "respond": "stop",
+                                "responseType": "json"
+                              },
+                              "pieceName": "@puchoaistudio/tool-webhook",
+                              "actionName": "return_response",
+                              "sampleData": {},
+                              "pieceVersion": "^2.0.4",
+                              "propertySettings": {
+                                "fields": {
+                                  "type": "MANUAL",
+                                  "schema": {
+                                    "body": {
+                                      "type": "JSON",
+                                      "required": true,
+                                      "displayName": "JSON Body"
+                                    },
+                                    "status": {
+                                      "type": "NUMBER",
+                                      "required": false,
+                                      "displayName": "Status",
+                                      "defaultValue": 200
+                                    },
+                                    "headers": {
+                                      "type": "OBJECT",
+                                      "required": false,
+                                      "displayName": "Headers"
+                                    }
+                                  }
+                                },
+                                "respond": {
+                                  "type": "MANUAL"
+                                },
+                                "responseType": {
+                                  "type": "MANUAL"
+                                }
+                              },
+                              "errorHandlingOptions": {
+                                "retryOnFailure": {
+                                  "value": false
+                                },
+                                "continueOnFailure": {
+                                  "value": false
+                                }
+                              }
+                            }
+                          },
+                          "settings": {
+                            "branches": [
+                              {
+                                "branchName": "Has Notifications",
+                                "branchType": "CONDITION",
+                                "conditions": [
+                                  [
+                                    {
+                                      "operator": "NUMBER_IS_GREATER_THAN",
+                                      "firstValue": "{{step_9['notification_count']}}",
+                                      "secondValue": "0",
+                                      "caseSensitive": false
+                                    }
+                                  ]
+                                ]
+                              },
+                              {
+                                "branchName": "Otherwise",
+                                "branchType": "FALLBACK"
+                              }
+                            ],
+                            "executionType": "EXECUTE_FIRST_MATCH"
                           }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
+                        },
+                        "displayName": "Resolve Absentees & Parent Emails"
+                      },
+                      "displayName": "Query Parents for Email"
+                    },
+                    "displayName": "Query Parent-Student Links"
+                  },
+                  "displayName": "Query Students from Affected Batches"
+                },
+                "displayName": "Identify Missed Sessions & Resolve Parents"
+              },
+              "displayName": "Query Today's Attendance Records"
+            },
+            "displayName": "Query Today's Scheduled Sessions"
+          },
+          "displayName": "Compute Check Window"
+        },
+        "displayName": "Read Absence Alert Delay Setting"
       }
     },
     "valid": true,
     "agentIds": [],
-    "connectionIds": [],
+    "connectionIds": [
+      "ifn7Ir2FCcJFwy2JQjUtW",
+      "QQ8QdTnbO4wLW62w6f3eq"
+    ],
     "schemaVersion": "7"
   },
   "blogUrl": ""

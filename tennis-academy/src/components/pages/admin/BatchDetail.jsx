@@ -544,7 +544,7 @@ const catResolvedEf = (ef) => ef.program && (!CATEGORIES_WITH_BALL.has(ef.progra
 // Filter courts to only those hosting this Category
 function courtsForCategory(allCourts, batches, program) {
   if (!program) return allCourts;
-  const courtIds = new Set(batches.filter(b => b.program === program && b.status === 'ACTIVE').map(b => b.courtId));
+  const courtIds = new Set(batches.filter(b => b.program === program && (b.status || '').toLowerCase() === 'active').map(b => b.courtId));
   if (courtIds.size === 0) return allCourts; // no batches yet → show all
   return allCourts.filter(c => courtIds.has(c.id));
 }

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useStudents } from '../../../hooks/useStudents';
 import { useDebounce } from '../../../hooks/useDebounce';
 import { useSupabase } from '../../../context/SupabaseContext';
+import { db } from '../../../mocks/localDb';
 import Card from '../../ui/Card';
 import StatusPill from '../../ui/StatusPill';
 import Modal from '../../ui/Modal';
@@ -82,36 +83,38 @@ function renderEnrollmentBlock(blk, setBlk, removable, onRemove, batchOptions = 
   
   function filterBatches(prog, ball) {
     if (!prog) return [];
-    // For JDP and HPP, students are placed in Advance, Intermediate, or Green Ball batches (Capacity follows student)
-    if (prog === 'JDP' || prog === 'HPP') {
-      if (!ball) {
-        return batchOptions.filter((b) => ['ADV', 'INT', 'GREEN'].includes(b.program) || b.name?.includes('Advance') || b.name?.includes('Intermediate'));
-      }
-      return batchOptions.filter((b) => 
-        (['ADV', 'INT', 'GREEN'].includes(b.program) || b.name?.includes('Advance') || b.name?.includes('Intermediate')) &&
-        (!b.ballLevel || b.ballLevel.toLowerCase() === ball.toLowerCase() || (b.name && b.name.toLowerCase().includes(ball.toLowerCase())))
-      );
+    const pLower = prog.toLowerCase();
+    const bLower = (ball || '').toLowerCase();
+
+    const matchesBall = (b) => {
+      if (!bLower) return true;
+      const ballL = (b.ballLevel || '').toLowerCase();
+      const progL = (b.program || '').toLowerCase();
+      const nameL = (b.name || '').toLowerCase();
+      return ballL === bLower || progL === bLower || nameL.includes(bLower);
+    };
+
+    const matchesCategory = (b) => {
+      const progL = (b.program || '').toLowerCase();
+      const nameL = (b.name || '').toLowerCase();
+      if (prog === 'BEG') return progL === 'beg' || nameL.includes('beginner') || ['green', 'orange', 'red'].includes(progL);
+      if (prog === 'JDP' || prog === 'HPP') return ['adv', 'int', 'green'].includes(progL) || nameL.includes('advance') || nameL.includes('intermediate');
+      return progL === pLower || nameL.includes(pLower);
+    };
+
+    // 1. Try exact match (both category AND ball match)
+    const exact = batchOptions.filter(b => matchesCategory(b) && matchesBall(b));
+    if (exact.length > 0) return exact;
+
+    // 2. Fallback: match by ball color if ball is selected
+    if (bLower) {
+      const ballMatches = batchOptions.filter(b => matchesBall(b));
+      if (ballMatches.length > 0) return ballMatches;
     }
 
-    if (prog === 'BEG') {
-      if (!ball) return batchOptions.filter((b) => (b.name && b.name.toLowerCase().includes('beginner')) || ['GREEN', 'ORANGE', 'RED'].includes(b.program));
-      return batchOptions.filter((b) => 
-        ((b.name && b.name.toLowerCase().includes('beginner')) || ['GREEN', 'ORANGE', 'RED'].includes(b.program)) &&
-        (!b.ballLevel || b.ballLevel.toLowerCase() === ball.toLowerCase() || (b.name && b.name.toLowerCase().includes(ball.toLowerCase())))
-      );
-    }
-
-    if (CATEGORIES_WITH_BALL.has(prog)) {
-      if (!ball) return batchOptions.filter((b) => b.program === prog || (b.name && b.name.toLowerCase().includes(prog.toLowerCase())));
-      return batchOptions.filter((b) => 
-        (b.program === prog || (b.name && b.name.toLowerCase().includes(prog.toLowerCase()))) && 
-        ((b.ballLevel || '').toLowerCase() === ball.toLowerCase() || (b.name && b.name.toLowerCase().includes(ball.toLowerCase())))
-      );
-    }
-
-    if (['ADULT', 'WEEKEND', 'FITNESS'].includes(prog)) {
-      return batchOptions.filter((b) => b.program === prog || (b.name && b.name.toLowerCase().includes(prog.toLowerCase())));
-    }
+    // 3. Fallback: match by category or return all active batches
+    const catMatches = batchOptions.filter(b => matchesCategory(b));
+    if (catMatches.length > 0) return catMatches;
 
     return batchOptions;
   }
@@ -271,7 +274,7 @@ export default function AdminStudents() {
     services.batches.list({ pageSize: 500 }).then((res) => {
       const all = res.data || [];
       setBatchesList(all);
-      setBatchOptions(all.filter((b) => b.status === 'ACTIVE' || b.status === 'active'));
+      setBatchOptions(all.filter((b) => (b.status || '').toLowerCase() === 'active'));
     });
     services.courts.list({ pageSize: 100 }).then((res) => {
       setCourtsList(res.data || []);
@@ -323,18 +326,36 @@ export default function AdminStudents() {
 
   const getFilteredBatches = (prog, ball) => {
     if (!prog) return [];
-    if (CATEGORIES_WITH_BALL.has(prog)) {
-      if (!ball) return [];
-      return batchOptions.filter((b) =>
-        b.program === prog && (b.ballLevel || '').toLowerCase() === ball.toLowerCase()
-      );
+    const pLower = prog.toLowerCase();
+    const bLower = (ball || '').toLowerCase();
+
+    const matchesBall = (b) => {
+      if (!bLower) return true;
+      const ballL = (b.ballLevel || '').toLowerCase();
+      const progL = (b.program || '').toLowerCase();
+      const nameL = (b.name || '').toLowerCase();
+      return ballL === bLower || progL === bLower || nameL.includes(bLower);
+    };
+
+    const matchesCategory = (b) => {
+      const progL = (b.program || '').toLowerCase();
+      const nameL = (b.name || '').toLowerCase();
+      if (prog === 'BEG') return progL === 'beg' || nameL.includes('beginner') || ['green', 'orange', 'red'].includes(progL);
+      if (prog === 'JDP' || prog === 'HPP') return ['adv', 'int', 'green'].includes(progL) || nameL.includes('advance') || nameL.includes('intermediate');
+      return progL === pLower || nameL.includes(pLower);
+    };
+
+    const exact = batchOptions.filter(b => matchesCategory(b) && matchesBall(b));
+    if (exact.length > 0) return exact;
+
+    if (bLower) {
+      const ballMatches = batchOptions.filter(b => matchesBall(b));
+      if (ballMatches.length > 0) return ballMatches;
     }
-    if (['GREEN', 'ORANGE', 'RED', 'ADULT', 'WEEKEND', 'FITNESS'].includes(prog)) {
-      return batchOptions.filter((b) => b.program === prog);
-    }
-    if (prog === 'JDP' || prog === 'HPP') {
-      return batchOptions;
-    }
+
+    const catMatches = batchOptions.filter(b => matchesCategory(b));
+    if (catMatches.length > 0) return catMatches;
+
     return batchOptions;
   };
 
@@ -523,6 +544,12 @@ export default function AdminStudents() {
         guardianName: student.guardianName,
         guardianEmail: student.guardianEmail,
         guardianPhone: student.guardianPhone,
+      }).then((res) => {
+        if (res?.mock || res?.status === 410) {
+          toast.info(`WF-D Student Onboarding: Processed for ${student.name} (Offline Mode)`);
+        } else if (res?.success !== false) {
+          toast.success(`WF-D Student Onboarding: Welcome sequence triggered for ${student.name}`);
+        }
       }).catch(err => console.error('[Students] WF-D Onboarding trigger error:', err));
 
       toast.success(`Student "${addForm.name}" created with enrollment(s)`);

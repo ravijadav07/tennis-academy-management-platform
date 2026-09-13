@@ -52,7 +52,10 @@
         "skip": false,
         "settings": {
           "input": {
-            "payload": "{{trigger['body']}}"
+            "payload": "{{trigger['body']}}",
+            "sheetId": 731582326,
+            "columnName": "status",
+            "searchValue": "active"
           },
           "sourceCode": {
             "code": "export const code = async (inputs) => {\n  const p = typeof inputs.payload === 'string' ? JSON.parse(inputs.payload) : (inputs.payload || {});\n  const now = new Date();\n  const month = parseInt(p.month || (now.getMonth() + 1));\n  const year = parseInt(p.year || now.getFullYear());\n  const startDate = year + '-' + String(month).padStart(2, '0') + '-01';\n  const endDate = new Date(year, month, 0).toISOString().split('T')[0];\n  const monthName = new Date(year, month - 1, 1).toLocaleString('default', { month: 'long' });\n  return { month: month, year: year, start_date: startDate, end_date: endDate, month_name: monthName };\n};",
@@ -85,7 +88,7 @@
               "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
               "sheetId": 731582326,
               "columnName": "status",
-              "searchValue": "inactive",
+              "searchValue": "active",
               "matchCase": false,
               "startingRow": 1,
               "numberOfRows": 50,
@@ -143,7 +146,7 @@
               "input": {
                 "auth": "",
                 "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
-                "sheetId": 0,
+                "sheetId": 772014212,
                 "columnName": "date",
                 "searchValue": "{{step_1['start_date']}}",
                 "matchCase": false,
@@ -203,7 +206,7 @@
                 "input": {
                   "auth": "",
                   "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
-                  "sheetId": 0,
+                  "sheetId": 1465573576,
                   "columnName": "status",
                   "searchValue": "approved",
                   "matchCase": false,

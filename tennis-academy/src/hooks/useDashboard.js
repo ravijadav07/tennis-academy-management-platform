@@ -74,7 +74,7 @@ export function useDashboard() {
 
   const { batches, courts, coaches, enrollments, students, attendance, coachAttendance, privateSessions } = data;
 
-  const activeBatches = useMemo(() => batches.filter((b) => b.status === 'ACTIVE' || b.status === 'active'), [batches]);
+  const activeBatches = useMemo(() => batches.filter((b) => (b.status || '').toLowerCase() === 'active'), [batches]);
 
   const todayDay = new Date().getDay();
   const todayBatches = useMemo(() => activeBatches.filter((b) => {

@@ -47,7 +47,7 @@ export default function Schedule() {
     if (!coachId) return [];
 
     const coachBatches = (state.batches || [])
-      .filter((b) => (b.primaryCoachId === coachId || b.supportCoachId === coachId) && (b.status === 'ACTIVE' || b.status === 'active'))
+      .filter((b) => (b.primaryCoachId === coachId || b.supportCoachId === coachId) && ((b.status || '').toLowerCase() === 'active'))
       .map((b) => {
         const court = (state.courts || []).find((c) => c.id === b.courtId);
         const roster = (state.enrollments || []).filter((e) => e.batchId === b.id && (e.status === 'ACTIVE' || e.status === 'active'));

@@ -85,7 +85,7 @@ export default function CoachDashboard() {
     if (!coachId) return { batches: [], privateSessions: [], checkedIn: false };
     const batches = data.batches.filter(
       (b) => (b.primaryCoachId === coachId || b.supportCoachId === coachId) &&
-             (b.status === 'ACTIVE' || b.status === 'active') &&
+             ((b.status || '').toLowerCase() === 'active') &&
              (b.dayPattern === todayPattern ||
               (todayPattern === 'SAT_SUN' && (b.dayPattern === 'WEEKEND' || b.dayPattern === 'SAT_SUN')) ||
               (todayPattern === 'WEEKEND' && (b.dayPattern === 'SAT_SUN' || b.dayPattern === 'WEEKEND')))
@@ -98,7 +98,7 @@ export default function CoachDashboard() {
     if (!coachId) return 0;
     return data.enrollments.filter((e) => {
       const b = data.batches.find((b) => b.id === e.batchId);
-      return b && (b.primaryCoachId === coachId || b.supportCoachId === coachId) && (b.status === 'ACTIVE' || b.status === 'active');
+      return b && (b.primaryCoachId === coachId || b.supportCoachId === coachId) && ((b.status || '').toLowerCase() === 'active');
     }).length;
   }, [data.enrollments, data.batches, coachId]);
 

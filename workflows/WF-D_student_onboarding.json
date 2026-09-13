@@ -143,12 +143,12 @@
               "input": {
                 "auth": "",
                 "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
-                "sheetId": 74175770,
+                "sheetId": 605693083,
                 "columnName": "batch_id",
                 "searchValue": "{{step_1['batch_id']}}",
                 "matchCase": false,
                 "startingRow": 1,
-                "numberOfRows": 1,
+                "numberOfRows": 100,
                 "includeTeamDrives": false
               },
               "pieceName": "@puchoaistudio/tool-google-sheets",
@@ -704,131 +704,71 @@
                               }
                             },
                             "nextAction": {
-                              "name": "step_8",
+                              "name": "step_9",
                               "type": "PIECE",
-                              "displayName": "Log Communication",
+                              "displayName": "Return Success Response",
                               "valid": true,
                               "skip": false,
                               "settings": {
                                 "input": {
-                                  "auth": "",
-                                  "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
-                                  "sheetId": 0,
-                                  "values": {
-                                    "student_id": "{{step_2['id']}}",
-                                    "parent_id": "{{step_3['id']}}",
-                                    "type": "welcome",
-                                    "channel": "email",
-                                    "status": "sent",
-                                    "date": "{{step_1['start_date']}}"
+                                  "fields": {
+                                    "body": {
+                                      "success": true,
+                                      "student_id": "{{step_2['id']}}",
+                                      "parent_id": "{{step_3['id']}}",
+                                      "message": "Student enrolled successfully",
+                                      "batch_capacity": "{{step_1a_cap['rows'][0]['capacity']}}",
+                                      "batch_enrolled": "{{step_1b_count['rows_count']}}"
+                                    },
+                                    "status": 200,
+                                    "headers": {}
                                   },
-                                  "as_string": false,
-                                  "first_row_headers": true,
-                                  "includeTeamDrives": false
+                                  "respond": "stop",
+                                  "responseType": "json"
                                 },
-                                "pieceName": "@puchoaistudio/tool-google-sheets",
-                                "actionName": "insert_row",
-                                "pieceVersion": "^2.0.9",
+                                "pieceName": "@puchoaistudio/tool-webhook",
+                                "actionName": "return_response",
+                                "pieceVersion": "^2.0.4",
                                 "propertySettings": {
-                                  "auth": {
-                                    "type": "MANUAL"
-                                  },
-                                  "spreadsheetId": {
-                                    "type": "MANUAL"
-                                  },
-                                  "sheetId": {
-                                    "type": "MANUAL"
-                                  },
-                                  "values": {
+                                  "fields": {
                                     "type": "MANUAL",
-                                    "schema": {}
+                                    "schema": {
+                                      "body": {
+                                        "type": "JSON",
+                                        "required": true,
+                                        "displayName": "JSON Body"
+                                      },
+                                      "status": {
+                                        "type": "NUMBER",
+                                        "required": false,
+                                        "displayName": "Status",
+                                        "defaultValue": 200
+                                      },
+                                      "headers": {
+                                        "type": "OBJECT",
+                                        "required": false,
+                                        "displayName": "Headers"
+                                      }
+                                    }
                                   },
-                                  "as_string": {
+                                  "respond": {
                                     "type": "MANUAL"
                                   },
-                                  "first_row_headers": {
-                                    "type": "MANUAL"
-                                  },
-                                  "includeTeamDrives": {
+                                  "responseType": {
                                     "type": "MANUAL"
                                   }
                                 },
                                 "sampleData": {},
                                 "errorHandlingOptions": {
                                   "retryOnFailure": {
-                                    "value": true
+                                    "value": false
                                   },
                                   "continueOnFailure": {
                                     "value": false
                                   }
                                 }
                               },
-                              "nextAction": {
-                                "name": "step_9",
-                                "type": "PIECE",
-                                "displayName": "Return Success Response",
-                                "valid": true,
-                                "skip": false,
-                                "settings": {
-                                  "input": {
-                                    "fields": {
-                                      "body": {
-                                        "success": true,
-                                        "student_id": "{{step_2['id']}}",
-                                        "parent_id": "{{step_3['id']}}",
-                                        "message": "Student enrolled successfully",
-                                        "batch_capacity": "{{step_1a_cap['rows'][0]['capacity']}}",
-                                        "batch_enrolled": "{{step_1b_count['rows_count']}}"
-                                      },
-                                      "status": 200,
-                                      "headers": {}
-                                    },
-                                    "respond": "stop",
-                                    "responseType": "json"
-                                  },
-                                  "pieceName": "@puchoaistudio/tool-webhook",
-                                  "actionName": "return_response",
-                                  "pieceVersion": "^2.0.4",
-                                  "propertySettings": {
-                                    "fields": {
-                                      "type": "MANUAL",
-                                      "schema": {
-                                        "body": {
-                                          "type": "JSON",
-                                          "required": true,
-                                          "displayName": "JSON Body"
-                                        },
-                                        "status": {
-                                          "type": "NUMBER",
-                                          "required": false,
-                                          "displayName": "Status",
-                                          "defaultValue": 200
-                                        },
-                                        "headers": {
-                                          "type": "OBJECT",
-                                          "required": false,
-                                          "displayName": "Headers"
-                                        }
-                                      }
-                                    },
-                                    "respond": {
-                                      "type": "MANUAL"
-                                    },
-                                    "responseType": {
-                                      "type": "MANUAL"
-                                    }
-                                  },
-                                  "sampleData": {},
-                                  "errorHandlingOptions": {
-                                    "retryOnFailure": {
-                                      "value": false
-                                    },
-                                    "continueOnFailure": {
-                                      "value": false
-                                    }
-                                  }
-                                }
-                              }
+                              "nextAction": null
                             }
                           }
                         }
@@ -959,130 +899,71 @@
                         }
                       },
                       "nextAction": {
-                        "name": "step_3np_log",
+                        "name": "step_4np",
                         "type": "PIECE",
-                        "displayName": "Log Enrollment (No Parent)",
+                        "displayName": "Return Success",
                         "valid": true,
                         "skip": false,
                         "settings": {
                           "input": {
-                            "auth": "",
-                            "spreadsheetId": "1OTn3vT8qIeZFHzMZWAJHE_9ouqLGMiIF_zVEZQHq6DA",
-                            "sheetId": 0,
-                            "values": {
-                              "student_id": "{{step_2np[\"id\"]}}",
-                              "type": "welcome",
-                              "channel": "email",
-                              "status": "sent",
-                              "date": "{{step_1[\"start_date\"]}}"
+                            "fields": {
+                              "body": {
+                                "success": true,
+                                "student_id": "{{step_2np['id']}}",
+                                "package_id": "{{step_3np['id']}}",
+                                "message": "Student enrolled successfully (no parent info provided)",
+                                "batch_capacity": "{{step_1a_cap['rows'][0]['capacity']}}",
+                                "batch_enrolled": "{{step_1b_count['rows_count']}}"
+                              },
+                              "status": 200,
+                              "headers": {}
                             },
-                            "as_string": false,
-                            "first_row_headers": true,
-                            "includeTeamDrives": false
+                            "respond": "stop",
+                            "responseType": "json"
                           },
-                          "pieceName": "@puchoaistudio/tool-google-sheets",
-                          "actionName": "insert_row",
-                          "pieceVersion": "^2.0.9",
+                          "pieceName": "@puchoaistudio/tool-webhook",
+                          "actionName": "return_response",
+                          "pieceVersion": "^2.0.4",
                           "propertySettings": {
-                            "auth": {
-                              "type": "MANUAL"
-                            },
-                            "spreadsheetId": {
-                              "type": "MANUAL"
-                            },
-                            "sheetId": {
-                              "type": "MANUAL"
-                            },
-                            "values": {
+                            "fields": {
                               "type": "MANUAL",
-                              "schema": {}
+                              "schema": {
+                                "body": {
+                                  "type": "JSON",
+                                  "required": true,
+                                  "displayName": "JSON Body"
+                                },
+                                "status": {
+                                  "type": "NUMBER",
+                                  "required": false,
+                                  "displayName": "Status",
+                                  "defaultValue": 200
+                                },
+                                "headers": {
+                                  "type": "OBJECT",
+                                  "required": false,
+                                  "displayName": "Headers"
+                                }
+                              }
                             },
-                            "as_string": {
+                            "respond": {
                               "type": "MANUAL"
                             },
-                            "first_row_headers": {
-                              "type": "MANUAL"
-                            },
-                            "includeTeamDrives": {
+                            "responseType": {
                               "type": "MANUAL"
                             }
                           },
                           "sampleData": {},
                           "errorHandlingOptions": {
                             "retryOnFailure": {
-                              "value": true
+                              "value": false
                             },
                             "continueOnFailure": {
                               "value": false
                             }
                           }
                         },
-                        "nextAction": {
-                          "name": "step_4np",
-                          "type": "PIECE",
-                          "displayName": "Return Success",
-                          "valid": true,
-                          "skip": false,
-                          "settings": {
-                            "input": {
-                              "fields": {
-                                "body": {
-                                  "success": true,
-                                  "student_id": "{{step_2np[\"id\"]}}",
-                                  "package_id": "{{step_3np[\"id\"]}}",
-                                  "message": "Student enrolled successfully (no parent info provided)",
-                                  "batch_capacity": "{{step_1a_cap['rows'][0]['capacity']}}",
-                                  "batch_enrolled": "{{step_1b_count['rows_count']}}"
-                                },
-                                "status": 200,
-                                "headers": {}
-                              },
-                              "respond": "stop",
-                              "responseType": "json"
-                            },
-                            "pieceName": "@puchoaistudio/tool-webhook",
-                            "actionName": "return_response",
-                            "pieceVersion": "^2.0.4",
-                            "propertySettings": {
-                              "fields": {
-                                "type": "MANUAL",
-                                "schema": {
-                                  "body": {
-                                    "type": "JSON",
-                                    "required": true,
-                                    "displayName": "JSON Body"
-                                  },
-                                  "status": {
-                                    "type": "NUMBER",
-                                    "required": false,
-                                    "displayName": "Status",
-                                    "defaultValue": 200
-                                  },
-                                  "headers": {
-                                    "type": "OBJECT",
-                                    "required": false,
-                                    "displayName": "Headers"
-                                  }
-                                }
-                              },
-                              "respond": {
-                                "type": "MANUAL"
-                              },
-                              "responseType": {
-                                "type": "MANUAL"
-                              }
-                            },
-                            "sampleData": {},
-                            "errorHandlingOptions": {
-                              "retryOnFailure": {
-                                "value": false
-                              },
-                              "continueOnFailure": {
-                                "value": false
-                              }
-                            }
-                          }
-                        }
+                        "nextAction": null
                       }
                     }
                   },
